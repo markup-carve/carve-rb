@@ -1,0 +1,26 @@
+[package]
+name = "carve-rb"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+publish = false
+license = "MIT"
+description = "Native Ruby binding (magnus + rb-sys) for the Carve markup language, over the carve-rs engine."
+
+[lib]
+# Ruby loads the extension as a C shared object. cdylib produces that.
+name = "carve"
+crate-type = ["cdylib"]
+
+[dependencies]
+# High-level CRuby bindings. The `rb-sys` feature exposes the low-level rb-sys
+# interop handles so this builds cleanly under rb_sys/mkmf for Ruby 3.2.
+magnus = { version = "0.8", features = ["rb-sys"] }
+rb-sys = "0.9"
+
+# The Carve engine. Imported under the Rust crate alias `carve_rs` so the
+# binding's own crate name (`carve-rb`) does not collide with the engine's
+# package name (`carve`) in the Cargo lockfile. Local path build (this machine).
+# To PUBLISH the gem, swap this for the git form, e.g.:
+#   carve_rs = { package = "carve", git = "https://github.com/markup-carve/carve-rs" }
+carve_rs = { package = "carve", path = "/media/mark/data/work/git/carve-rs" }

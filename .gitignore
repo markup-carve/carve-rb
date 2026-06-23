@@ -1,0 +1,12 @@
+/tmp/
+/target/
+ext/carve/target/
+*.so
+*.bundle
+*.o
+*.log
+Makefile
+mkmf.log
+/lib/carve/carve.so
+/pkg/
+Gemfile.lock
