@@ -20,7 +20,11 @@ rb-sys = "0.9"
 
 # The Carve engine. Imported under the Rust crate alias `carve_rs` so the
 # binding's own crate name (`carve-rb`) does not collide with the engine's
-# package name (`carve`) in the Cargo lockfile. Local path build (this machine).
-# To PUBLISH the gem, swap this for the git form, e.g.:
+# package name (`carve`) in the Cargo lockfile.
+#
+# PINNED to the `proto/div-label-fallback` branch (carve-rs PR #143) for the
+# static render mode + `StaticRenderers` API (mode, with_renderers, the
+# mermaid/chart/graphviz/math renderer keys). RE-PIN to the default form once
+# #143 merges to main, e.g.:
 #   carve_rs = { package = "carve", git = "https://github.com/markup-carve/carve-rs" }
-carve_rs = { package = "carve", path = "/media/mark/data/work/git/carve-rs" }
+carve_rs = { package = "carve", git = "https://github.com/markup-carve/carve-rs", branch = "proto/div-label-fallback" }

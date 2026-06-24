@@ -47,9 +47,57 @@ Carve.to_html(src, extensions: %w[math-block list-table])
 
 `autolink`, `details`, `list_table`, `math_block`, `heading_permalinks`,
 `citations`, `tab_normalize`, `wikilinks`, `external_links`, `fenced_render`,
-`spoiler`, `table_of_contents` (see `Carve::EXTENSIONS`).
+`fenced_render_graphviz`, `fenced_render_chart`, `spoiler`,
+`table_of_contents` (see `Carve::EXTENSIONS`).
 
 An unknown extension name raises `ArgumentError`.
+
+## Static render mode + renderers
+
+By default `Carve.to_html` renders **interactive** HTML: client-script
+constructs (Mermaid/Graphviz/Chart diagrams, math) emit hydration elements
+(`<pre class="mermaid">`, ...) and disclosure stays collapsed (`<details>`).
+
+Pass `mode: :static` to emit **self-contained** HTML for print, PDF, or
+archival. Static mode forces disclosure (`<details open>`) and pre-renders
+client-script constructs through the `renderers:` callables you supply.
+
+```ruby
+Carve.to_html(<<~CRV, extensions: [:fenced_render], mode: :static,
+              renderers: { mermaid: ->(src) { "<svg>#{src}</svg>" } })
+  ```mermaid
+  graph TD; A-->B
+  ```
+CRV
+```
+
+### Renderer callable signatures
+
+The `renderers:` Hash is keyed by Symbol or String (see
+`Carve::RENDERER_KEYS`):
+
+| Key | Callable signature | Receives |
+| --- | ------------------ | -------- |
+| `:mermaid` | `(String) -> String` | the diagram source |
+| `:chart` | `(String) -> String` | the chart JSON source |
+| `:graphviz` | `(String) -> String` | the DOT / Graphviz source |
+| `:math` | `(String, display) -> String` | the TeX source and a `display` boolean (`true` for block / display math, `false` for inline) |
+
+Each callable returns a self-contained HTML string (an `<svg>` / `<img>` for a
+diagram, MathML / HTML for math) that the engine emits **verbatim** on the
+static path.
+
+### Source fallback (graceful degradation)
+
+When the renderer a construct needs is **absent**, or a supplied renderer
+**raises** or returns a **non-String**, the construct degrades to its source -
+never blank, and never raw HTML. The fallback source is **HTML-escaped**, so a
+construct body containing markup (e.g. `<img onerror=...>`) can never inject raw
+HTML. This is part of the cross-implementation graceful-degradation rollout
+(spec carve #205; siblings carve-js #242, carve-php #240, carve-rs #143,
+carve-py #1).
+
+An unknown `mode:` value or an unknown `renderers:` key raises `ArgumentError`.
 
 ## API
 
@@ -57,9 +105,13 @@ An unknown extension name raises `ArgumentError`.
 | ------ | ----------- |
 | `Carve.to_html(source)` | Render Carve source to HTML. |
 | `Carve.to_html(source, extensions: [...])` | Render with the named extensions enabled. |
+| `Carve.to_html(source, mode: :static, renderers: {...})` | Render self-contained static HTML with build-time renderers. |
 | `Carve.to_html_with_extensions(source, names_array)` | Native primitive (Array of Strings). |
+| `Carve.to_html_full(source, names_array, mode_string, renderers_hash)` | Native static-mode primitive. |
 | `Carve::VERSION` | Gem version. |
 | `Carve::EXTENSIONS` | Array of recognized extension symbols. |
+| `Carve::MODES` | Array of recognized render modes (`:interactive`, `:static`). |
+| `Carve::RENDERER_KEYS` | Array of recognized `renderers:` keys. |
 
 ## Develop
 
@@ -80,13 +132,20 @@ rake test      # runs the minitest suite
 >
 > (Adjust the GCC version directory to match your toolchain.)
 
-## Publishing note
+## carve-rs dependency pin
 
-For a published gem, the Rust crate dependency in `ext/carve/Cargo.toml` should
-point at the git (or crates.io) source rather than a local path:
+The static render mode + `StaticRenderers` API lives on the carve-rs
+`proto/div-label-fallback` branch (carve-rs PR #143), so
+`ext/carve/Cargo.toml` is pinned to it:
 
 ```toml
-carve = { git = "https://github.com/markup-carve/carve-rs" }
+carve_rs = { package = "carve", git = "https://github.com/markup-carve/carve-rs", branch = "proto/div-label-fallback" }
+```
+
+Re-pin to the default branch once carve-rs #143 merges to main:
+
+```toml
+carve_rs = { package = "carve", git = "https://github.com/markup-carve/carve-rs" }
 ```
 
 ## License
