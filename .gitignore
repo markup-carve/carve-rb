@@ -10,3 +10,5 @@ mkmf.log
 /lib/carve/carve.so
 /pkg/
 Gemfile.lock
+/vendor/
+/.bundle/
