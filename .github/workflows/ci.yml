@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guard against panic = "abort" (preserves FFI catch_unwind safety)
+        # magnus turns Rust panics into Ruby exceptions via catch_unwind, which
+        # only works under panic = "unwind". This step fails the build if any
+        # tracked Cargo.toml sets panic = "abort".
+        run: bash scripts/check-panic-unwind.sh
+
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: cargo check (ext crate)
+        run: cargo check --manifest-path ext/carve/Cargo.toml
