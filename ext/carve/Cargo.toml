@@ -12,14 +12,6 @@ description = "Native Ruby binding (magnus + rb-sys) for the Carve markup langua
 name = "carve"
 crate-type = ["cdylib"]
 
-# IMPORTANT: do NOT set `panic = "abort"` anywhere (no `[profile.release]`
-# panic setting here, and none inherited from a workspace). magnus wraps every
-# Rust call this extension exposes in catch_unwind to convert a Rust panic into
-# a Ruby exception; that conversion only works under `panic = "unwind"` (the
-# Cargo default). Setting `panic = "abort"` silently removes the safety net and
-# a panic would abort the host Ruby interpreter. The CI step
-# (scripts/check-panic-unwind.sh) enforces this.
-
 [dependencies]
 # High-level CRuby bindings. The `rb-sys` feature exposes the low-level rb-sys
 # interop handles so this builds cleanly under rb_sys/mkmf for Ruby 3.2.
@@ -29,8 +21,4 @@ rb-sys = "0.9"
 # The Carve engine. Imported under the Rust crate alias `carve_rs` so the
 # binding's own crate name (`carve-rb`) does not collide with the engine's
 # package name (`carve`) in the Cargo lockfile.
-#
-# Tracks carve-rs `main`, which now carries the static render mode +
-# `StaticRenderers` API (mode, with_renderers, the mermaid/chart/graphviz/math
-# renderer keys) following the merge of carve-rs PR #143.
-carve_rs = { package = "carve", git = "https://github.com/markup-carve/carve-rs", branch = "main" }
+carve_rs = { package = "carve", git = "https://github.com/markup-carve/carve-rs", rev = "09c64118223c1574d136c308cfe2a70df8ab5128" }
