@@ -20,6 +20,7 @@ module Carve
     math_block
     heading_permalinks
     citations
+    code_callouts
     tab_normalize
     wikilinks
     external_links

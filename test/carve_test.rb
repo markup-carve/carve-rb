@@ -76,6 +76,14 @@ class CarveTest < Minitest::Test
     assert_equal sym, str
   end
 
+  def test_extension_changes_output_code_callouts
+    src = "``` python\nresult = 1 + 1  <1>\n```\n\n<1> The sum.\n"
+    plain = Carve.to_html(src)
+    with_cc = Carve.to_html(src, extensions: [:code_callouts])
+    refute_equal plain, with_cc
+    assert_includes with_cc, 'class="callout"'
+  end
+
   def test_unknown_extension_raises_argument_error
     assert_raises(ArgumentError) do
       Carve.to_html("# x", extensions: [:no_such_extension])

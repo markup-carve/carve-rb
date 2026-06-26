@@ -15,8 +15,9 @@
 //! top of these primitives.
 
 use carve_rs::{
-    Autolink, CarveExtension, Citations, Details, ExternalLinks, FencedRender, HeadingPermalinks,
-    ListTable, MathBlock, Mode, Options, Spoiler, StaticRenderers, TabNormalize, TableOfContents,
+    Autolink, CarveExtension, Citations, CodeCallouts, Details, ExternalLinks, FencedRender,
+    HeadingPermalinks, ListTable, MathBlock, Mode, Options, Spoiler, StaticRenderers, TabNormalize,
+    TableOfContents,
     Wikilinks,
 };
 use magnus::value::{InnerValue, Opaque};
@@ -61,6 +62,7 @@ fn extension_for(name: &str) -> Option<Box<dyn CarveExtension>> {
         "math_block" | "mathblock" | "math" => Box::new(MathBlock::new()),
         "heading_permalinks" | "permalinks" => Box::new(HeadingPermalinks::new()),
         "citations" => Box::new(Citations::new()),
+        "code_callouts" | "codecallouts" => Box::new(CodeCallouts::new()),
         "tab_normalize" | "tabnormalize" => Box::new(TabNormalize::new()),
         "wikilinks" => Box::new(Wikilinks::new()),
         "external_links" | "externallinks" => Box::new(ExternalLinks::new()),
