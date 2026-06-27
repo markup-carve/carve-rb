@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    name: Build and publish to RubyGems
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Guard against panic = "abort"
+        run: bash scripts/check-panic-unwind.sh
+
+      - name: Compile native extension
+        run: bundle exec rake compile
+
+      - name: Build gem
+        run: gem build carve.gemspec
+
+      - name: Configure RubyGems credentials
+        run: |
+          mkdir -p ~/.gem
+          printf -- '---\n:rubygems_api_key: %s\n' "${{ secrets.RUBYGEMS_API_KEY }}" > ~/.gem/credentials
+          chmod 0600 ~/.gem/credentials
+
+      - name: Push gem to RubyGems
+        run: gem push carve-lang-*.gem
