@@ -3,7 +3,7 @@
 require_relative "lib/carve/version"
 
 Gem::Specification.new do |spec|
-  spec.name = "carve"
+  spec.name = "carve-lang"
   spec.version = Carve::VERSION
   spec.authors = ["markup-carve"]
   spec.summary = "Native Ruby bindings for the Carve markup language."
