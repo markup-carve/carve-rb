@@ -11,12 +11,21 @@ how Djot's `djotter` gem wraps the `jotdown` crate.
 
 ```ruby
 # Gemfile
-gem "carve"
+gem "carve-lang"
 ```
 
 ```sh
 bundle install
 ```
+
+Or install directly:
+
+```sh
+gem install carve-lang
+```
+
+Then `require "carve"` as normal - the gem distribution name is `carve-lang`
+but the require path stays `carve`.
 
 Building from source requires a **Rust toolchain** (`cargo`, Rust >= 1.75) and
 Ruby development headers. RubyGems compiles the native extension at install
