@@ -55,8 +55,8 @@ Carve.to_html(src, extensions: %w[math-block list-table])
 ### Recognized extensions
 
 `autolink`, `details`, `list_table`, `math_block`, `heading_permalinks`,
-`citations`, `tab_normalize`, `wikilinks`, `external_links`, `fenced_render`,
-`fenced_render_graphviz`, `fenced_render_chart`, `spoiler`,
+`citations`, `code_callouts`, `tab_normalize`, `wikilinks`, `external_links`,
+`fenced_render`, `fenced_render_graphviz`, `fenced_render_chart`, `spoiler`,
 `table_of_contents` (see `Carve::EXTENSIONS`).
 
 An unknown extension name raises `ArgumentError`.
@@ -143,19 +143,18 @@ rake test      # runs the minitest suite
 
 ## carve-rs dependency pin
 
-The static render mode + `StaticRenderers` API lives on the carve-rs
-`proto/div-label-fallback` branch (carve-rs PR #143), so
-`ext/carve/Cargo.toml` is pinned to it:
+`ext/carve/Cargo.toml` pins a specific carve-rs commit for reproducible gem
+builds:
 
 ```toml
-carve_rs = { package = "carve", git = "https://github.com/markup-carve/carve-rs", branch = "proto/div-label-fallback" }
+carve_rs = { package = "carve", git = "https://github.com/markup-carve/carve-rs", rev = "09c64118223c1574d136c308cfe2a70df8ab5128" }
 ```
 
-Re-pin to the default branch once carve-rs #143 merges to main:
-
-```toml
-carve_rs = { package = "carve", git = "https://github.com/markup-carve/carve-rs" }
-```
+The crate is imported under the alias `carve_rs`. Note: carve-rs has since
+renamed its published crate to `carve-lang` on `main`; this pin predates that
+rename, so `package = "carve"` is correct for this exact `rev`. When bumping to
+a newer carve-rs commit (past the rename), update both the `rev` and
+`package = "carve-lang"`.
 
 ## License
 
