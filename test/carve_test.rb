@@ -260,4 +260,33 @@ class CarveTest < Minitest::Test
   def test_byte_identical_table
     assert_byte_identical("| h1 | h2 |\n|----|----|\n| x | y |\n")
   end
+
+  # Extension-generated ids join the document id namespace (extensions
+  # contract 2.6): reference-list ids dedupe against explicit {#id}
+  # attributes and generated heading ids inside the engine. The binding
+  # exposes citations without a bibliography pool, so only ref-{key}
+  # entries are reachable here (cite-{key}-{n} anchors need a pool).
+  def test_citation_reference_ids_avoid_heading_ids
+    src = "# ref foo\n\nSee [@foo].\n\n[@foo]: Foo reference.\n"
+    html = Carve.to_html(src, extensions: [:citations])
+    assert_includes html, 'id="ref-foo"'          # the heading section keeps the slug
+    assert_includes html, 'id="ref-foo-2"'        # the reference entry is bumped
+    assert_includes html, 'href="#ref-foo-2"'     # and the citation link follows
+  end
+
+  def test_citation_reference_ids_avoid_explicit_ids
+    src = "{#ref-foo}\nReserved.\n\nSee [@foo].\n\n[@foo]: Foo reference.\n"
+    html = Carve.to_html(src, extensions: [:citations])
+    assert_includes html, 'id="ref-foo-2"'
+    assert_includes html, 'href="#ref-foo-2"'
+  end
+
+  def test_citation_reference_ids_stable_without_collision
+    src = "See [@foo].\n\n[@foo]: Foo reference.\n"
+    html = Carve.to_html(src, extensions: [:citations])
+    assert_includes html, 'id="ref-foo"'
+    assert_includes html, 'href="#ref-foo"'
+    refute_includes html, 'ref-foo-2'
+  end
+
 end

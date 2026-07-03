@@ -36,15 +36,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4388bee8683e3d04af747c73422af53102d2bd24d9eadb6cbc100baef4b43f8"
 
 [[package]]
-name = "carve"
+name = "carve-lang"
 version = "0.1.0"
-source = "git+https://github.com/markup-carve/carve-rs?rev=09c64118223c1574d136c308cfe2a70df8ab5128#09c64118223c1574d136c308cfe2a70df8ab5128"
+source = "git+https://github.com/markup-carve/carve-rs?rev=ce9c84e904e99548089aad8f4f73043a4c98e788#ce9c84e904e99548089aad8f4f73043a4c98e788"
 
 [[package]]
 name = "carve-rb"
 version = "0.1.0"
 dependencies = [
- "carve",
+ "carve-lang",
  "magnus",
  "rb-sys",
 ]
