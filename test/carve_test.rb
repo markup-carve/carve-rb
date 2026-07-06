@@ -289,4 +289,73 @@ class CarveTest < Minitest::Test
     refute_includes html, 'ref-foo-2'
   end
 
+  # ---- Carve.parse (AST export) --------------------------------------
+
+  def test_parse_returns_document_root
+    ast = Carve.parse("# Hi")
+    assert_equal "document", ast[:type]
+    assert_kind_of Array, ast[:children]
+    assert_equal({}, ast[:frontmatter])
+    assert_equal 4, ast[:source_len]
+  end
+
+  def test_parse_heading_with_inline_children
+    heading = Carve.parse("# Hello *world*")[:children].first
+    assert_equal "heading", heading[:type]
+    assert_equal 1, heading[:level]
+    kinds = heading[:children].map { |n| n[:type] }
+    assert_equal %w[text emphasis], kinds
+    strong = heading[:children].last
+    assert_equal "strong", strong[:kind]
+    assert_equal "world", strong[:children].first[:value]
+  end
+
+  def test_parse_emphasis_kinds
+    para = Carve.parse("*b* /i/")[:children].first
+    kinds = para[:children].select { |n| n[:type] == "emphasis" }.map { |n| n[:kind] }
+    assert_equal %w[strong italic], kinds
+  end
+
+  def test_parse_list_items
+    list = Carve.parse("- one\n- two\n")[:children].first
+    assert_equal "list", list[:type]
+    refute list[:ordered]
+    assert_equal 2, list[:items].size
+    assert_equal "list_item", list[:items].first[:type]
+  end
+
+  def test_parse_table_header_cells
+    table = Carve.parse("|= A |= B |\n| 1 | 2 |\n")[:children].first
+    assert_equal "table", table[:type]
+    assert_equal [true, true], table[:rows].first[:cells].map { |c| c[:header] }
+  end
+
+  def test_parse_code_block_fields
+    code = Carve.parse("```ruby\nputs 1\n```\n")[:children].first
+    assert_equal "code_block", code[:type]
+    assert_equal "ruby", code[:lang]
+    assert_includes code[:content], "puts 1"
+  end
+
+  def test_parse_link_node
+    para = Carve.parse("[text](https://x.io)")[:children].first
+    link = para[:children].find { |n| n[:type] == "link" }
+    assert_equal "https://x.io", link[:href]
+    assert_equal "text", link[:children].first[:value]
+  end
+
+  def test_parse_handles_deep_nesting_beyond_json_default
+    # Ruby JSON defaults max_nesting to 100; the engine allows deeper. A doc
+    # the engine renders must also parse without JSON::NestingError.
+    src = ("> " * 120) + "deep\n"
+    ast = Carve.parse(src)
+    assert_equal "document", ast[:type]
+  end
+
+  def test_parse_attrs_shape
+    node = Carve.parse("{#id .cls}\n# H")[:children].first
+    assert_equal "id", node[:attrs][:id]
+    assert_includes node[:attrs][:classes], "cls"
+  end
+
 end

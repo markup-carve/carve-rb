@@ -5,6 +5,7 @@
 # This file loads the compiled native extension (built from ext/carve, a Rust
 # crate wrapping the carve-rs engine via magnus) and layers a small,
 # idiomatic Ruby API on top of the raw primitives it exports.
+require "json"
 require_relative "carve/version"
 
 # Load the compiled native extension. Built by `rake compile` to
@@ -94,6 +95,26 @@ module Carve
         (mode || :interactive).to_s,
         renderers || {},
       )
+    end
+
+    # Parse Carve +source+ into an AST: a tree of Ruby Hashes and Arrays.
+    #
+    #   Carve.parse("# Hi")
+    #   # => {type: "document", frontmatter: {}, footnote_defs: {},
+    #   #     children: [{type: "heading", level: 1,
+    #   #                 children: [{type: "text", value: "Hi"}], attrs: nil}],
+    #   #     source_len: 4}
+    #
+    # Every node is a Hash with a +:type+ key plus its fields; child collections
+    # are Arrays; +:attrs+ is +nil+ or a Hash of +{id:, classes:, key_values:}+.
+    # Keys are symbols. This is the raw parse tree (default profile, no
+    # extensions), suitable for a custom renderer (e.g. Carve -> PDF).
+    def parse(source)
+      # max_nesting: false - the engine already bounds nesting (its own
+      # MAX_NESTING_DEPTH cap), and that cap exceeds Ruby JSON's default
+      # max_nesting of 100. Without this, deeply-nested-but-valid documents
+      # that Carve.to_html renders fine would raise JSON::NestingError here.
+      JSON.parse(_to_ast_json(source.to_s), symbolize_names: true, max_nesting: false)
     end
   end
 end
