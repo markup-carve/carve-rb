@@ -14,6 +14,9 @@
 //! `Carve.to_html(source, extensions: [...], mode: ..., renderers: {...})` on
 //! top of these primitives.
 
+mod ast_json;
+
+use ast_json::document_to_json;
 use carve_rs::{
     Autolink, CarveExtension, Citations, CodeCallouts, Details, ExternalLinks, FencedRender,
     HeadingPermalinks, ListTable, MathBlock, Mode, Options, Spoiler, StaticRenderers, TabNormalize,
@@ -190,6 +193,15 @@ fn to_html(source: String) -> String {
     carve_rs::to_html(&source)
 }
 
+/// Parse Carve source and return its AST as a JSON string.
+///
+/// The pure-Ruby wrapper (`Carve.parse`) turns this into a tree of Ruby
+/// Hashes/Arrays. Parsing uses the default profile (no extensions); the AST is
+/// the raw parse tree, so render-stage extension rewrites are not applied.
+fn to_ast_json(source: String) -> String {
+    document_to_json(&carve_rs::parse(&source))
+}
+
 /// Render Carve source to HTML with the named extensions enabled.
 ///
 /// `names` is a Ruby Array of Strings/Symbols. An unrecognized name raises a
@@ -266,6 +278,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     // these. `_to_html` is the no-extension fast path; the wrapper owns the
     // bare `to_html` name.
     module.define_singleton_method("_to_html", function!(to_html, 1))?;
+    module.define_singleton_method("_to_ast_json", function!(to_ast_json, 1))?;
     module.define_singleton_method(
         "to_html_with_extensions",
         function!(to_html_with_extensions, 2),

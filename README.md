@@ -61,6 +61,29 @@ Carve.to_html(src, extensions: %w[math-block list-table])
 
 An unknown extension name raises `ArgumentError`.
 
+## Parsing to an AST
+
+`Carve.parse` returns the parsed document as a tree of Ruby Hashes and Arrays,
+for consumers that want to walk or transform the document rather than render
+HTML - for example a custom PDF renderer (see
+[`carve-hexapdf`](https://github.com/markup-carve/carve-hexapdf)).
+
+```ruby
+Carve.parse("# Hello *world*")
+# => {type: "document", frontmatter: {}, footnote_defs: {},
+#     children: [{type: "heading", level: 1,
+#                 children: [{type: "text", value: "Hello "},
+#                            {type: "emphasis", kind: "strong",
+#                             children: [{type: "text", value: "world"}], attrs: nil}],
+#                 attrs: nil}],
+#     source_len: 15}
+```
+
+Every node is a Hash with a `:type` key plus its fields; child collections are
+Arrays; `:attrs` is `nil` or a Hash of `{id:, classes:, key_values:}`. Keys are
+symbols. This is the raw parse tree (default profile, no extensions), so
+render-stage extension rewrites are not applied.
+
 ## Static render mode + renderers
 
 By default `Carve.to_html` renders **interactive** HTML: client-script
@@ -113,6 +136,7 @@ An unknown `mode:` value or an unknown `renderers:` key raises `ArgumentError`.
 | Method | Description |
 | ------ | ----------- |
 | `Carve.to_html(source)` | Render Carve source to HTML. |
+| `Carve.parse(source)` | Parse Carve source into an AST (tree of Ruby Hashes/Arrays). |
 | `Carve.to_html(source, extensions: [...])` | Render with the named extensions enabled. |
 | `Carve.to_html(source, mode: :static, renderers: {...})` | Render self-contained static HTML with build-time renderers. |
 | `Carve.to_html_with_extensions(source, names_array)` | Native primitive (Array of Strings). |
