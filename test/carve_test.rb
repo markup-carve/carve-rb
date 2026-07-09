@@ -5,8 +5,9 @@ require "open3"
 require "carve"
 
 class CarveTest < Minitest::Test
-  # Absolute path to the carve-rs CLI binary, used for byte-identical checks.
-  CARVE_CLI = "/media/mark/data/work/git/carve-rs/target/release/carve"
+  # Path to the carve-rs CLI binary, used for byte-identical checks.
+  # Override with the CARVE_CLI env var; the test is skipped when absent.
+  CARVE_CLI = ENV.fetch("CARVE_CLI", "../carve-rs/target/release/carve")
 
   def test_version_defined
     assert_match(/\A\d+\.\d+\.\d+\z/, Carve::VERSION)
