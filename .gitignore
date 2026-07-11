@@ -12,3 +12,4 @@ mkmf.log
 Gemfile.lock
 /vendor/
 /.bundle/
+carve-lang-*.gem
