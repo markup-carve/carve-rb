@@ -16,13 +16,16 @@ Gem::Specification.new do |spec|
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.0.0"
 
+  # The reject keeps Cargo build artifacts (ext/carve/target/) out of the
+  # package; the glob would otherwise sweep generated .rs/.lock files in after
+  # any local or CI compile.
   spec.files = Dir[
     "lib/**/*.rb",
     "ext/**/*.{rs,rb,toml,lock}",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
-  ]
+  ].reject { |f| f.start_with?("ext/carve/target/") }
   spec.require_paths = ["lib"]
 
   # Tells RubyGems this gem ships a Rust native extension built via extconf.rb.
