@@ -345,6 +345,20 @@ class CarveTest < Minitest::Test
     assert_equal "text", link[:children].first[:value]
   end
 
+  def test_parse_autolink_exposes_display_text
+    para = Carve.parse("<mailto:a@b.example>")[:children].first
+    auto = para[:children].find { |n| n[:type] == "autolink" }
+    assert_equal "mailto:a@b.example", auto[:href]
+    assert_equal "mailto:a@b.example", auto[:text]
+  end
+
+  def test_parse_critic_nodes_expose_attrs
+    para = Carve.parse("a {+ins+}{.note} b")[:children].first
+    ins = para[:children].find { |n| n[:type] == "critic_insert" }
+    assert_equal "ins", ins[:children].first[:value]
+    assert ins.key?(:attrs)
+  end
+
   def test_parse_handles_deep_nesting_beyond_json_default
     # Ruby JSON defaults max_nesting to 100; the engine allows deeper. A doc
     # the engine renders must also parse without JSON::NestingError.

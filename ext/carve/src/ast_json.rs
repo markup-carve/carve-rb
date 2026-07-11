@@ -370,9 +370,10 @@ fn inline(n: &InlineNode) -> Value {
             ("type", "emoji".into()),
             ("name", Value::String(name.clone())),
         ]),
-        InlineNode::AutoLink(AutoLink { attrs: a, href }) => obj(vec![
+        InlineNode::AutoLink(AutoLink { attrs: a, href, text }) => obj(vec![
             ("type", "autolink".into()),
             ("href", Value::String(href.clone())),
+            ("text", Value::String(text.clone())),
             ("attrs", attrs(a)),
         ]),
         InlineNode::CrossRef(CrossRef { target }) => obj(vec![
@@ -413,13 +414,15 @@ fn inline(n: &InlineNode) -> Value {
         ]),
         InlineNode::SoftBreak => obj(vec![("type", "soft_break".into())]),
         InlineNode::HardBreak => obj(vec![("type", "hard_break".into())]),
-        InlineNode::CriticInsert(CriticInsert { children }) => obj(vec![
+        InlineNode::CriticInsert(CriticInsert { attrs: a, children }) => obj(vec![
             ("type", "critic_insert".into()),
             ("children", inlines(children)),
+            ("attrs", attrs(a)),
         ]),
-        InlineNode::CriticDelete(CriticDelete { children }) => obj(vec![
+        InlineNode::CriticDelete(CriticDelete { attrs: a, children }) => obj(vec![
             ("type", "critic_delete".into()),
             ("children", inlines(children)),
+            ("attrs", attrs(a)),
         ]),
         InlineNode::CriticSubstitute(CriticSubstitute { old_text, new_text }) => obj(vec![
             ("type", "critic_substitute".into()),

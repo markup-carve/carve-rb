@@ -20,6 +20,7 @@ Gem::Specification.new do |spec|
     "lib/**/*.rb",
     "ext/**/*.{rs,rb,toml,lock}",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ]
   spec.require_paths = ["lib"]
