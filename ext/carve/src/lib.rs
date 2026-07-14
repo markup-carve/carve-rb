@@ -9,10 +9,12 @@
 //! * `Carve.to_html_full(source, extensions, mode, renderers)` -> HTML String,
 //!   the static-render-mode primitive: `mode` is `"interactive"` (default) or
 //!   `"static"`; `renderers` is a Hash of build-time renderer callables.
+//! * `Carve.to_html_full_with_symbols(source, extensions, mode, renderers,
+//!   symbols)` -> HTML String, the same primitive plus the `:name:` symbol map.
 //!
 //! The pure-Ruby wrapper in `lib/carve.rb` adds the keyword-argument form
-//! `Carve.to_html(source, extensions: [...], mode: ..., renderers: {...})` on
-//! top of these primitives.
+//! `Carve.to_html(source, extensions: [...], mode: ..., renderers: {...},
+//! symbols: {...})` on top of these primitives.
 
 mod ast_json;
 
@@ -237,14 +239,28 @@ fn boxed_extensions(ruby: &Ruby, names: RArray) -> Result<Vec<Box<dyn CarveExten
     Ok(boxed)
 }
 
+/// Lower a Ruby symbols Hash into owned `(name, value)` pairs.
+///
+/// Keys may be Strings or Symbols; values MUST be Strings (a non-String value
+/// raises Ruby's `TypeError` from the conversion, so a mistyped map fails fast
+/// instead of silently dropping entries).
+fn build_symbols(hash: RHash) -> Result<Vec<(String, String)>, Error> {
+    let mut pairs: Vec<(String, String)> = Vec::new();
+    hash.foreach(|key: Value, value: Value| {
+        // Accept String or Symbol keys.
+        let name: String = key.to_r_string()?.to_string()?;
+        // Values must be real Strings - TryConvert raises TypeError otherwise.
+        let value: String = magnus::TryConvert::try_convert(value)?;
+        pairs.push((name, value));
+        Ok(magnus::r_hash::ForEach::Continue)
+    })?;
+    Ok(pairs)
+}
+
 /// Full static-render-mode primitive: extensions + mode + renderers.
 ///
-/// * `names` - Ruby Array of extension name Strings/Symbols (may be empty).
-/// * `mode` - `"interactive"` (default) or `"static"`; unknown raises
-///   `ArgumentError`.
-/// * `renderers` - Ruby Hash of build-time renderer callables (keys
-///   `mermaid` / `chart` / `graphviz` -> `(String) -> String`, `math` ->
-///   `(String, bool) -> String`), consulted only on the static HTML path.
+/// Kept at its original arity for direct callers; delegates to
+/// [`to_html_full_with_symbols`] with an empty symbol map.
 fn to_html_full(
     ruby: &Ruby,
     source: String,
@@ -252,15 +268,47 @@ fn to_html_full(
     mode: String,
     renderers: RHash,
 ) -> Result<String, Error> {
+    to_html_full_with_symbols(ruby, source, names, mode, renderers, ruby.hash_new())
+}
+
+/// Full primitive: extensions + mode + renderers + symbol map.
+///
+/// * `names` - Ruby Array of extension name Strings/Symbols (may be empty).
+/// * `mode` - `"interactive"` (default) or `"static"`; unknown raises
+///   `ArgumentError`.
+/// * `renderers` - Ruby Hash of build-time renderer callables (keys
+///   `mermaid` / `chart` / `graphviz` -> `(String) -> String`, `math` ->
+///   `(String, bool) -> String`), consulted only on the static HTML path.
+/// * `symbols` - Ruby Hash mapping a `:name:` symbol's name to its value
+///   (String/Symbol keys, String values; may be empty). A mapped name renders
+///   its value; an unmapped `:name:` stays literal `:name:` text.
+///
+/// SECURITY: a mapped symbol value is inserted as TRUSTED RAW output in the
+/// target format - it is NOT escaped, the same trust class as the `renderers`
+/// map. `{"b" => "<b>x</b>"}` emits a real `<b>` element. This is deliberate:
+/// processor configuration is trusted. NEVER build a symbols map out of
+/// untrusted / user-supplied input.
+fn to_html_full_with_symbols(
+    ruby: &Ruby,
+    source: String,
+    names: RArray,
+    mode: String,
+    renderers: RHash,
+    symbols: RHash,
+) -> Result<String, Error> {
     let parsed_mode = parse_mode(ruby, &mode)?;
     let static_renderers = build_renderers(ruby, renderers)?;
     let boxed = boxed_extensions(ruby, names)?;
+    let symbol_pairs = build_symbols(symbols)?;
 
     let mut options = Options::new()
         .with_mode(parsed_mode)
         .with_renderers(static_renderers);
     for ext in &boxed {
         options = options.with_extension(ext.as_ref());
+    }
+    for (name, value) in &symbol_pairs {
+        options = options.with_symbol(name.clone(), value.clone());
     }
     Ok(carve_rs::to_html_with_options(&source, &options))
 }
@@ -284,5 +332,9 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
         function!(to_html_with_extensions, 2),
     )?;
     module.define_singleton_method("to_html_full", function!(to_html_full, 4))?;
+    module.define_singleton_method(
+        "to_html_full_with_symbols",
+        function!(to_html_full_with_symbols, 5),
+    )?;
     Ok(())
 }

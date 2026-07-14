@@ -81,19 +81,39 @@ module Carve
     #
     # An unknown mode or renderer key raises ArgumentError (from the native
     # layer).
-    def to_html(source, extensions: nil, mode: nil, renderers: nil)
+    #
+    # ==== Symbols
+    #
+    # A +:name:+ symbol renders its literal +:name:+ source unless the name is
+    # in the +symbols:+ Hash (String or Symbol keys, String values):
+    #
+    #   Carve.to_html("Ship it :rocket: :shrug:", symbols: { "rocket" => "🚀" })
+    #   # => "<p>Ship it 🚀 :shrug:</p>"   (an unmapped name stays literal)
+    #
+    # The leading word-boundary guard is unaffected by an active map: +a:b:c+,
+    # +10:30:+ and +me@example.com+ never become symbols. A non-String value
+    # raises TypeError (from the native layer).
+    #
+    # SECURITY: a mapped symbol value is inserted as TRUSTED RAW output in the
+    # target format - it is NOT escaped, the same trust class as a +renderers:+
+    # callable. <tt>{ "b" => "<b>x</b>" }</tt> emits a real +<b>+ element, not
+    # escaped text. This is deliberate: processor configuration is trusted.
+    # NEVER build a symbols map out of untrusted / user-supplied input.
+    def to_html(source, extensions: nil, mode: nil, renderers: nil, symbols: nil)
       list = Array(extensions)
 
-      # Fast path: interactive (default), no extensions, no renderers.
-      if list.empty? && (mode.nil? || mode.to_s == "interactive") && (renderers.nil? || renderers.empty?)
+      # Fast path: interactive (default), no extensions, no renderers, no symbols.
+      if list.empty? && (mode.nil? || mode.to_s == "interactive") &&
+         (renderers.nil? || renderers.empty?) && (symbols.nil? || symbols.empty?)
         return _to_html(source.to_s)
       end
 
-      to_html_full(
+      to_html_full_with_symbols(
         source.to_s,
         list.map(&:to_s),
         (mode || :interactive).to_s,
         renderers || {},
+        symbols || {},
       )
     end
 

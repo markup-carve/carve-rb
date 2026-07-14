@@ -131,6 +131,27 @@ carve-py #1).
 
 An unknown `mode:` value or an unknown `renderers:` key raises `ArgumentError`.
 
+## Symbols
+
+A `:name:` symbol renders its literal `:name:` source unless the name is in the
+**symbols map** passed as `symbols:` (String or Symbol keys, String values):
+
+```ruby
+Carve.to_html("Ship it :rocket: :shrug:", symbols: { "rocket" => "🚀" })
+# => "<p>Ship it 🚀 :shrug:</p>"   (an unmapped name stays literal)
+```
+
+The leading word-boundary guard is unaffected by an active map: `a:b:c`,
+`10:30:` and `me@example.com` never become symbols. A non-String value raises
+`TypeError`.
+
+> **Security: symbol values are TRUSTED RAW output.**
+> A mapped value is inserted into the output **unescaped** - the same trust
+> class as a `renderers:` callable. `{ "b" => "<b>x</b>" }` emits a real `<b>`
+> element, not escaped text. This is deliberate (processor configuration is
+> trusted). **Never build a symbols map out of untrusted / user-supplied
+> input.**
+
 ## API
 
 | Method | Description |
@@ -139,8 +160,10 @@ An unknown `mode:` value or an unknown `renderers:` key raises `ArgumentError`.
 | `Carve.parse(source)` | Parse Carve source into an AST (tree of Ruby Hashes/Arrays). |
 | `Carve.to_html(source, extensions: [...])` | Render with the named extensions enabled. |
 | `Carve.to_html(source, mode: :static, renderers: {...})` | Render self-contained static HTML with build-time renderers. |
+| `Carve.to_html(source, symbols: {...})` | Render with a `:name:` -> value symbol map (values are raw, see above). |
 | `Carve.to_html_with_extensions(source, names_array)` | Native primitive (Array of Strings). |
 | `Carve.to_html_full(source, names_array, mode_string, renderers_hash)` | Native static-mode primitive. |
+| `Carve.to_html_full_with_symbols(source, names_array, mode_string, renderers_hash, symbols_hash)` | Native primitive, static mode + symbol map. |
 | `Carve::VERSION` | Gem version. |
 | `Carve::EXTENSIONS` | Array of recognized extension symbols. |
 | `Carve::MODES` | Array of recognized render modes (`:interactive`, `:static`). |
