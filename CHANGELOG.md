@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Bump the carve-rs engine to `6887f97`, picking up two language changes:
+  superscript/subscript are now braced-only (bare `^x^` / `,x,` are literal
+  text; the markup is `{^x^}` / `{,x,}`), and the `:name:` symbol inline was
+  added (with a leading word-boundary guard, so `a:b:c`, `10:30:` and
+  `me@example.com` stay literal).
+- **Breaking (`Carve.parse`):** the inline node formerly emitted as
+  `type: "emoji"` is now `type: "symbol"` and carries an `attrs` key, matching
+  the engine's rename and the other implementations.
+- **Breaking (`Carve.parse`):** a block extension's `summary` is now a list of
+  inline nodes rather than a plain string, matching the admonition `title`
+  shape (admonition titles are inline content).
+
 ## [0.1.0] - 2026-07-12
 
 ### Added
