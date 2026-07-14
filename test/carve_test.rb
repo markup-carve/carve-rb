@@ -417,4 +417,55 @@ class CarveTest < Minitest::Test
     assert_equal "emphasis", node[:title].last[:type]
   end
 
+
+  # --- symbols map -----------------------------------------------------------
+
+  def test_symbols_map_renders_mapped_value
+    out = Carve.to_html("Ship it :rocket:", symbols: { "rocket" => "\u{1F680}" })
+    assert_includes out, "Ship it \u{1F680}"
+    refute_includes out, ":rocket:"
+  end
+
+  def test_symbols_map_accepts_symbol_keys_and_composes_with_extensions
+    out = Carve.to_html("Ship it :rocket:", extensions: [:autolink], symbols: { rocket: "\u{1F680}" })
+    assert_includes out, "\u{1F680}"
+  end
+
+  def test_symbols_map_plus_one_is_a_valid_name
+    assert_includes Carve.to_html("nice :+1:", symbols: { "+1" => "\u{1F44D}" }), "nice \u{1F44D}"
+  end
+
+  def test_unmapped_symbol_stays_literal_with_a_map_active
+    out = Carve.to_html(":rocket: and :shrug:", symbols: { "rocket" => "\u{1F680}" })
+    assert_includes out, "\u{1F680}"
+    assert_includes out, ":shrug:"
+  end
+
+  def test_symbols_map_does_not_defeat_the_word_boundary_guard
+    # Each of these names WOULD map if the leading word-boundary guard were lost.
+    out = Carve.to_html(
+      "a:b:c and 10:30: and me@example.com",
+      symbols: { "b" => "MAPPED-B", "30" => "MAPPED-30", "example" => "MAPPED-EX" },
+    )
+    assert_includes out, "a:b:c"
+    assert_includes out, "10:30:"
+    assert_includes out, "me@example.com"
+    refute_includes out, "MAPPED-"
+  end
+
+  def test_symbol_value_is_trusted_raw_output_not_escaped
+    # Documented contract: a symbol value is inserted RAW into the target format
+    # (same trust class as the renderers map), so markup comes through as markup.
+    # Never build a symbols map from untrusted input.
+    out = Carve.to_html(":bold:", symbols: { "bold" => "<b>x</b>" })
+    assert_includes out, "<b>x</b>"
+    refute_includes out, "&lt;b&gt;"
+  end
+
+  def test_symbols_map_rejects_a_non_string_value
+    assert_raises(TypeError) do
+      Carve.to_html(":n:", symbols: { "n" => 1 })
+    end
+  end
+
 end
