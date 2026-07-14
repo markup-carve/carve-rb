@@ -373,4 +373,48 @@ class CarveTest < Minitest::Test
     assert_includes node[:attrs][:classes], "cls"
   end
 
+  # --- Engine language surface --------------------------------------------
+  #
+  # These exercise the carve-rs engine through the binding's public API, so a
+  # stale engine pin in ext/carve/Cargo.lock surfaces as a test failure rather
+  # than as a silently outdated language.
+
+  def test_superscript_and_subscript_are_braced_only
+    # Bare `^x^` / `,x,` are literal text; only the braced forms mark up.
+    literal = Carve.to_html("a ^2^ b and H,2,O")
+    refute_includes literal, "<sup>"
+    refute_includes literal, "<sub>"
+
+    marked = Carve.to_html("x{^2^} and H{,2,}O")
+    assert_includes marked, "<sup>2</sup>"
+    assert_includes marked, "<sub>2</sub>"
+  end
+
+  def test_symbol_inline_renders_and_takes_attrs
+    # An unmapped symbol renders its `:name:` source, but it is a real Symbol
+    # node - attaching attributes proves it parsed as one rather than as text.
+    assert_includes Carve.to_html(":smile:{.emoji}"), '<span class="emoji">:smile:</span>'
+  end
+
+  def test_symbol_word_boundary_guard
+    # A `:` preceded by a word character does not open a symbol.
+    out = Carve.to_html("a:b:c and 10:30: and me@example.com")
+    refute_includes out, "<span"
+    assert_includes out, "a:b:c"
+  end
+
+  def test_parse_symbol_node
+    node = Carve.parse(":+1:")[:children].first[:children].first
+    assert_equal "symbol", node[:type]
+    assert_equal "+1", node[:name]
+  end
+
+  def test_parse_admonition_title_is_inline_content
+    # The admonition title is a list of inline nodes, not a plain string.
+    node = Carve.parse(%Q{::: note "Heads *up*"\nBody.\n:::\n})[:children].first
+    assert_equal "admonition", node[:type]
+    assert_equal "text", node[:title].first[:type]
+    assert_equal "emphasis", node[:title].last[:type]
+  end
+
 end

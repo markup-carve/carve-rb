@@ -16,9 +16,9 @@ use carve_rs::{
     Abbreviation, AbbreviationDef, Admonition, Attrs, AutoLink, BlockExtension, BlockNode,
     BlockQuote, CaptionNumber, Citation, CitationGroup, CitationRenderMode, CodeBlock, Comment,
     CriticComment, CriticDelete, CriticInsert, CriticSubstitute, CrossRef, DefinitionList, Div,
-    Document, Emoji, Emphasis, EmphasisKind, Figure, FigureTarget, Footnote, Heading, Image,
+    Document, Emphasis, EmphasisKind, Figure, FigureTarget, Footnote, Heading, Image,
     InlineExtension, InlineNode, Link, List, ListItem, Math, Mention, OrderedListType, Paragraph,
-    RawBlock, RawInline, Span, Table, TableAlign, TableCell, TableCellSpan, TableRow, Tag,
+    RawBlock, RawInline, Span, Symbol, Table, TableAlign, TableCell, TableCellSpan, TableRow, Tag,
     ThematicBreak,
 };
 use serde_json::{Map, Value};
@@ -201,7 +201,7 @@ fn block(b: &BlockNode) -> Value {
                 ("type", "block_extension".into()),
                 ("name", Value::String(name.clone())),
                 ("children", blocks(children)),
-                ("summary", opt_str(summary)),
+                ("summary", opt_inlines(summary)),
                 ("label", opt_str(label)),
                 ("attrs", attrs(a)),
             ])
@@ -366,9 +366,10 @@ fn inline(n: &InlineNode) -> Value {
             ("format", Value::String(format.clone())),
             ("content", Value::String(content.clone())),
         ]),
-        InlineNode::Emoji(Emoji { name }) => obj(vec![
-            ("type", "emoji".into()),
+        InlineNode::Symbol(Symbol { name, attrs: a }) => obj(vec![
+            ("type", "symbol".into()),
             ("name", Value::String(name.clone())),
+            ("attrs", attrs(a)),
         ]),
         InlineNode::AutoLink(AutoLink { attrs: a, href, text }) => obj(vec![
             ("type", "autolink".into()),
