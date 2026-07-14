@@ -27,3 +27,17 @@ jobs:
 
       - name: cargo check (ext crate)
         run: cargo check --manifest-path ext/carve/Cargo.toml
+
+      # `cargo check` only proves the extension COMPILES. The Ruby suite is the
+      # only thing that exercises the gem's actual behavior through its public
+      # API -- without it the engine can drift underneath us in silence, which
+      # is exactly what happened: the carve-rs pin sat months behind and had
+      # even fallen behind two breaking AST changes, while CI stayed green.
+      - name: Install libclang (rb-sys bindgen)
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+
+      - name: Compile the extension and run the test suite
+        run: |
+          bundle install
+          bundle exec rake compile
+          bundle exec rake test
