@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bump the carve-rs engine to `ef78fd5`, picking up two new AST node types.
+
+- **Breaking (`Carve.parse`):** a backslash escape is now its own inline node,
+  `{"type":"escaped_text","value":"-"}`, instead of being folded into the
+  surrounding text. The backslash carries intent the character does not - an
+  author writes `\-\-` precisely so a consumer will not render an en dash -
+  and a walker that reads only `text` nodes now sees the run split at each
+  escape (carve#350).
+
+- **Breaking (`Carve.parse`):** a `::: |` fence is now `{"type":"line_block"}`
+  instead of a `div` carrying a `.line-block` class. Inside the fence every
+  newline is a hard break, which a plain div with that class does not imply, so
+  the class alone could not say which one a node was (carve#359).
+
+  Both are additive for a consumer with a default branch and a compile error
+  for one without - the binding's own walker matches exhaustively, which is why
+  this bump and these arms have to land together.
+
 - Bump the carve-rs engine to `6887f97`, picking up two language changes:
   superscript/subscript are now braced-only (bare `^x^` / `,x,` are literal
   text; the markup is `{^x^}` / `{,x,}`), and the `:name:` symbol inline was

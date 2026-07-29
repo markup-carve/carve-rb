@@ -17,7 +17,8 @@ use carve_rs::{
     BlockQuote, CaptionNumber, Citation, CitationGroup, CitationRenderMode, CodeBlock, Comment,
     CriticComment, CriticDelete, CriticInsert, CriticSubstitute, CrossRef, DefinitionList, Div,
     Document, Emphasis, EmphasisKind, Figure, FigureTarget, Footnote, Heading, Image,
-    InlineExtension, InlineNode, Link, List, ListItem, Math, Mention, OrderedListType,
+    InlineExtension, InlineNode, LineBlock, Link, List, ListItem, Math, Mention,
+    OrderedListType,
     Paragraph,
     LiteralInline, RawBlock, RawInline, SmartPunctuation, Span, Symbol, Table, TableAlign,
     TableCell,
@@ -162,6 +163,15 @@ fn block(b: &BlockNode) -> Value {
         BlockNode::Div(Div { attrs: a, label, children }) => obj(vec![
             ("type", "div".into()),
             ("label", opt_str(label)),
+            ("children", blocks(children)),
+            ("attrs", attrs(a)),
+        ]),
+        // A `::: |` fence, where every newline is a hard break. Its own type
+        // rather than a div carrying a `.line-block` class: a plain div with
+        // that class keeps soft breaks, so the class alone cannot say which one
+        // this is (carve#359).
+        BlockNode::LineBlock(LineBlock { attrs: a, children }) => obj(vec![
+            ("type", "line_block".into()),
             ("children", blocks(children)),
             ("attrs", attrs(a)),
         ]),
@@ -355,6 +365,14 @@ fn inline(n: &InlineNode) -> Value {
     match n {
         InlineNode::Text(s) => obj(vec![
             ("type", "text".into()),
+            ("value", Value::String(s.clone())),
+        ]),
+        // A character the author escaped. Its own type rather than plain text:
+        // the backslash carries intent the character does not, which is what
+        // lets a consumer reproduce `\-\-` instead of emitting an en dash
+        // (carve#350). The value is the character, without the backslash.
+        InlineNode::EscapedText(s) => obj(vec![
+            ("type", "escaped_text".into()),
             ("value", Value::String(s.clone())),
         ]),
         InlineNode::Emphasis(Emphasis { attrs: a, kind, children }) => obj(vec![
