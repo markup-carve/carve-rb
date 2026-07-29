@@ -18,7 +18,8 @@ use carve_rs::{
     CriticComment, CriticDelete, CriticInsert, CriticSubstitute, CrossRef, DefinitionList, Div,
     Document, Emphasis, EmphasisKind, Figure, FigureTarget, Footnote, Heading, Image,
     InlineExtension, InlineNode, Link, List, ListItem, Math, Mention, OrderedListType, Paragraph,
-    RawBlock, RawInline, Span, Symbol, Table, TableAlign, TableCell, TableCellSpan, TableRow, Tag,
+    RawBlock, RawInline, SmartPunctuation, Span, Symbol, Table, TableAlign, TableCell,
+    TableCellSpan, TableRow, Tag,
     ThematicBreak,
 };
 use serde_json::{Map, Value};
@@ -370,6 +371,19 @@ fn inline(n: &InlineNode) -> Value {
             ("type", "symbol".into()),
             ("name", Value::String(name.clone())),
             ("attrs", attrs(a)),
+        ]),
+        // A typographic substitution carries BOTH halves: the resolved kind and
+        // the author's source run (spec PART 9 section 8). A consumer that only
+        // wants to display the document reads the glyph - present on quotes,
+        // whose character is locale-dependent and fixed during parsing - or
+        // resolves `kind` through the spec's table. One rebuilding source reads
+        // `value`. Dropping either half would make this binding's JSON lossier
+        // than the tree it serializes.
+        InlineNode::SmartPunctuation(SmartPunctuation { kind, value, glyph }) => obj(vec![
+            ("type", "smart_punctuation".into()),
+            ("kind", Value::String(kind.clone())),
+            ("value", Value::String(value.clone())),
+            ("glyph", opt_str(glyph)),
         ]),
         InlineNode::AutoLink(AutoLink { attrs: a, href, text }) => obj(vec![
             ("type", "autolink".into()),

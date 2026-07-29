@@ -317,6 +317,31 @@ class CarveTest < Minitest::Test
     assert_equal %w[strong italic], kinds
   end
 
+  # A typographic substitution is its own node carrying BOTH halves: the
+  # resolved kind and the author's source run (spec PART 9 section 8). A
+  # consumer that displays the document reads the glyph or resolves the kind; a
+  # consumer rebuilding source reads the value. Serializing only one half would
+  # make this binding's JSON lossier than the tree behind it.
+  def test_parse_smart_punctuation_carries_kind_and_source
+    para = Carve.parse(%(He said "hi" and it's fine... a--b))[:children].first
+    smart = para[:children].select { |n| n[:type] == "smart_punctuation" }
+
+    kinds = smart.map { |n| n[:kind] }
+    assert_includes kinds, "left_double_quote"
+    assert_includes kinds, "ellipsis"
+    assert_includes kinds, "en_dash"
+
+    # The author's spelling survives.
+    assert_equal "...", smart.find { |n| n[:kind] == "ellipsis" }[:value]
+    assert_equal "--", smart.find { |n| n[:kind] == "en_dash" }[:value]
+
+    # A quote carries its resolved glyph, because the character is
+    # locale-dependent and is chosen during parsing; other kinds resolve
+    # through the spec's table and carry no glyph of their own.
+    assert_equal "\u201C", smart.find { |n| n[:kind] == "left_double_quote" }[:glyph]
+    assert_nil smart.find { |n| n[:kind] == "ellipsis" }[:glyph]
+  end
+
   def test_parse_list_items
     list = Carve.parse("- one\n- two\n")[:children].first
     assert_equal "list", list[:type]
