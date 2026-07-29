@@ -186,9 +186,31 @@ class CarveTest < Minitest::Test
     end
   end
 
-  def test_unknown_renderer_key_raises_argument_error
+  # The engine keys diagram renderers by fence css class and accepts ANY key,
+  # including a custom fence word's class. This binding therefore forwards the
+  # key instead of allowlisting it - an allowlist could not express a custom
+  # fence at all, and had to be edited whenever the engine learned a new
+  # diagram type.
+  #
+  # The cost is that a typo no longer raises: "mermiad" now registers a
+  # renderer that never fires, where it used to be an ArgumentError. That is
+  # the price of matching the engine's contract rather than imposing a stricter
+  # one on top of it.
+  def test_arbitrary_renderer_key_registers_a_diagram_renderer
+    html = Carve.to_html("```mermaid\ngraph TD;\n```\n",
+                         extensions: [:fenced_render], mode: :static,
+                         renderers: { "mermaid" => ->(_src) { "<svg id=\"m\"></svg>" } })
+    assert_includes html, "<svg id=\"m\"></svg>"
+
+    # An unrecognized key is accepted rather than rejected: it simply never
+    # matches a fence.
+    assert_kind_of String, Carve.to_html("# x", mode: :static,
+                                         renderers: { "no_such" => ->(s) { s } })
+  end
+
+  def test_empty_renderer_key_raises_argument_error
     assert_raises(ArgumentError) do
-      Carve.to_html("# x", mode: :static, renderers: { "no_such" => ->(s) { s } })
+      Carve.to_html("# x", mode: :static, renderers: { "" => ->(s) { s } })
     end
   end
 
@@ -315,6 +337,31 @@ class CarveTest < Minitest::Test
     para = Carve.parse("*b* /i/")[:children].first
     kinds = para[:children].select { |n| n[:type] == "emphasis" }.map { |n| n[:kind] }
     assert_equal %w[strong italic], kinds
+  end
+
+  # A typographic substitution is its own node carrying BOTH halves: the
+  # resolved kind and the author's source run (spec PART 9 section 8). A
+  # consumer that displays the document reads the glyph or resolves the kind; a
+  # consumer rebuilding source reads the value. Serializing only one half would
+  # make this binding's JSON lossier than the tree behind it.
+  def test_parse_smart_punctuation_carries_kind_and_source
+    para = Carve.parse(%(He said "hi" and it's fine... a--b))[:children].first
+    smart = para[:children].select { |n| n[:type] == "smart_punctuation" }
+
+    kinds = smart.map { |n| n[:kind] }
+    assert_includes kinds, "left_double_quote"
+    assert_includes kinds, "ellipsis"
+    assert_includes kinds, "en_dash"
+
+    # The author's spelling survives.
+    assert_equal "...", smart.find { |n| n[:kind] == "ellipsis" }[:value]
+    assert_equal "--", smart.find { |n| n[:kind] == "en_dash" }[:value]
+
+    # A quote carries its resolved glyph, because the character is
+    # locale-dependent and is chosen during parsing; other kinds resolve
+    # through the spec's table and carry no glyph of their own.
+    assert_equal "\u201C", smart.find { |n| n[:kind] == "left_double_quote" }[:glyph]
+    assert_nil smart.find { |n| n[:kind] == "ellipsis" }[:glyph]
   end
 
   def test_parse_list_items

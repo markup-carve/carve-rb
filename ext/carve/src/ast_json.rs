@@ -17,8 +17,11 @@ use carve_rs::{
     BlockQuote, CaptionNumber, Citation, CitationGroup, CitationRenderMode, CodeBlock, Comment,
     CriticComment, CriticDelete, CriticInsert, CriticSubstitute, CrossRef, DefinitionList, Div,
     Document, Emphasis, EmphasisKind, Figure, FigureTarget, Footnote, Heading, Image,
-    InlineExtension, InlineNode, Link, List, ListItem, Math, Mention, OrderedListType, Paragraph,
-    RawBlock, RawInline, Span, Symbol, Table, TableAlign, TableCell, TableCellSpan, TableRow, Tag,
+    InlineExtension, InlineNode, Link, List, ListItem, Math, Mention, OrderedListType,
+    Paragraph,
+    LiteralInline, RawBlock, RawInline, SmartPunctuation, Span, Symbol, Table, TableAlign,
+    TableCell,
+    TableCellSpan, TableRow, Tag,
     ThematicBreak,
 };
 use serde_json::{Map, Value};
@@ -115,13 +118,26 @@ fn block(b: &BlockNode) -> Value {
             ("children", inlines(children)),
             ("attrs", attrs(a)),
         ]),
-        BlockNode::Paragraph(Paragraph { attrs: a, children }) => obj(vec![
+        BlockNode::Paragraph(Paragraph {
+            attrs: a,
+            children,
+            at_content_column: _,
+        }) => obj(vec![
             ("type", "paragraph".into()),
             ("children", inlines(children)),
             ("attrs", attrs(a)),
         ]),
         BlockNode::CodeBlock(c) => code_block(c),
-        BlockNode::List(List { attrs: a, ordered, start, ol_type, tight, items }) => obj(vec![
+        BlockNode::List(List {
+            attrs: a,
+            ordered,
+            start,
+            ol_type,
+            tight,
+            items,
+            delim: _,
+            bullet_char: _,
+        }) => obj(vec![
             ("type", "list".into()),
             ("ordered", Value::Bool(*ordered)),
             ("start", opt_usize(start)),
@@ -312,7 +328,11 @@ fn figure_target(t: &FigureTarget) -> Value {
         FigureTarget::BlockQuote(q) => block_quote(q),
         FigureTarget::Table(tb) => table(tb),
         FigureTarget::CodeBlock(c) => code_block(c),
-        FigureTarget::Paragraph(Paragraph { attrs: a, children }) => obj(vec![
+        FigureTarget::Paragraph(Paragraph {
+            attrs: a,
+            children,
+            at_content_column: _,
+        }) => obj(vec![
             ("type", "paragraph".into()),
             ("children", inlines(children)),
             ("attrs", attrs(a)),
@@ -343,6 +363,15 @@ fn inline(n: &InlineNode) -> Value {
             ("children", inlines(children)),
             ("attrs", attrs(a)),
         ]),
+        // The inline literal (spec PART 9 section 27) is a verbatim span with
+        // the code wrapper dropped. It serializes as its own type rather than
+        // as code, because a consumer rebuilding source has to know which of
+        // the two the author wrote.
+        InlineNode::LiteralInline(l) => obj(vec![
+            ("type", "literal_inline".into()),
+            ("content", Value::String(l.content.clone())),
+            ("attrs", attrs(&l.attrs)),
+        ]),
         InlineNode::Code(s, a) => obj(vec![
             ("type", "code".into()),
             ("value", Value::String(s.clone())),
@@ -370,6 +399,19 @@ fn inline(n: &InlineNode) -> Value {
             ("type", "symbol".into()),
             ("name", Value::String(name.clone())),
             ("attrs", attrs(a)),
+        ]),
+        // A typographic substitution carries BOTH halves: the resolved kind and
+        // the author's source run (spec PART 9 section 8). A consumer that only
+        // wants to display the document reads the glyph - present on quotes,
+        // whose character is locale-dependent and fixed during parsing - or
+        // resolves `kind` through the spec's table. One rebuilding source reads
+        // `value`. Dropping either half would make this binding's JSON lossier
+        // than the tree it serializes.
+        InlineNode::SmartPunctuation(SmartPunctuation { kind, value, glyph }) => obj(vec![
+            ("type", "smart_punctuation".into()),
+            ("kind", Value::String(kind.clone())),
+            ("value", Value::String(value.clone())),
+            ("glyph", opt_str(glyph)),
         ]),
         InlineNode::AutoLink(AutoLink { attrs: a, href, text }) => obj(vec![
             ("type", "autolink".into()),
