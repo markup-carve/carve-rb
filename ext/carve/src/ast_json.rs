@@ -17,8 +17,10 @@ use carve_rs::{
     BlockQuote, CaptionNumber, Citation, CitationGroup, CitationRenderMode, CodeBlock, Comment,
     CriticComment, CriticDelete, CriticInsert, CriticSubstitute, CrossRef, DefinitionList, Div,
     Document, Emphasis, EmphasisKind, Figure, FigureTarget, Footnote, Heading, Image,
-    InlineExtension, InlineNode, Link, List, ListItem, Math, Mention, OrderedListType, Paragraph,
-    RawBlock, RawInline, SmartPunctuation, Span, Symbol, Table, TableAlign, TableCell,
+    InlineExtension, InlineNode, Link, List, ListItem, Math, Mention, OrderedListType,
+    Paragraph,
+    LiteralInline, RawBlock, RawInline, SmartPunctuation, Span, Symbol, Table, TableAlign,
+    TableCell,
     TableCellSpan, TableRow, Tag,
     ThematicBreak,
 };
@@ -116,13 +118,26 @@ fn block(b: &BlockNode) -> Value {
             ("children", inlines(children)),
             ("attrs", attrs(a)),
         ]),
-        BlockNode::Paragraph(Paragraph { attrs: a, children }) => obj(vec![
+        BlockNode::Paragraph(Paragraph {
+            attrs: a,
+            children,
+            at_content_column: _,
+        }) => obj(vec![
             ("type", "paragraph".into()),
             ("children", inlines(children)),
             ("attrs", attrs(a)),
         ]),
         BlockNode::CodeBlock(c) => code_block(c),
-        BlockNode::List(List { attrs: a, ordered, start, ol_type, tight, items }) => obj(vec![
+        BlockNode::List(List {
+            attrs: a,
+            ordered,
+            start,
+            ol_type,
+            tight,
+            items,
+            delim: _,
+            bullet_char: _,
+        }) => obj(vec![
             ("type", "list".into()),
             ("ordered", Value::Bool(*ordered)),
             ("start", opt_usize(start)),
@@ -313,7 +328,11 @@ fn figure_target(t: &FigureTarget) -> Value {
         FigureTarget::BlockQuote(q) => block_quote(q),
         FigureTarget::Table(tb) => table(tb),
         FigureTarget::CodeBlock(c) => code_block(c),
-        FigureTarget::Paragraph(Paragraph { attrs: a, children }) => obj(vec![
+        FigureTarget::Paragraph(Paragraph {
+            attrs: a,
+            children,
+            at_content_column: _,
+        }) => obj(vec![
             ("type", "paragraph".into()),
             ("children", inlines(children)),
             ("attrs", attrs(a)),
@@ -343,6 +362,15 @@ fn inline(n: &InlineNode) -> Value {
             ("kind", emphasis_kind_str(*kind).into()),
             ("children", inlines(children)),
             ("attrs", attrs(a)),
+        ]),
+        // The inline literal (spec PART 9 section 27) is a verbatim span with
+        // the code wrapper dropped. It serializes as its own type rather than
+        // as code, because a consumer rebuilding source has to know which of
+        // the two the author wrote.
+        InlineNode::LiteralInline(l) => obj(vec![
+            ("type", "literal_inline".into()),
+            ("content", Value::String(l.content.clone())),
+            ("attrs", attrs(&l.attrs)),
         ]),
         InlineNode::Code(s, a) => obj(vec![
             ("type", "code".into()),

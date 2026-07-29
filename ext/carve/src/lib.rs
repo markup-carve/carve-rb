@@ -173,16 +173,20 @@ fn build_renderers(ruby: &Ruby, hash: RHash) -> Result<StaticRenderers, Error> {
     for (name, value) in pairs {
         let callable: Opaque<Value> = Opaque::from(value);
         match name.trim().to_ascii_lowercase().as_str() {
-            "mermaid" => out.mermaid = Some(wrap_diagram(callable)),
-            "chart" => out.chart = Some(wrap_diagram(callable)),
-            "graphviz" => out.graphviz = Some(wrap_diagram(callable)),
+            // The engine keys diagram renderers by fence css class and accepts
+            // ANY key, including a custom fence word's class - it is no longer
+            // three named fields. Passing the key through rather than
+            // allowlisting it keeps this binding from having to be edited every
+            // time the engine learns a new diagram type.
             "math" => out.math = Some(wrap_math(callable)),
-            other => {
+            other if !other.is_empty() => {
+                out.diagrams
+                    .insert(other.to_string(), wrap_diagram(callable));
+            }
+            _ => {
                 return Err(Error::new(
                     ruby.exception_arg_error(),
-                    format!(
-                        "Unknown Carve renderer key: {other:?} (supported: \"mermaid\", \"chart\", \"graphviz\", \"math\")"
-                    ),
+                    "Carve renderer key must not be empty".to_string(),
                 ));
             }
         }

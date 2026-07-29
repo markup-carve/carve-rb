@@ -186,9 +186,31 @@ class CarveTest < Minitest::Test
     end
   end
 
-  def test_unknown_renderer_key_raises_argument_error
+  # The engine keys diagram renderers by fence css class and accepts ANY key,
+  # including a custom fence word's class. This binding therefore forwards the
+  # key instead of allowlisting it - an allowlist could not express a custom
+  # fence at all, and had to be edited whenever the engine learned a new
+  # diagram type.
+  #
+  # The cost is that a typo no longer raises: "mermiad" now registers a
+  # renderer that never fires, where it used to be an ArgumentError. That is
+  # the price of matching the engine's contract rather than imposing a stricter
+  # one on top of it.
+  def test_arbitrary_renderer_key_registers_a_diagram_renderer
+    html = Carve.to_html("```mermaid\ngraph TD;\n```\n",
+                         extensions: [:fenced_render], mode: :static,
+                         renderers: { "mermaid" => ->(_src) { "<svg id=\"m\"></svg>" } })
+    assert_includes html, "<svg id=\"m\"></svg>"
+
+    # An unrecognized key is accepted rather than rejected: it simply never
+    # matches a fence.
+    assert_kind_of String, Carve.to_html("# x", mode: :static,
+                                         renderers: { "no_such" => ->(s) { s } })
+  end
+
+  def test_empty_renderer_key_raises_argument_error
     assert_raises(ArgumentError) do
-      Carve.to_html("# x", mode: :static, renderers: { "no_such" => ->(s) { s } })
+      Carve.to_html("# x", mode: :static, renderers: { "" => ->(s) { s } })
     end
   end
 
