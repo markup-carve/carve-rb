@@ -230,7 +230,7 @@ rake test      # runs the minitest suite
 builds:
 
 ```toml
-carve_rs = { package = "carve-lang", git = "https://github.com/markup-carve/carve-rs", rev = "ef78fd5749ede7e7f24e4f5860269bf0f5ed58d0" }
+carve_rs = { package = "carve-lang", git = "https://github.com/markup-carve/carve-rs", rev = "fd867b89c0a289344bbacaf1de3d9d99a4bc7d65" }
 ```
 
 The crate is imported under the alias `carve_rs`. It is published as `carve-lang`
@@ -242,6 +242,14 @@ When bumping the `rev`, run `rake compile` and commit the resulting
 revision, so leaving it behind means every fresh clone gets a dirty working tree
 on its first build and the gem can resolve to a different engine than the one
 that was tested.
+
+Whether the pin is current is not a judgment call: CI runs the mandatory spec
+corpus through the compiled extension and requires byte-identical HTML, so a pin
+that has fallen behind fails a build. Locally:
+
+```sh
+CARVE_SPEC_CORPUS=/path/to/carve/tests/corpus bundle exec rake test
+```
 
 ## License
 
