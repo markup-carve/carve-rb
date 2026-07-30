@@ -152,6 +152,41 @@ The leading word-boundary guard is unaffected by an active map: `a:b:c`,
 > trusted). **Never build a symbols map out of untrusted / user-supplied
 > input.**
 
+## Untrusted input
+
+Carve's normative hardening is always on and needs no option: dangerous URL
+schemes are blanked, event-handler attributes like `onclick` are dropped, and the
+bidi override/isolate characters behind Trojan Source are removed from rendered
+text.
+
+Raw passthrough is the deliberate exception. A ` ```=html ` block or a
+`` `…`{=html} `` span renders **verbatim** by design, so it is the one thing
+input you did not author has to switch off:
+
+``` ruby
+Carve.to_html(user_input, safe: true, profile: :comment)
+```
+
+`safe:` escapes those raw blocks and spans instead of emitting them. `profile:`
+restricts which constructs are allowed at all and caps input length -
+`:full`, `:article`, `:comment` or `:minimal`, String or Symbol. An unknown name
+raises `ArgumentError` rather than being ignored.
+
+A profile **rejection** raises too, rather than returning something that looks
+like output:
+
+``` ruby
+Carve.to_html("x" * 20_000, profile: :minimal)
+# ArgumentError: Profile violations: 'document' is not allowed: max_length_exceeded (...)
+```
+
+That matters for untrusted input: the engine's infallible entry point answers a
+rejection with an empty String, which a caller cannot tell from a document that
+legitimately rendered to nothing.
+
+Full recipe, defaults and threat model:
+[Security](https://markup-carve.github.io/carve/security).
+
 ## API
 
 | Method | Description |
@@ -161,6 +196,7 @@ The leading word-boundary guard is unaffected by an active map: `a:b:c`,
 | `Carve.to_html(source, extensions: [...])` | Render with the named extensions enabled. |
 | `Carve.to_html(source, mode: :static, renderers: {...})` | Render self-contained static HTML with build-time renderers. |
 | `Carve.to_html(source, symbols: {...})` | Render with a `:name:` -> value symbol map (values are raw, see above). |
+| `Carve.to_html(source, safe: true, profile: :comment)` | Render untrusted input: escape `=html` raw blocks/spans, restrict constructs. |
 | `Carve.to_html_with_extensions(source, names_array)` | Native primitive (Array of Strings). |
 | `Carve.to_html_full(source, names_array, mode_string, renderers_hash)` | Native static-mode primitive. |
 | `Carve.to_html_full_with_symbols(source, names_array, mode_string, renderers_hash, symbols_hash)` | Native primitive, static mode + symbol map. |
@@ -194,14 +230,18 @@ rake test      # runs the minitest suite
 builds:
 
 ```toml
-carve_rs = { package = "carve", git = "https://github.com/markup-carve/carve-rs", rev = "09c64118223c1574d136c308cfe2a70df8ab5128" }
+carve_rs = { package = "carve-lang", git = "https://github.com/markup-carve/carve-rs", rev = "ef78fd5749ede7e7f24e4f5860269bf0f5ed58d0" }
 ```
 
-The crate is imported under the alias `carve_rs`. Note: carve-rs has since
-renamed its published crate to `carve-lang` on `main`; this pin predates that
-rename, so `package = "carve"` is correct for this exact `rev`. When bumping to
-a newer carve-rs commit (past the rename), update both the `rev` and
-`package = "carve-lang"`.
+The crate is imported under the alias `carve_rs`. It is published as `carve-lang`
+(carve-rs renamed it from `carve`), so a pin at any revision past that rename
+needs `package = "carve-lang"` as above.
+
+When bumping the `rev`, run `rake compile` and commit the resulting
+`ext/carve/Cargo.lock` in the same change. The lock records the resolved
+revision, so leaving it behind means every fresh clone gets a dirty working tree
+on its first build and the gem can resolve to a different engine than the one
+that was tested.
 
 ## License
 

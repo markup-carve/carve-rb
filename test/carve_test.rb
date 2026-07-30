@@ -515,4 +515,62 @@ class CarveTest < Minitest::Test
     end
   end
 
+  # ---------------------------------------------------------------- safe render
+
+  RAW_HTML_SRC = "# Heading\n\n```=html\n<script>alert(1)</script>\n```\n"
+
+  def test_safe_escapes_a_raw_html_block
+    out = Carve.to_html(RAW_HTML_SRC, safe: true)
+    assert_includes out, "&lt;script&gt;"
+    refute_includes out, "<script>"
+  end
+
+  # Pairs with the test above: without it, a change that stopped emitting raw
+  # HTML at all would leave that assertion green for the wrong reason.
+  def test_raw_html_is_emitted_verbatim_by_default
+    out = Carve.to_html(RAW_HTML_SRC)
+    assert_includes out, "<script>alert(1)</script>"
+  end
+
+  def test_profile_restricts_constructs
+    out = Carve.to_html(RAW_HTML_SRC, profile: "comment")
+    refute_includes out, "<h1"
+
+    # And the default keeps the heading, so the check above can fail.
+    assert_includes Carve.to_html(RAW_HTML_SRC), "<h1"
+  end
+
+  def test_profile_accepts_a_symbol
+    assert_equal Carve.to_html(RAW_HTML_SRC, profile: "comment"),
+                 Carve.to_html(RAW_HTML_SRC, profile: :comment)
+  end
+
+  def test_unknown_profile_raises_argument_error
+    error = assert_raises(ArgumentError) do
+      Carve.to_html("# Hi", profile: "nope")
+    end
+    assert_includes error.message, "comment"
+    assert_includes error.message, "minimal"
+  end
+
+  def test_safe_composes_with_extensions
+    out = Carve.to_html(RAW_HTML_SRC, safe: true, extensions: [:details])
+    assert_includes out, "&lt;script&gt;"
+    refute_includes out, "<script>"
+  end
+
+  def test_profile_length_cap_raises_instead_of_returning_empty_html
+    # The infallible engine entry point returns "" on a profile rejection, which
+    # a caller cannot tell from a document that rendered to nothing.
+    error = assert_raises(ArgumentError) do
+      Carve.to_html("x" * 20_000, profile: :minimal)
+    end
+    assert_includes error.message, "Profile violations"
+  end
+
+  def test_input_under_the_cap_still_renders
+    # Makes the check above able to fail rather than passing on any raise.
+    assert_includes Carve.to_html("hello", profile: :minimal), "<p>hello</p>"
+  end
+
 end
