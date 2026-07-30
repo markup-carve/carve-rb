@@ -11,19 +11,23 @@
 //!   `"static"`; `renderers` is a Hash of build-time renderer callables.
 //! * `Carve.to_html_full_with_symbols(source, extensions, mode, renderers,
 //!   symbols)` -> HTML String, the same primitive plus the `:name:` symbol map.
+//! * `Carve._to_html_safe(source, extensions, mode, renderers, symbols, safe,
+//!   profile)` -> HTML String, the same primitive plus the two safe-render
+//!   controls: `safe` escapes `=html` raw blocks/spans, `profile` is nil or one
+//!   of `"full"` / `"article"` / `"comment"` / `"minimal"`. The others delegate
+//!   to it, so there is one implementation of the render path.
 //!
 //! The pure-Ruby wrapper in `lib/carve.rb` adds the keyword-argument form
 //! `Carve.to_html(source, extensions: [...], mode: ..., renderers: {...},
-//! symbols: {...})` on top of these primitives.
+//! symbols: {...}, safe: ..., profile: ...)` on top of these primitives.
 
 mod ast_json;
 
 use ast_json::document_to_json;
 use carve_rs::{
     Autolink, CarveExtension, Citations, CodeCallouts, Details, ExternalLinks, FencedRender,
-    HeadingPermalinks, ListTable, MathBlock, Mode, Options, Spoiler, StaticRenderers, TabNormalize,
-    TableOfContents,
-    Wikilinks,
+    HeadingPermalinks, ListTable, MathBlock, Mode, Options, Profile, Spoiler, StaticRenderers,
+    TabNormalize, TableOfContents, Wikilinks,
 };
 use magnus::value::{InnerValue, Opaque};
 use magnus::{function, prelude::*, Error, RArray, RHash, Ruby, Value};
@@ -300,7 +304,57 @@ fn to_html_full_with_symbols(
     renderers: RHash,
     symbols: RHash,
 ) -> Result<String, Error> {
+    // The safe-render arguments default off here so this signature stays as
+    // published; `to_html_safe` is the one that takes them.
+    to_html_safe(ruby, source, names, mode, renderers, symbols, false, None)
+}
+
+/// Map a profile name to a [`Profile`], or raise Ruby ArgumentError.
+///
+/// The four presets are the engine's; an unknown name is reported rather than
+/// silently ignored, the same way [`parse_mode`] reports an unknown mode.
+fn parse_profile(ruby: &Ruby, name: &str) -> Result<Profile, Error> {
+    match name {
+        "full" => Ok(Profile::full()),
+        "article" => Ok(Profile::article()),
+        "comment" => Ok(Profile::comment()),
+        "minimal" => Ok(Profile::minimal()),
+        other => Err(Error::new(
+            ruby.exception_arg_error(),
+            format!(
+                "Unknown Carve profile: {other:?} \
+                 (supported: \"full\", \"article\", \"comment\", \"minimal\")"
+            ),
+        )),
+    }
+}
+
+/// [`to_html_full_with_symbols`] plus the two safe-render controls.
+///
+/// `safe` escapes `=html` raw blocks and spans instead of emitting them. Carve's
+/// normative hardening (URL scheme denylist, event-handler attributes, the
+/// Trojan-Source bidi characters) is always on and needs no argument; raw
+/// passthrough is the deliberate exception, so it is the one thing untrusted
+/// input has to switch off.
+///
+/// `profile` is `nil` or one of the four preset names, restricting which
+/// constructs are allowed at all and capping input length.
+#[allow(clippy::too_many_arguments)]
+fn to_html_safe(
+    ruby: &Ruby,
+    source: String,
+    names: RArray,
+    mode: String,
+    renderers: RHash,
+    symbols: RHash,
+    safe: bool,
+    profile: Option<String>,
+) -> Result<String, Error> {
     let parsed_mode = parse_mode(ruby, &mode)?;
+    let parsed_profile = match profile.as_deref() {
+        None => None,
+        Some(name) => Some(parse_profile(ruby, name)?),
+    };
     let static_renderers = build_renderers(ruby, renderers)?;
     let boxed = boxed_extensions(ruby, names)?;
     let symbol_pairs = build_symbols(symbols)?;
@@ -314,7 +368,21 @@ fn to_html_full_with_symbols(
     for (name, value) in &symbol_pairs {
         options = options.with_symbol(name.clone(), value.clone());
     }
-    Ok(carve_rs::to_html_with_options(&source, &options))
+    if safe {
+        options = options.with_raw_html(false);
+    }
+    if let Some(p) = parsed_profile {
+        options = options.with_profile(p);
+    }
+
+    // The fallible entry point, not `to_html_with_options`. That one is
+    // `try_...().unwrap_or_default()`, so a profile rejection -- input past
+    // `max_length`, or a denied construct when the action is Error -- comes back
+    // as an EMPTY STRING. For the untrusted-input case that is the worst
+    // possible answer: a caller cannot tell a rejected 20 KB comment from a
+    // document that legitimately rendered to nothing.
+    carve_rs::try_to_html_with_options(&source, &options)
+        .map_err(|e| Error::new(ruby.exception_arg_error(), e.to_string()))
 }
 
 /// Entry point invoked by Ruby when the extension is loaded.
@@ -340,5 +408,6 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
         "to_html_full_with_symbols",
         function!(to_html_full_with_symbols, 5),
     )?;
+    module.define_singleton_method("_to_html_safe", function!(to_html_safe, 7))?;
     Ok(())
 }

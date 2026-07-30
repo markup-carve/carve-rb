@@ -99,21 +99,56 @@ module Carve
     # callable. <tt>{ "b" => "<b>x</b>" }</tt> emits a real +<b>+ element, not
     # escaped text. This is deliberate: processor configuration is trusted.
     # NEVER build a symbols map out of untrusted / user-supplied input.
-    def to_html(source, extensions: nil, mode: nil, renderers: nil, symbols: nil)
+    #
+    # ==== Untrusted input
+    #
+    # Carve's normative hardening is always on and needs no argument here:
+    # dangerous URL schemes are blanked, event-handler attributes such as
+    # +onclick+ are dropped, and the bidi override / isolate characters behind
+    # Trojan Source are removed from rendered text.
+    #
+    # Raw passthrough is the deliberate exception - a <tt>```=html</tt> block or
+    # a <tt>`...`{=html}</tt> span renders VERBATIM by design - so it is the one
+    # thing input you did not author has to switch off:
+    #
+    #   Carve.to_html(user_input, safe: true, profile: :comment)
+    #
+    # +safe:+ escapes those raw blocks and spans instead of emitting them.
+    # +profile:+ restricts which constructs are allowed at all and caps input
+    # length: +:full+, +:article+, +:comment+ or +:minimal+ (String or Symbol),
+    # +nil+ for no profile. An unknown profile name raises ArgumentError (from
+    # the native layer) rather than being ignored.
+    #
+    # A profile REJECTION also raises ArgumentError - input past the profile's
+    # +max_length+, or a denied construct when the profile's action is error:
+    #
+    #   Carve.to_html("x" * 20_000, profile: :minimal)
+    #   # ArgumentError: Profile violations: 'document' is not allowed:
+    #   #   max_length_exceeded (...)
+    #
+    # It is an exception rather than a return value because the engine's
+    # infallible entry point answers a rejection with an empty String, which a
+    # caller cannot tell from a document that legitimately rendered to nothing.
+    def to_html(source, extensions: nil, mode: nil, renderers: nil, symbols: nil,
+                safe: false, profile: nil)
       list = Array(extensions)
 
-      # Fast path: interactive (default), no extensions, no renderers, no symbols.
+      # Fast path: interactive (default), no extensions, no renderers, no
+      # symbols, and neither safe-render control in play.
       if list.empty? && (mode.nil? || mode.to_s == "interactive") &&
-         (renderers.nil? || renderers.empty?) && (symbols.nil? || symbols.empty?)
+         (renderers.nil? || renderers.empty?) && (symbols.nil? || symbols.empty?) &&
+         !safe && profile.nil?
         return _to_html(source.to_s)
       end
 
-      to_html_full_with_symbols(
+      _to_html_safe(
         source.to_s,
         list.map(&:to_s),
         (mode || :interactive).to_s,
         renderers || {},
         symbols || {},
+        !!safe,
+        profile&.to_s,
       )
     end
 
