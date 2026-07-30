@@ -36,7 +36,18 @@ jobs:
       - name: Install libclang (rb-sys bindgen)
         run: sudo apt-get update && sudo apt-get install -y libclang-dev
 
+      # The corpus is the only check that can tell a drifted pin from a current
+      # one: everything above asserts hand-written expectations, which a drifted
+      # engine satisfies happily.
+      - name: Check out the spec corpus
+        uses: actions/checkout@v4
+        with:
+          repository: markup-carve/carve
+          path: spec
+
       - name: Compile the extension and run the test suite
+        env:
+          CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
         run: |
           bundle install
           bundle exec rake compile
