@@ -573,4 +573,47 @@ class CarveTest < Minitest::Test
     assert_includes Carve.to_html("hello", profile: :minimal), "<p>hello</p>"
   end
 
+  # ------------------------------------------------------------- stamp reader
+
+  # The literal bytes carve-php and carve-js write, so a divergence in any
+  # writer fails here rather than in the field.
+  PHP_MARKER = "# Hi\n\n%% carve-version: 0.1; generated-by: carve-php 0.1.0\n"
+  JS_BLOCK_MARKER = "# Hi\n\n%%%\ncarve-version: 0.1\ngenerated-by: carve-js 0.1.0\n%%%\n"
+
+  def test_read_stamp_reads_a_marker_written_by_carve_php
+    assert_equal({ version: "0.1", generated_by: "carve-php 0.1.0" }, Carve.read_stamp(PHP_MARKER))
+  end
+
+  def test_read_stamp_reads_the_block_form_from_carve_js
+    assert_equal({ version: "0.1", generated_by: "carve-js 0.1.0" }, Carve.read_stamp(JS_BLOCK_MARKER))
+  end
+
+  def test_read_stamp_returns_nil_for_an_unstamped_document
+    assert_nil Carve.read_stamp("# Hi\n\nNo marker.\n")
+  end
+
+  def test_read_stamp_does_not_mistake_a_trailing_comment_for_a_marker
+    # Keeps "no marker" from quietly meaning "parsing gave up".
+    assert_nil Carve.read_stamp("# Hi\n\n%% just a note\n")
+  end
+
+  def test_read_stamp_reports_an_unrecorded_writer_as_nil
+    assert_equal({ version: "0.1", generated_by: nil }, Carve.read_stamp("# Hi\n\n%% carve-version: 0.1\n"))
+  end
+
+  def test_needs_review_for_older_and_unstamped_documents
+    assert Carve.needs_review?("a\n\n%% carve-version: 0.0.9; generated-by: x\n")
+    # Unknown provenance: assuming a document is current is the unsafe direction.
+    assert Carve.needs_review?("a\n")
+  end
+
+  def test_needs_review_is_false_for_a_current_document
+    refute Carve.needs_review?(PHP_MARKER)
+  end
+
+  def test_needs_review_accepts_an_explicit_target_version
+    refute Carve.needs_review?("a\n\n%% carve-version: 0.1; generated-by: x\n", "0.1.0")
+    assert Carve.needs_review?("a\n\n%% carve-version: 0.9; generated-by: x\n", "0.10")
+  end
+
 end

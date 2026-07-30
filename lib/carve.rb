@@ -152,6 +152,40 @@ module Carve
       )
     end
 
+
+    # Read a document's provenance marker, as written by +carve fmt --stamp+.
+    #
+    #   Carve.read_stamp(source)
+    #   # => {version: "0.1", generated_by: "carve-php 0.1.0"}
+    #   Carve.read_stamp("# Hi\n")
+    #   # => nil
+    #
+    # Returns +nil+ when the document carries no marker. That is the normal case
+    # for a hand-written document and means "unknown", not "current".
+    #
+    # Both documented marker forms are read - the trailing +%%+ line and the
+    # +%%%+ block - and a marker written by any Carve engine reads the same,
+    # which is the point of recording it.
+    def read_stamp(source)
+      _read_stamp(source.to_s)
+    end
+
+    # Whether a document was last processed under an older spec version than
+    # this engine targets, so the +[behavior]+ changelog entries between the two
+    # are worth reviewing.
+    #
+    #   Carve.needs_review?(stored_document)
+    #
+    # An UNSTAMPED document answers true: its provenance is unknown, and
+    # assuming it is current is the unsafe direction. Pass +current_version+ to
+    # compare against something other than this engine's spec version.
+    #
+    # See https://markup-carve.github.io/carve/versioning for what a version
+    # difference means for a stored document.
+    def needs_review?(source, current_version = nil)
+      _stamp_needs_review(source.to_s, current_version&.to_s)
+    end
+
     # Parse Carve +source+ into an AST: a tree of Ruby Hashes and Arrays.
     #
     #   Carve.parse("# Hi")
