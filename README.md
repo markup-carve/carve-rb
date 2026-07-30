@@ -187,6 +187,30 @@ legitimately rendered to nothing.
 Full recipe, defaults and threat model:
 [Security](https://markup-carve.github.io/carve/security).
 
+## Stored documents and spec versions
+
+`carve fmt --stamp` (in any Carve engine) records the spec version a document was
+last processed under. This gem reads that marker back, so a repository of stored
+`.crv` files can be checked for documents predating a breaking spec change:
+
+``` ruby
+Carve.read_stamp(source)
+# => {version: "0.1", generated_by: "carve-php 0.1.0"}
+
+Carve.needs_review?(source)   # true when the document predates this engine
+```
+
+An **unstamped** document answers `true`: its provenance is unknown, and assuming
+it is current is the unsafe direction. Both marker forms are read, and a marker
+written by any engine reads the same - the format is the contract, not any one
+API - so the answer matches carve-php, carve-js, carve-rs and carve-go on the
+same document.
+
+What a version difference means is the
+[versioning contract](https://markup-carve.github.io/carve/versioning): only
+`[behavior]` changelog entries between the stamped version and yours can require
+a document change.
+
 ## API
 
 | Method | Description |
@@ -197,6 +221,8 @@ Full recipe, defaults and threat model:
 | `Carve.to_html(source, mode: :static, renderers: {...})` | Render self-contained static HTML with build-time renderers. |
 | `Carve.to_html(source, symbols: {...})` | Render with a `:name:` -> value symbol map (values are raw, see above). |
 | `Carve.to_html(source, safe: true, profile: :comment)` | Render untrusted input: escape `=html` raw blocks/spans, restrict constructs. |
+| `Carve.read_stamp(source)` | Read a document's provenance marker: `{version:, generated_by:}` or `nil`. |
+| `Carve.needs_review?(source)` | Whether a document predates this engine's spec version (unstamped counts as yes). |
 | `Carve.to_html_with_extensions(source, names_array)` | Native primitive (Array of Strings). |
 | `Carve.to_html_full(source, names_array, mode_string, renderers_hash)` | Native static-mode primitive. |
 | `Carve.to_html_full_with_symbols(source, names_array, mode_string, renderers_hash, symbols_hash)` | Native primitive, static mode + symbol map. |
@@ -230,7 +256,7 @@ rake test      # runs the minitest suite
 builds:
 
 ```toml
-carve_rs = { package = "carve-lang", git = "https://github.com/markup-carve/carve-rs", rev = "fd867b89c0a289344bbacaf1de3d9d99a4bc7d65" }
+carve_rs = { package = "carve-lang", git = "https://github.com/markup-carve/carve-rs", rev = "0e157ad81ee273af3038f7fa7213b451397fca67" }
 ```
 
 The crate is imported under the alias `carve_rs`. It is published as `carve-lang`

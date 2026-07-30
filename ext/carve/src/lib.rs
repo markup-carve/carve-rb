@@ -385,6 +385,38 @@ fn to_html_safe(
         .map_err(|e| Error::new(ruby.exception_arg_error(), e.to_string()))
 }
 
+
+/// Read a document's provenance marker.
+///
+/// Returns a Hash `{version:, generated_by:}` or nil when the document carries
+/// none - the normal case for a hand-written document, meaning "unknown" rather
+/// than "current".
+fn read_stamp(ruby: &Ruby, source: String) -> Result<Value, Error> {
+    let Some(stamp) = carve_rs::read_stamp(&source) else {
+        return Ok(ruby.qnil().as_value());
+    };
+
+    let hash = ruby.hash_new();
+    hash.aset(ruby.sym_new("version"), stamp.version)?;
+    match stamp.generated_by {
+        Some(writer) => hash.aset(ruby.sym_new("generated_by"), writer)?,
+        None => hash.aset(ruby.sym_new("generated_by"), ruby.qnil())?,
+    }
+
+    Ok(hash.as_value())
+}
+
+/// Whether a document was last processed under an older spec version than this
+/// engine targets.
+///
+/// An unstamped document answers true: its provenance is unknown, and assuming
+/// it is current is the unsafe direction.
+fn stamp_needs_review(source: String, current_version: Option<String>) -> bool {
+    let current = current_version.unwrap_or_else(|| carve_rs::SPEC_VERSION.to_string());
+
+    carve_rs::needs_review(&source, &current)
+}
+
 /// Entry point invoked by Ruby when the extension is loaded.
 ///
 /// `name = "carve"` makes the macro emit the `Init_carve` symbol that matches
@@ -409,5 +441,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
         function!(to_html_full_with_symbols, 5),
     )?;
     module.define_singleton_method("_to_html_safe", function!(to_html_safe, 7))?;
+    module.define_singleton_method("_read_stamp", function!(read_stamp, 1))?;
+    module.define_singleton_method("_stamp_needs_review", function!(stamp_needs_review, 2))?;
     Ok(())
 }
