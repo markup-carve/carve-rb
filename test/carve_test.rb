@@ -332,11 +332,21 @@ class CarveTest < Minitest::Test
     refute ast.key?(:footnoteDefs)
   end
 
+  # The RAW block, not the parsed mapping (spec PART 12 §2). A typed block is
+  # the case that makes the difference load-bearing rather than cosmetic: the
+  # engine does not parse json/toml into its mapping at all, so publishing the
+  # mapping meant this document came back with NO frontmatter.
+  def test_parse_publishes_a_typed_frontmatter_block
+    ast = Carve.parse("---json\n{\"a\": 1}\n---\n\nbody\n")
+
+    assert_equal({ content: "{\"a\": 1}", format: "json" }, ast[:frontmatter])
+  end
+
   def test_parse_carries_root_fields_the_document_does_have
     with_frontmatter = Carve.parse("---\ntitle: x\n---\n\nbody\n")
     with_footnote = Carve.parse("a[^r]\n\n[^r]: d\n")
 
-    assert_equal({ title: "x" }, with_frontmatter[:frontmatter])
+    assert_equal({ content: "title: x", format: "yaml" }, with_frontmatter[:frontmatter])
     refute with_frontmatter.key?(:footnoteDefs)
     assert with_footnote.key?(:footnoteDefs)
     refute with_footnote.key?(:frontmatter)

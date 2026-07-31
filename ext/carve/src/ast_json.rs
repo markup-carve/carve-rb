@@ -28,6 +28,13 @@ use carve_rs::{
 use serde_json::{Map, Value};
 
 /// Public entry point: a full `Document` to a JSON string.
+///
+/// NOTE: source positions are deliberately NOT published yet. carve-rs tracks
+/// them behind a parse option that this binding does not enable, so `pos` is
+/// `None` on every node here and emitting the field would publish nothing.
+/// PART 12 section 4 requires positions on a serialized document, so this is a
+/// known gap rather than a decision - it needs the binding to parse with
+/// positions on AND every node type to carry one upstream.
 pub fn document_to_json(doc: &Document) -> String {
     let mut m = Map::new();
     m.insert("type".into(), "document".into());
@@ -36,11 +43,18 @@ pub fn document_to_json(doc: &Document) -> String {
     // EXACTLY when the document has them. Emitting an empty object for a
     // document with neither says "this document has frontmatter, and it is
     // empty" - a different claim, and one the reference does not make.
-    if !doc.frontmatter.is_empty() {
+    //
+    // The RAW block, not the parsed mapping. The mapping is built by splitting
+    // each line on the first colon, so key order, comments and anything that is
+    // not `key: value` are gone - and a typed (`---json`, `---toml`) block is
+    // not parsed into it at all, leaving it EMPTY for a document that plainly
+    // has frontmatter. Publishing it under the same field name the reference
+    // uses for the raw form meant a consumer reading `frontmatter.content` got
+    // nothing here and a string from carve-js, with no error anywhere.
+    if let Some(raw) = &doc.frontmatter_raw {
         let mut fm = Map::new();
-        for (k, v) in &doc.frontmatter {
-            fm.insert(k.clone(), Value::String(v.clone()));
-        }
+        fm.insert("format".into(), Value::String(raw.format.clone()));
+        fm.insert("content".into(), Value::String(raw.content.clone()));
         m.insert("frontmatter".into(), Value::Object(fm));
     }
 
@@ -130,7 +144,7 @@ fn inlines(list: &[InlineNode]) -> Value {
 
 fn block(b: &BlockNode) -> Value {
     match b {
-        BlockNode::Heading(Heading { attrs: a, level, children }) => obj(vec![
+        BlockNode::Heading(Heading { attrs: a, level, children, pos: _ }) => obj(vec![
             ("type", "heading".into()),
             ("level", Value::from(*level)),
             ("children", inlines(children)),
@@ -140,6 +154,7 @@ fn block(b: &BlockNode) -> Value {
             attrs: a,
             children,
             at_content_column: _,
+            pos: _,
         }) => obj(vec![
             ("type", "paragraph".into()),
             ("children", inlines(children)),
@@ -359,6 +374,7 @@ fn figure_target(t: &FigureTarget) -> Value {
             attrs: a,
             children,
             at_content_column: _,
+            pos: _,
         }) => obj(vec![
             ("type", "paragraph".into()),
             ("children", inlines(children)),
