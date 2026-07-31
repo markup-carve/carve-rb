@@ -42,10 +42,10 @@ pub fn document_to_json(doc: &Document) -> String {
     for (k, v) in &doc.footnote_defs {
         fdefs.insert(k.clone(), blocks(v));
     }
-    m.insert("footnote_defs".into(), Value::Object(fdefs));
+    m.insert("footnoteDefs".into(), Value::Object(fdefs));
 
     m.insert("children".into(), blocks(&doc.children));
-    m.insert("source_len".into(), Value::from(doc.source_len));
+    m.insert("srcByteLength".into(), Value::from(doc.source_len));
 
     Value::Object(m).to_string()
 }
@@ -465,28 +465,43 @@ fn inline(n: &InlineNode) -> Value {
             ("abbr", Value::String(abbr.clone())),
             ("expansion", Value::String(expansion.clone())),
         ]),
-        InlineNode::Footnote(Footnote { attrs: a, id, inline: inl, number, ref_id }) => obj(vec![
-            ("type", "footnote".into()),
-            ("id", opt_str(id)),
-            ("inline", opt_inlines(inl)),
-            ("number", opt_usize(number)),
-            ("ref_id", opt_str(ref_id)),
-            ("attrs", attrs(a)),
-        ]),
+        // `footnote` names the BLOCK definition type in the vocabulary, so the
+        // two inline forms are `footnote_ref` (`[^a]`) and `inline_footnote`
+        // (`^[…]`) - split by the node's own shape, since the engine keeps both
+        // in one struct (carve#405).
+        InlineNode::Footnote(Footnote { attrs: a, id, inline: inl, number, ref_id }) => {
+            if inl.is_some() {
+                obj(vec![
+                    ("type", "inline_footnote".into()),
+                    ("inline", opt_inlines(inl)),
+                    ("number", opt_usize(number)),
+                    ("refId", opt_str(ref_id)),
+                    ("attrs", attrs(a)),
+                ])
+            } else {
+                obj(vec![
+                    ("type", "footnote_ref".into()),
+                    ("id", opt_str(id)),
+                    ("number", opt_usize(number)),
+                    ("refId", opt_str(ref_id)),
+                    ("attrs", attrs(a)),
+                ])
+            }
+        }
         InlineNode::SoftBreak => obj(vec![("type", "soft_break".into())]),
         InlineNode::HardBreak => obj(vec![("type", "hard_break".into())]),
         InlineNode::CriticInsert(CriticInsert { attrs: a, children }) => obj(vec![
-            ("type", "critic_insert".into()),
+            ("type", "insert".into()),
             ("children", inlines(children)),
             ("attrs", attrs(a)),
         ]),
         InlineNode::CriticDelete(CriticDelete { attrs: a, children }) => obj(vec![
-            ("type", "critic_delete".into()),
+            ("type", "delete".into()),
             ("children", inlines(children)),
             ("attrs", attrs(a)),
         ]),
         InlineNode::CriticSubstitute(CriticSubstitute { old_text, new_text }) => obj(vec![
-            ("type", "critic_substitute".into()),
+            ("type", "substitution".into()),
             ("old_text", Value::String(old_text.clone())),
             ("new_text", Value::String(new_text.clone())),
         ]),

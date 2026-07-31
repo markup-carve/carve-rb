@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING (AST JSON): node types and root field names now match the
+  reference shape.** `Carve.parse` published names PART 12 does not describe,
+  so a tree from this binding did not interoperate with carve-js or carve-php:
+
+  | was | now |
+  |---|---|
+  | `critic_insert` / `critic_delete` / `critic_substitute` | `insert` / `delete` / `substitution` |
+  | `footnote` (both forms) | `footnote_ref` / `inline_footnote` |
+  | `ref_id` | `refId` |
+  | `footnote_defs` | `footnoteDefs` |
+  | `source_len` | `srcByteLength` |
+
+  The three `critic_*` names and the footnote split are the spec vocabulary
+  (docs/profiles.md); `footnote` there is the BLOCK definition type, so using
+  it for the inline forms named three things with one identifier
+  (markup-carve/carve#405).
+
+### Changed
+
 - Bump the carve-rs engine to `ef78fd5`, picking up two new AST node types.
 
 - **Breaking (`Carve.parse`):** a backslash escape is now its own inline node,
