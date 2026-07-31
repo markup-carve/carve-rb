@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The AST root carries exactly `type`, `children` and `srcByteLength`.**
+  Frontmatter and footnote definitions are now block nodes in `children`
+  rather than root fields, which is what PART 12 §7 requires: a root field
+  cannot carry the position §4 requires of every node, and both are source an
+  editor navigates to (carve#411, carve#418).
+
+  Frontmatter is the first child, carrying `format` and **raw** `content` -
+  not the parsed key/values, which could not represent a `---toml` block at
+  all. A definition is a `footnote` child of the document carrying `id`.
+
+  Breaking for anything reading `ast[:frontmatter]` or `ast[:footnoteDefs]`.
+
+
+### Changed
+
 - **BREAKING (AST JSON): node types and root field names now match the
   reference shape.** `Carve.parse` published names PART 12 does not describe,
   so a tree from this binding did not interoperate with carve-js or carve-php:
