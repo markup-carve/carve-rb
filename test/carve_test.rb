@@ -319,7 +319,7 @@ class CarveTest < Minitest::Test
     assert_equal "document", ast[:type]
     assert_kind_of Array, ast[:children]
     assert_equal({}, ast[:frontmatter])
-    assert_equal 4, ast[:source_len]
+    assert_equal 4, ast[:srcByteLength]
   end
 
   def test_parse_heading_with_inline_children
@@ -399,9 +399,41 @@ class CarveTest < Minitest::Test
     assert_equal "mailto:a@b.example", auto[:text]
   end
 
+  def test_parse_uses_the_spec_node_vocabulary
+    # These names are docs/profiles.md, not this binding's choosing: a tree from
+    # here has to be readable by carve-js and carve-php (markup-carve/carve#405).
+    para = Carve.parse("a {+i+} {-d-} {~o~>n~} b")[:children].first
+    types = para[:children].map { |n| n[:type] }
+
+    assert_includes types, "insert"
+    assert_includes types, "delete"
+    assert_includes types, "substitution"
+    refute_includes types, "critic_insert"
+  end
+
+  def test_parse_splits_the_two_footnote_forms
+    # `footnote` is the BLOCK definition type in the vocabulary, so using it for
+    # the inline forms named three things with one identifier.
+    para = Carve.parse("a[^r] and ^[n]\n\n[^r]: def\n")[:children].first
+    types = para[:children].map { |n| n[:type] }
+
+    assert_includes types, "footnote_ref"
+    assert_includes types, "inline_footnote"
+    refute_includes types, "footnote"
+  end
+
+  def test_parse_root_uses_reference_field_names
+    ast = Carve.parse("a[^r]\n\n[^r]: def\n")
+
+    assert ast.key?(:footnoteDefs)
+    assert ast.key?(:srcByteLength)
+    refute ast.key?(:footnote_defs)
+    refute ast.key?(:source_len)
+  end
+
   def test_parse_critic_nodes_expose_attrs
     para = Carve.parse("a {+ins+}{.note} b")[:children].first
-    ins = para[:children].find { |n| n[:type] == "critic_insert" }
+    ins = para[:children].find { |n| n[:type] == "insert" }
     assert_equal "ins", ins[:children].first[:value]
     assert ins.key?(:attrs)
   end
