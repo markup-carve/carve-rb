@@ -318,8 +318,28 @@ class CarveTest < Minitest::Test
     ast = Carve.parse("# Hi")
     assert_equal "document", ast[:type]
     assert_kind_of Array, ast[:children]
-    assert_equal({}, ast[:frontmatter])
     assert_equal 4, ast[:srcByteLength]
+  end
+
+  # PART 12 section 2: the root carries `frontmatter` and `footnoteDefs`
+  # EXACTLY when the document has them. This used to emit an empty object for
+  # every document, which says "this document has frontmatter, and it is empty"
+  # - a different claim, and one the reference does not make (carve#411).
+  def test_parse_omits_root_fields_the_document_does_not_have
+    ast = Carve.parse("# Hi")
+
+    refute ast.key?(:frontmatter)
+    refute ast.key?(:footnoteDefs)
+  end
+
+  def test_parse_carries_root_fields_the_document_does_have
+    with_frontmatter = Carve.parse("---\ntitle: x\n---\n\nbody\n")
+    with_footnote = Carve.parse("a[^r]\n\n[^r]: d\n")
+
+    assert_equal({ title: "x" }, with_frontmatter[:frontmatter])
+    refute with_frontmatter.key?(:footnoteDefs)
+    assert with_footnote.key?(:footnoteDefs)
+    refute with_footnote.key?(:frontmatter)
   end
 
   def test_parse_heading_with_inline_children

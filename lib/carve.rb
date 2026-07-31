@@ -189,10 +189,13 @@ module Carve
     # Parse Carve +source+ into an AST: a tree of Ruby Hashes and Arrays.
     #
     #   Carve.parse("# Hi")
-    #   # => {type: "document", frontmatter: {}, footnote_defs: {},
+    #   # => {type: "document",
     #   #     children: [{type: "heading", level: 1,
     #   #                 children: [{type: "text", value: "Hi"}], attrs: nil}],
-    #   #     source_len: 4}
+    #   #     srcByteLength: 4}
+    #
+    # The root carries +:srcByteLength+ always, and +:frontmatter+ and
+    # +:footnoteDefs+ exactly when the document has them (spec PART 12 §2).
     #
     # Every node is a Hash with a +:type+ key plus its fields; child collections
     # are Arrays; +:attrs+ is +nil+ or a Hash of +{id:, classes:, key_values:}+.

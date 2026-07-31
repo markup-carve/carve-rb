@@ -32,17 +32,25 @@ pub fn document_to_json(doc: &Document) -> String {
     let mut m = Map::new();
     m.insert("type".into(), "document".into());
 
-    let mut fm = Map::new();
-    for (k, v) in &doc.frontmatter {
-        fm.insert(k.clone(), Value::String(v.clone()));
+    // PART 12 section 2: the root carries `frontmatter` and `footnoteDefs`
+    // EXACTLY when the document has them. Emitting an empty object for a
+    // document with neither says "this document has frontmatter, and it is
+    // empty" - a different claim, and one the reference does not make.
+    if !doc.frontmatter.is_empty() {
+        let mut fm = Map::new();
+        for (k, v) in &doc.frontmatter {
+            fm.insert(k.clone(), Value::String(v.clone()));
+        }
+        m.insert("frontmatter".into(), Value::Object(fm));
     }
-    m.insert("frontmatter".into(), Value::Object(fm));
 
-    let mut fdefs = Map::new();
-    for (k, v) in &doc.footnote_defs {
-        fdefs.insert(k.clone(), blocks(v));
+    if !doc.footnote_defs.is_empty() {
+        let mut fdefs = Map::new();
+        for (k, v) in &doc.footnote_defs {
+            fdefs.insert(k.clone(), blocks(v));
+        }
+        m.insert("footnoteDefs".into(), Value::Object(fdefs));
     }
-    m.insert("footnoteDefs".into(), Value::Object(fdefs));
 
     m.insert("children".into(), blocks(&doc.children));
     m.insert("srcByteLength".into(), Value::from(doc.source_len));
