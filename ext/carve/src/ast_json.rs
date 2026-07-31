@@ -52,9 +52,18 @@ pub fn document_to_json(doc: &Document) -> String {
 
 // ---- helpers ---------------------------------------------------------------
 
+/// Build a node object, OMITTING absent fields.
+///
+/// The reference shape leaves an absent field out rather than publishing it as
+/// `null`, so emitting `"inline": null` on every footnote reference was four
+/// fields the reference does not have on that node (PART 12 §3). Consumers
+/// keying on presence saw every optional field as present-and-empty.
 fn obj(pairs: Vec<(&str, Value)>) -> Value {
     let mut m = Map::new();
     for (k, v) in pairs {
+        if v.is_null() {
+            continue;
+        }
         m.insert(k.into(), v);
     }
     Value::Object(m)
