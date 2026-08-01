@@ -7,7 +7,7 @@
 //!
 //! Every node becomes a JSON object with a `"type"` tag plus its fields.
 //! Inline text is `{"type":"text","value":"..."}`. Child collections are
-//! JSON arrays. `Attrs` become `{"id","classes","key_values"}` or `null`.
+//! JSON arrays. `Attrs` become `{"id","classes","keyValues"}` or `null`.
 //!
 //! This walker lives in the binding (not carve-rs) so the engine stays free of
 //! a serde dependency; only the gem's native extension pulls in `serde_json`.
@@ -150,7 +150,9 @@ fn attrs(a: &Option<Attrs>) -> Value {
                     "classes",
                     Value::Array(at.classes.iter().map(|c| Value::String(c.clone())).collect()),
                 ),
-                ("key_values", Value::Object(kv)),
+                // `keyValues` in the reference, not this engine's `key_values`
+                // (PART 12 §3).
+                ("keyValues", Value::Object(kv)),
             ])
         }
     }
@@ -201,14 +203,27 @@ fn block(b: &BlockNode) -> Value {
             ol_type,
             tight,
             items,
-            delim: _,
-            bullet_char: _,
+            delim,
+            bullet_char,
             pos: p,
         }) => obj(vec![
             ("type", "list".into()),
             ("ordered", Value::Bool(*ordered)),
             ("start", opt_usize(start)),
-            ("ol_type", ol_type.map(ol_type_str).map(Value::from).unwrap_or(Value::Null)),
+            // `olType` in the reference, not this engine's `ol_type` (PART 12
+            // §3). The AUTHOR-CHOICE fields below were dropped entirely, so a
+            // consumer could not tell `- a` from `* a`, nor `1.` from `1)` -
+            // and §11 makes that distinction semantic: a sibling with a
+            // different marker starts a NEW list.
+            ("olType", ol_type.map(ol_type_str).map(Value::from).unwrap_or(Value::Null)),
+            (
+                "bulletChar",
+                bullet_char.map(|c| Value::from(c.to_string())).unwrap_or(Value::Null),
+            ),
+            (
+                "delim",
+                delim.map(|c| Value::from(c.to_string())).unwrap_or(Value::Null),
+            ),
             ("tight", Value::Bool(*tight)),
             (
                 "items",
@@ -584,8 +599,8 @@ fn inline(n: &InlineNode) -> Value {
         ]),
         InlineNode::CriticSubstitute(CriticSubstitute { old_text, new_text }) => obj(vec![
             ("type", "substitution".into()),
-            ("old_text", Value::String(old_text.clone())),
-            ("new_text", Value::String(new_text.clone())),
+            ("oldText", Value::String(old_text.clone())),
+            ("newText", Value::String(new_text.clone())),
         ]),
         InlineNode::CriticComment(CriticComment { text }) => obj(vec![
             ("type", "critic_comment".into()),
