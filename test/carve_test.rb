@@ -363,6 +363,16 @@ class CarveTest < Minitest::Test
     assert_kind_of Array, definition[:children]
   end
 
+  def test_parse_puts_the_definition_after_the_content
+    # PART 12 section 7 puts a definition where the author wrote it, and the
+    # engine used to write the whole map BEFORE `children` - so a document's
+    # first child was its own footnote, and anything reading `children.first`
+    # got the note's body. Found here, fixed in carve-rs (markup-carve/carve-rs#364).
+    types = Carve.parse("a[^r]\n\n[^r]: d\n")[:children].map { |node| node[:type] }
+
+    assert_equal %w[paragraph footnote], types
+  end
+
   def test_parse_emits_neither_node_when_the_document_has_neither
     ast = Carve.parse("# Hi")
 
