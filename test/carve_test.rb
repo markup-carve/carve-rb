@@ -485,6 +485,17 @@ class CarveTest < Minitest::Test
   # table around them. carve-rs had the fields and never wrote to them, and this
   # serializer never published them either - so both halves had to change before
   # a consumer saw anything (carve-rs#356).
+  # PART 12 section 3: an implementation "MUST NOT expose an internal field the
+  # reference does not have". `from_crossref` is this engine's own bookkeeping -
+  # whether a link was synthesized from a cross-reference - and it was on every
+  # link the binding published.
+  def test_parse_does_not_leak_engine_internals_on_a_link
+    node = Carve.parse("[t](/u)\n")[:children][0][:children][0]
+
+    assert_equal %i[children href type], node.keys.sort
+    refute node.key?(:from_crossref)
+  end
+
   def test_parse_publishes_cell_positions
     source = "| a | b |\n|---|---|\n| c | d |\n"
     cell = Carve.parse(source)[:children][0][:rows][0][:cells][0]
