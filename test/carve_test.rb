@@ -521,7 +521,9 @@ class CarveTest < Minitest::Test
   def test_parse_does_not_leak_engine_internals_on_a_link
     node = Carve.parse("[t](/u)\n")[:children][0][:children][0]
 
-    assert_equal %i[children href type], node.keys.sort
+    # `pos` is required by PART 12 section 4, not an internal - the point of
+    # this test is that `from_crossref` and friends stay out.
+    assert_equal %i[children href pos type], node.keys.sort
     refute node.key?(:from_crossref)
   end
 

@@ -14,17 +14,12 @@
 
 use carve_rs::{
     Abbreviation, AbbreviationDef, Admonition, Attrs, AutoLink, BlockExtension, BlockNode,
-    BlockQuote, CaptionNumber, Citation, CitationGroup, CitationRenderMode, CodeBlock, Comment,
-    CriticComment, CriticDelete, CriticInsert, CriticSubstitute, CrossRef, DefinitionList, Div,
-    Document, Emphasis, EmphasisKind, Figure, FigureTarget, Footnote, Heading, Image,
-    InlineExtension, InlineNode, LineBlock, Link, List, ListItem, Math, Mention,
-    OrderedListType,
-    Paragraph,
-    Pos,
-    LiteralInline, RawBlock, RawInline, SmartPunctuation, Span, Symbol, Table, TableAlign,
-    TableCell,
-    TableCellSpan, TableRow, Tag,
-    ThematicBreak,
+    BlockQuote, Break, CaptionNumber, Citation, CitationGroup, CitationRenderMode, Code, CodeBlock,
+    Comment, CriticComment, CriticDelete, CriticInsert, CriticSubstitute, CrossRef, DefinitionList,
+    Div, Document, Emphasis, EmphasisKind, EscapedText, Figure, FigureTarget, Footnote, Heading,
+    Image, InlineExtension, InlineNode, LineBlock, Link, List, ListItem, LiteralInline, Math,
+    Mention, OrderedListType, Paragraph, Pos, RawBlock, RawInline, SmartPunctuation, Span, Symbol,
+    Table, TableAlign, TableCell, TableCellSpan, TableRow, Tag, Text, ThematicBreak,
 };
 use serde_json::{Map, Value};
 
@@ -83,7 +78,6 @@ pub fn document_to_json(doc: &Document) -> String {
 
     Value::Object(m).to_string()
 }
-
 
 // ---- helpers ---------------------------------------------------------------
 
@@ -148,7 +142,12 @@ fn attrs(a: &Option<Attrs>) -> Value {
                 ("id", opt_str(&at.id)),
                 (
                     "classes",
-                    Value::Array(at.classes.iter().map(|c| Value::String(c.clone())).collect()),
+                    Value::Array(
+                        at.classes
+                            .iter()
+                            .map(|c| Value::String(c.clone()))
+                            .collect(),
+                    ),
                 ),
                 // `keyValues` in the reference, not this engine's `key_values`
                 // (PART 12 §3).
@@ -177,7 +176,12 @@ fn inlines(list: &[InlineNode]) -> Value {
 
 fn block(b: &BlockNode) -> Value {
     match b {
-        BlockNode::Heading(Heading { attrs: a, level, children, pos: p }) => obj(vec![
+        BlockNode::Heading(Heading {
+            attrs: a,
+            level,
+            children,
+            pos: p,
+        }) => obj(vec![
             ("type", "heading".into()),
             ("level", Value::from(*level)),
             ("children", inlines(children)),
@@ -215,26 +219,40 @@ fn block(b: &BlockNode) -> Value {
             // consumer could not tell `- a` from `* a`, nor `1.` from `1)` -
             // and §11 makes that distinction semantic: a sibling with a
             // different marker starts a NEW list.
-            ("olType", ol_type.map(ol_type_str).map(Value::from).unwrap_or(Value::Null)),
+            (
+                "olType",
+                ol_type
+                    .map(ol_type_str)
+                    .map(Value::from)
+                    .unwrap_or(Value::Null),
+            ),
             (
                 "bulletChar",
-                bullet_char.map(|c| Value::from(c.to_string())).unwrap_or(Value::Null),
+                bullet_char
+                    .map(|c| Value::from(c.to_string()))
+                    .unwrap_or(Value::Null),
             ),
             (
                 "delim",
-                delim.map(|c| Value::from(c.to_string())).unwrap_or(Value::Null),
+                delim
+                    .map(|c| Value::from(c.to_string()))
+                    .unwrap_or(Value::Null),
             ),
             ("tight", Value::Bool(*tight)),
-            (
-                "items",
-                Value::Array(items.iter().map(list_item).collect()),
-            ),
+            ("items", Value::Array(items.iter().map(list_item).collect())),
             ("attrs", attrs(a)),
             ("pos", pos(p)),
         ]),
         BlockNode::BlockQuote(q) => block_quote(q),
         BlockNode::Table(t) => table(t),
-        BlockNode::Admonition(Admonition { attrs: a, kind, title, label, children, pos: p }) => obj(vec![
+        BlockNode::Admonition(Admonition {
+            attrs: a,
+            kind,
+            title,
+            label,
+            children,
+            pos: p,
+        }) => obj(vec![
             ("type", "admonition".into()),
             ("kind", Value::String(kind.clone())),
             ("title", opt_inlines(title)),
@@ -243,7 +261,12 @@ fn block(b: &BlockNode) -> Value {
             ("attrs", attrs(a)),
             ("pos", pos(p)),
         ]),
-        BlockNode::Div(Div { attrs: a, label, children, pos: p }) => obj(vec![
+        BlockNode::Div(Div {
+            attrs: a,
+            label,
+            children,
+            pos: p,
+        }) => obj(vec![
             ("type", "div".into()),
             ("label", opt_str(label)),
             ("children", blocks(children)),
@@ -254,13 +277,21 @@ fn block(b: &BlockNode) -> Value {
         // rather than a div carrying a `.line-block` class: a plain div with
         // that class keeps soft breaks, so the class alone cannot say which one
         // this is (carve#359).
-        BlockNode::LineBlock(LineBlock { attrs: a, children, pos: p }) => obj(vec![
+        BlockNode::LineBlock(LineBlock {
+            attrs: a,
+            children,
+            pos: p,
+        }) => obj(vec![
             ("type", "line_block".into()),
             ("children", blocks(children)),
             ("attrs", attrs(a)),
             ("pos", pos(p)),
         ]),
-        BlockNode::DefinitionList(DefinitionList { attrs: a, items }) => obj(vec![
+        BlockNode::DefinitionList(DefinitionList {
+            attrs: a,
+            items,
+            pos: p,
+        }) => obj(vec![
             ("type", "definition_list".into()),
             (
                 "items",
@@ -285,41 +316,66 @@ fn block(b: &BlockNode) -> Value {
                 ),
             ),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
-        BlockNode::Figure(Figure { attrs: a, target, caption, pos: p }) => obj(vec![
+        BlockNode::Figure(Figure {
+            attrs: a,
+            target,
+            caption,
+            pos: p,
+        }) => obj(vec![
             ("type", "figure".into()),
             ("target", figure_target(target)),
             ("caption", inlines(caption)),
             ("attrs", attrs(a)),
             ("pos", pos(p)),
         ]),
-        BlockNode::AbbreviationDef(AbbreviationDef { abbr, expansion }) => obj(vec![
+        BlockNode::AbbreviationDef(AbbreviationDef {
+            abbr,
+            expansion,
+            pos: p,
+        }) => obj(vec![
             ("type", "abbreviation_def".into()),
             ("abbr", Value::String(abbr.clone())),
             ("expansion", Value::String(expansion.clone())),
+            ("pos", pos(p)),
         ]),
-        BlockNode::RawBlock(RawBlock { format, content, pos: p }) => obj(vec![
+        BlockNode::RawBlock(RawBlock {
+            format,
+            content,
+            pos: p,
+        }) => obj(vec![
             ("type", "raw_block".into()),
             ("format", Value::String(format.clone())),
             ("content", Value::String(content.clone())),
             ("pos", pos(p)),
         ]),
-        BlockNode::Comment(Comment { block, content, pos: p }) => obj(vec![
+        BlockNode::Comment(Comment {
+            block,
+            content,
+            pos: p,
+        }) => obj(vec![
             ("type", "comment".into()),
             ("block", Value::Bool(*block)),
             ("content", Value::String(content.clone())),
             ("pos", pos(p)),
         ]),
-        BlockNode::Extension(BlockExtension { attrs: a, name, children, summary, label }) => {
-            obj(vec![
-                ("type", "block_extension".into()),
-                ("name", Value::String(name.clone())),
-                ("children", blocks(children)),
-                ("summary", opt_inlines(summary)),
-                ("label", opt_str(label)),
-                ("attrs", attrs(a)),
-            ])
-        }
+        BlockNode::Extension(BlockExtension {
+            attrs: a,
+            name,
+            children,
+            summary,
+            label,
+            pos: p,
+        }) => obj(vec![
+            ("type", "block_extension".into()),
+            ("name", Value::String(name.clone())),
+            ("children", blocks(children)),
+            ("summary", opt_inlines(summary)),
+            ("label", opt_str(label)),
+            ("attrs", attrs(a)),
+            ("pos", pos(p)),
+        ]),
         BlockNode::BlockImage(img) => {
             // A block-level image reuses the inline Image shape but tagged
             // block_image so a renderer can place it as a standalone figure.
@@ -379,10 +435,7 @@ fn table(t: &Table) -> Value {
     obj(vec![
         ("type", "table".into()),
         ("caption", opt_inlines(&t.caption)),
-        (
-            "rows",
-            Value::Array(t.rows.iter().map(table_row).collect()),
-        ),
+        ("rows", Value::Array(t.rows.iter().map(table_row).collect())),
         ("attrs", attrs(&t.attrs)),
         ("pos", pos(&t.pos)),
     ])
@@ -460,23 +513,31 @@ fn ol_type_str(t: OrderedListType) -> &'static str {
 
 fn inline(n: &InlineNode) -> Value {
     match n {
-        InlineNode::Text(s) => obj(vec![
+        InlineNode::Text(Text { value, pos: p }) => obj(vec![
             ("type", "text".into()),
-            ("value", Value::String(s.clone())),
+            ("value", Value::String(value.clone())),
+            ("pos", pos(p)),
         ]),
         // A character the author escaped. Its own type rather than plain text:
         // the backslash carries intent the character does not, which is what
         // lets a consumer reproduce `\-\-` instead of emitting an en dash
         // (carve#350). The value is the character, without the backslash.
-        InlineNode::EscapedText(s) => obj(vec![
+        InlineNode::EscapedText(EscapedText { value, pos: p }) => obj(vec![
             ("type", "escaped_text".into()),
-            ("value", Value::String(s.clone())),
+            ("value", Value::String(value.clone())),
+            ("pos", pos(p)),
         ]),
-        InlineNode::Emphasis(Emphasis { attrs: a, kind, children }) => obj(vec![
+        InlineNode::Emphasis(Emphasis {
+            attrs: a,
+            kind,
+            children,
+            pos: p,
+        }) => obj(vec![
             ("type", "emphasis".into()),
             ("kind", emphasis_kind_str(*kind).into()),
             ("children", inlines(children)),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
         // The inline literal (spec PART 9 section 27) is a verbatim span with
         // the code wrapper dropped. It serializes as its own type rather than
@@ -487,33 +548,59 @@ fn inline(n: &InlineNode) -> Value {
             ("content", Value::String(l.content.clone())),
             ("attrs", attrs(&l.attrs)),
         ]),
-        InlineNode::Code(s, a) => obj(vec![
+        InlineNode::Code(Code {
+            value,
+            attrs: a,
+            pos: p,
+        }) => obj(vec![
             ("type", "code".into()),
-            ("value", Value::String(s.clone())),
+            ("value", Value::String(value.clone())),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
         InlineNode::Link(l) => link(l),
         InlineNode::Image(img) => image(img),
-        InlineNode::Span(Span { attrs: a, children }) => obj(vec![
+        InlineNode::Span(Span {
+            attrs: a,
+            children,
+            pos: p,
+        }) => obj(vec![
             ("type", "span".into()),
             ("children", inlines(children)),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
-        InlineNode::Math(Math { attrs: a, display, content }) => obj(vec![
+        InlineNode::Math(Math {
+            attrs: a,
+            display,
+            content,
+            pos: p,
+        }) => obj(vec![
             ("type", "math".into()),
             ("display", Value::Bool(*display)),
             ("content", Value::String(content.clone())),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
-        InlineNode::RawInline(RawInline { format, content }) => obj(vec![
+        InlineNode::RawInline(RawInline {
+            format,
+            content,
+            pos: p,
+        }) => obj(vec![
             ("type", "raw_inline".into()),
             ("format", Value::String(format.clone())),
             ("content", Value::String(content.clone())),
+            ("pos", pos(p)),
         ]),
-        InlineNode::Symbol(Symbol { name, attrs: a }) => obj(vec![
+        InlineNode::Symbol(Symbol {
+            name,
+            attrs: a,
+            pos: p,
+        }) => obj(vec![
             ("type", "symbol".into()),
             ("name", Value::String(name.clone())),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
         // A typographic substitution carries BOTH halves: the resolved kind and
         // the author's source run (spec PART 9 section 8). A consumer that only
@@ -522,51 +609,85 @@ fn inline(n: &InlineNode) -> Value {
         // resolves `kind` through the spec's table. One rebuilding source reads
         // `value`. Dropping either half would make this binding's JSON lossier
         // than the tree it serializes.
-        InlineNode::SmartPunctuation(SmartPunctuation { kind, value, glyph }) => obj(vec![
+        InlineNode::SmartPunctuation(SmartPunctuation {
+            kind,
+            value,
+            glyph,
+            pos: p,
+        }) => obj(vec![
             ("type", "smart_punctuation".into()),
             ("kind", Value::String(kind.clone())),
             ("value", Value::String(value.clone())),
             ("glyph", opt_str(glyph)),
+            ("pos", pos(p)),
         ]),
-        InlineNode::AutoLink(AutoLink { attrs: a, href, text }) => obj(vec![
+        InlineNode::AutoLink(AutoLink {
+            attrs: a,
+            href,
+            text,
+            pos: p,
+        }) => obj(vec![
             ("type", "autolink".into()),
             ("href", Value::String(href.clone())),
             ("text", Value::String(text.clone())),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
-        InlineNode::CrossRef(CrossRef { target }) => obj(vec![
+        InlineNode::CrossRef(CrossRef { target, pos: p }) => obj(vec![
             ("type", "cross_ref".into()),
             ("target", Value::String(target.clone())),
+            ("pos", pos(p)),
         ]),
-        InlineNode::CaptionNumber(CaptionNumber { number }) => obj(vec![
+        InlineNode::CaptionNumber(CaptionNumber { number, pos: p }) => obj(vec![
             ("type", "caption_number".into()),
             ("number", opt_usize(number)),
+            ("pos", pos(p)),
         ]),
-        InlineNode::Mention(Mention { user }) => obj(vec![
+        InlineNode::Mention(Mention { user, pos: p }) => obj(vec![
             ("type", "mention".into()),
             ("user", Value::String(user.clone())),
+            ("pos", pos(p)),
         ]),
-        InlineNode::Tag(Tag { name }) => obj(vec![
+        InlineNode::Tag(Tag { name, pos: p }) => obj(vec![
             ("type", "tag".into()),
             ("name", Value::String(name.clone())),
+            ("pos", pos(p)),
         ]),
         InlineNode::CitationGroup(g) => citation_group(g),
-        InlineNode::Extension(InlineExtension { attrs: a, name, children }) => obj(vec![
+        InlineNode::Extension(InlineExtension {
+            attrs: a,
+            name,
+            children,
+            pos: p,
+        }) => obj(vec![
             ("type", "inline_extension".into()),
             ("name", Value::String(name.clone())),
             ("children", inlines(children)),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
-        InlineNode::Abbreviation(Abbreviation { abbr, expansion }) => obj(vec![
+        InlineNode::Abbreviation(Abbreviation {
+            abbr,
+            expansion,
+            pos: p,
+        }) => obj(vec![
             ("type", "abbreviation".into()),
             ("abbr", Value::String(abbr.clone())),
             ("expansion", Value::String(expansion.clone())),
+            ("pos", pos(p)),
         ]),
         // `footnote` names the BLOCK definition type in the vocabulary, so the
         // two inline forms are `footnote_ref` (`[^a]`) and `inline_footnote`
         // (`^[…]`) - split by the node's own shape, since the engine keeps both
         // in one struct (carve#405).
-        InlineNode::Footnote(Footnote { attrs: a, id, inline: inl, number, ref_id }) => {
+        InlineNode::Footnote(Footnote {
+            attrs: a,
+            id,
+            inline: inl,
+            number,
+            ref_id,
+            pos: p,
+        }) => {
             if inl.is_some() {
                 obj(vec![
                     ("type", "inline_footnote".into()),
@@ -574,6 +695,7 @@ fn inline(n: &InlineNode) -> Value {
                     ("number", opt_usize(number)),
                     ("refId", opt_str(ref_id)),
                     ("attrs", attrs(a)),
+                    ("pos", pos(p)),
                 ])
             } else {
                 obj(vec![
@@ -582,29 +704,50 @@ fn inline(n: &InlineNode) -> Value {
                     ("number", opt_usize(number)),
                     ("refId", opt_str(ref_id)),
                     ("attrs", attrs(a)),
+                    ("pos", pos(p)),
                 ])
             }
         }
-        InlineNode::SoftBreak => obj(vec![("type", "soft_break".into())]),
-        InlineNode::HardBreak => obj(vec![("type", "hard_break".into())]),
-        InlineNode::CriticInsert(CriticInsert { attrs: a, children }) => obj(vec![
+        InlineNode::SoftBreak(Break { pos: p }) => {
+            obj(vec![("type", "soft_break".into()), ("pos", pos(p))])
+        }
+        InlineNode::HardBreak(Break { pos: p }) => {
+            obj(vec![("type", "hard_break".into()), ("pos", pos(p))])
+        }
+        InlineNode::CriticInsert(CriticInsert {
+            attrs: a,
+            children,
+            pos: p,
+        }) => obj(vec![
             ("type", "insert".into()),
             ("children", inlines(children)),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
-        InlineNode::CriticDelete(CriticDelete { attrs: a, children }) => obj(vec![
+        InlineNode::CriticDelete(CriticDelete {
+            attrs: a,
+            children,
+            pos: p,
+        }) => obj(vec![
             ("type", "delete".into()),
             ("children", inlines(children)),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
-        InlineNode::CriticSubstitute(CriticSubstitute { old_text, new_text }) => obj(vec![
+        InlineNode::CriticSubstitute(CriticSubstitute {
+            old_text,
+            new_text,
+            pos: p,
+        }) => obj(vec![
             ("type", "substitution".into()),
             ("oldText", Value::String(old_text.clone())),
             ("newText", Value::String(new_text.clone())),
+            ("pos", pos(p)),
         ]),
-        InlineNode::CriticComment(CriticComment { text }) => obj(vec![
+        InlineNode::CriticComment(CriticComment { text, pos: p }) => obj(vec![
             ("type", "critic_comment".into()),
             ("text", Value::String(text.clone())),
+            ("pos", pos(p)),
         ]),
     }
 }
@@ -621,6 +764,7 @@ fn link(l: &Link) -> Value {
         ("ref", opt_str(&l.ref_label)),
         ("rawRef", opt_str(&l.raw_ref)),
         ("attrs", attrs(&l.attrs)),
+        ("pos", pos(&l.pos)),
     ])
 }
 
@@ -631,6 +775,7 @@ fn image(img: &Image) -> Value {
         ("alt", Value::String(img.alt.clone())),
         ("title", opt_str(&img.title)),
         ("attrs", attrs(&img.attrs)),
+        ("pos", pos(&img.pos)),
     ])
 }
 
@@ -651,6 +796,7 @@ fn citation_group(g: &CitationGroup) -> Value {
             "items",
             Value::Array(g.items.iter().map(citation).collect()),
         ),
+        ("pos", pos(&g.pos)),
     ])
 }
 

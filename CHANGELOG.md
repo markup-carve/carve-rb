@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Inline nodes carry `pos`.** The engine bump brings carve-rs's inline
+  position work (markup-carve/carve-rs#360), and the serializer now publishes it
+  on every inline type as well as the remaining block ones - text, escaped text,
+  code, links, images, breaks, citation groups, footnote references and the
+  editorial marks.
+
+  Against the spec's `scripts/ast-conformance.mjs` over the 507-document corpus,
+  this takes carve-rb from **2553 findings to 576**. What remains is carve-rs's
+  own gap (287 text nodes it still cannot place) plus one shape defect tracked
+  separately: this binding publishes `{"type":"emphasis","kind":"strong"}` where
+  the reference publishes `{"type":"strong"}`.
+
+### Added
+
 - **`Carve.parse` now publishes source positions.** Every block node the engine
   can place carries `pos` with `startLine`, `endLine`, `startColumn`,
   `endColumn`, `startOffset` and `endOffset`, as PART 12 section 4 spells it:

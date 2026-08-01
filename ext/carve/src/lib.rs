@@ -392,7 +392,6 @@ fn to_html_safe(
         .map_err(|e| Error::new(ruby.exception_arg_error(), e.to_string()))
 }
 
-
 /// Read a document's provenance marker.
 ///
 /// Returns a Hash `{version:, generated_by:}` or nil when the document carries
