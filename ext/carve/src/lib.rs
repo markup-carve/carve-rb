@@ -12,14 +12,17 @@
 //! * `Carve.to_html_full_with_symbols(source, extensions, mode, renderers,
 //!   symbols)` -> HTML String, the same primitive plus the `:name:` symbol map.
 //! * `Carve._to_html_safe(source, extensions, mode, renderers, symbols, safe,
-//!   profile)` -> HTML String, the same primitive plus the two safe-render
-//!   controls: `safe` escapes `=html` raw blocks/spans, `profile` is nil or one
-//!   of `"full"` / `"article"` / `"comment"` / `"minimal"`. The others delegate
-//!   to it, so there is one implementation of the render path.
+//!   profile, sections)` -> HTML String, the same primitive plus the two
+//!   safe-render controls and the section-wrapping switch: `safe` escapes
+//!   `=html` raw blocks/spans, `profile` is nil or one of `"full"` /
+//!   `"article"` / `"comment"` / `"minimal"`, `sections` wraps top-level
+//!   headings in `<section>` (spec PART 9 §13). The others delegate to it, so
+//!   there is one implementation of the render path.
 //!
 //! The pure-Ruby wrapper in `lib/carve.rb` adds the keyword-argument form
 //! `Carve.to_html(source, extensions: [...], mode: ..., renderers: {...},
-//! symbols: {...}, safe: ..., profile: ...)` on top of these primitives.
+//! symbols: {...}, safe: ..., profile: ..., sections: ...)` on top of these
+//! primitives.
 
 
 use carve_rs::{
@@ -317,9 +320,10 @@ fn to_html_full_with_symbols(
     renderers: RHash,
     symbols: RHash,
 ) -> Result<String, Error> {
-    // The safe-render arguments default off here so this signature stays as
-    // published; `to_html_safe` is the one that takes them.
-    to_html_safe(ruby, source, names, mode, renderers, symbols, false, None)
+    // The safe-render arguments default off and section wrapping stays on, so
+    // this signature stays as published; `to_html_safe` is the one that takes
+    // them.
+    to_html_safe(ruby, source, names, mode, renderers, symbols, false, None, true)
 }
 
 /// Map a profile name to a [`Profile`], or raise Ruby ArgumentError.
@@ -352,6 +356,11 @@ fn parse_profile(ruby: &Ruby, name: &str) -> Result<Profile, Error> {
 ///
 /// `profile` is `nil` or one of the four preset names, restricting which
 /// constructs are allowed at all and capping input length.
+///
+/// `sections` wraps each top-level heading in `<section id="…">` (spec PART 9
+/// §13) and is `true` for every existing caller. `false` renders headings flat
+/// with the id back on the `<h*>`, for a host whose CSS or JS assumes rendered
+/// blocks are direct children of the content container.
 #[allow(clippy::too_many_arguments)]
 fn to_html_safe(
     ruby: &Ruby,
@@ -362,6 +371,7 @@ fn to_html_safe(
     symbols: RHash,
     safe: bool,
     profile: Option<String>,
+    sections: bool,
 ) -> Result<String, Error> {
     let parsed_mode = parse_mode(ruby, &mode)?;
     let parsed_profile = match profile.as_deref() {
@@ -386,6 +396,9 @@ fn to_html_safe(
     }
     if let Some(p) = parsed_profile {
         options = options.with_profile(p);
+    }
+    if !sections {
+        options = options.with_sections(false);
     }
 
     // The fallible entry point, not `to_html_with_options`. That one is
@@ -453,7 +466,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
         "to_html_full_with_symbols",
         function!(to_html_full_with_symbols, 5),
     )?;
-    module.define_singleton_method("_to_html_safe", function!(to_html_safe, 7))?;
+    module.define_singleton_method("_to_html_safe", function!(to_html_safe, 8))?;
     module.define_singleton_method("_read_stamp", function!(read_stamp, 1))?;
     module.define_singleton_method("_stamp_needs_review", function!(stamp_needs_review, 2))?;
     Ok(())

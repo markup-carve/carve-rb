@@ -152,6 +152,35 @@ The leading word-boundary guard is unaffected by an active map: `a:b:c`,
 > trusted). **Never build a symbols map out of untrusted / user-supplied
 > input.**
 
+## Section wrappers
+
+A top-level heading is wrapped, along with the content following it up to the
+next same-or-shallower heading, in a `<section>` carrying the heading's id (spec
+PART 9 §13). Only the id moves - `{#install .featured}` gives
+`<section id="install"><h2 class="featured">` - and a heading inside a
+blockquote, div or list item is not wrapped at all.
+
+Pass `sections: false` to render headings flat, with the id back on the `<h*>`:
+
+```ruby
+Carve.to_html("# A\n\np\n")
+# => "<section id=\"A\">\n  <h1>A</h1>\n  <p>p</p>\n</section>"
+
+Carve.to_html("# A\n\np\n", sections: false)
+# => "<h1 id=\"A\">A</h1>\n<p>p</p>"
+```
+
+This is for a host whose CSS or JS assumes rendered blocks are direct children
+of the content container - the `.stack > * + *` spacing idiom, `:first-child`,
+`nth-child()` counting, DOM child walks - all of which stop matching once a
+wrapper sits in between. It is the one output change that breaks a document
+whose *source* migrated cleanly.
+
+Nothing else changes: ids, collision dedup, `</#id>` cross-references, implicit
+`[Heading][]` references and heading numbering all resolve against the slug
+rather than the element carrying it. The endnotes
+`<section role="doc-endnotes">` is a separate construct and is still emitted.
+
 ## Untrusted input
 
 Carve's normative hardening is always on and needs no option: dangerous URL
@@ -221,6 +250,7 @@ a document change.
 | `Carve.to_html(source, mode: :static, renderers: {...})` | Render self-contained static HTML with build-time renderers. |
 | `Carve.to_html(source, symbols: {...})` | Render with a `:name:` -> value symbol map (values are raw, see above). |
 | `Carve.to_html(source, safe: true, profile: :comment)` | Render untrusted input: escape `=html` raw blocks/spans, restrict constructs. |
+| `Carve.to_html(source, sections: false)` | Render headings flat, with the id on the `<h*>` instead of a `<section>` wrapper. |
 | `Carve.read_stamp(source)` | Read a document's provenance marker: `{version:, generated_by:}` or `nil`. |
 | `Carve.needs_review?(source)` | Whether a document predates this engine's spec version (unstamped counts as yes). |
 | `Carve.to_html_with_extensions(source, names_array)` | Native primitive (Array of Strings). |

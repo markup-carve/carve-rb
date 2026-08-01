@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`Carve.to_html(source, sections: false)` renders headings without the
+  `<section>` wrapper** (#36, spec PART 9 §13). The id goes back on the `<h*>`
+  alongside its other attributes, and the blocks that would have been section
+  children stay as siblings. Default `true`, so existing output is unchanged.
+
+  The wrapper is the one output change that breaks a site whose source migrated
+  cleanly: CSS and JS assuming rendered blocks are direct children of the
+  content container stop matching once a `<section>` sits in between.
+
+  The keyword also disqualifies the no-options fast path in `to_html`. That path
+  calls `_to_html`, which takes no options at all, so short-circuiting to it
+  would have dropped the flag and returned wrapped output with no error - the
+  kind of failure a caller cannot see. It is pinned by its own test rather than
+  left to the implementation.
+
 ### Changed
 
 - **Engine bumped to carve-rs `5308d86`** (from `aad11cc`, 15 commits). Two of

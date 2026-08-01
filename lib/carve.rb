@@ -100,6 +100,34 @@ module Carve
     # escaped text. This is deliberate: processor configuration is trusted.
     # NEVER build a symbols map out of untrusted / user-supplied input.
     #
+    # ==== Section wrappers
+    #
+    # A top-level heading is wrapped, along with the content following it up to
+    # the next same-or-shallower heading, in a +<section>+ carrying the heading's
+    # id (spec PART 9 §13). Only the id moves - +{#install .featured}+ gives
+    # <tt><section id="install"><h2 class="featured"></tt> - and a heading inside
+    # a blockquote, div or list item is not wrapped at all.
+    #
+    # Pass +sections: false+ to render headings flat, with the id back on the
+    # +<h*>+:
+    #
+    #   Carve.to_html("# A\n\np\n")
+    #   # => "<section id=\"A\">\n  <h1>A</h1>\n  <p>p</p>\n</section>"
+    #   Carve.to_html("# A\n\np\n", sections: false)
+    #   # => "<h1 id=\"A\">A</h1>\n<p>p</p>"
+    #
+    # This is for a host whose CSS or JS assumes rendered blocks are direct
+    # children of the content container - the <tt>.stack > * + *</tt> spacing
+    # idiom, +:first-child+, +nth-child()+ counting, DOM child walks - all of
+    # which stop matching once a wrapper sits in between. It is the one output
+    # change that breaks a document whose *source* migrated cleanly.
+    #
+    # Nothing else changes: ids, collision dedup, <tt></#id></tt>
+    # cross-references, implicit +[Heading][]+ references and heading numbering
+    # all resolve against the slug rather than the element carrying it. The
+    # endnotes <tt><section role="doc-endnotes"></tt> is a separate construct and
+    # is still emitted.
+    #
     # ==== Untrusted input
     #
     # Carve's normative hardening is always on and needs no argument here:
@@ -130,14 +158,17 @@ module Carve
     # infallible entry point answers a rejection with an empty String, which a
     # caller cannot tell from a document that legitimately rendered to nothing.
     def to_html(source, extensions: nil, mode: nil, renderers: nil, symbols: nil,
-                safe: false, profile: nil)
+                safe: false, profile: nil, sections: true)
       list = Array(extensions)
 
       # Fast path: interactive (default), no extensions, no renderers, no
-      # symbols, and neither safe-render control in play.
+      # symbols, neither safe-render control in play, and section wrapping left
+      # on. `sections: false` MUST fall through -- `_to_html` takes no options,
+      # so short-circuiting to it would drop the flag and return wrapped output
+      # with no error, which is the failure mode a caller cannot see.
       if list.empty? && (mode.nil? || mode.to_s == "interactive") &&
          (renderers.nil? || renderers.empty?) && (symbols.nil? || symbols.empty?) &&
-         !safe && profile.nil?
+         !safe && profile.nil? && sections
         return _to_html(source.to_s)
       end
 
@@ -149,6 +180,7 @@ module Carve
         symbols || {},
         !!safe,
         profile&.to_s,
+        !!sections,
       )
     end
 
