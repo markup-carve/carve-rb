@@ -354,9 +354,12 @@ class CarveTest < Minitest::Test
     ast = Carve.parse("a[^r]\n\n[^r]: d\n")
     definition = ast[:children].find { |node| node[:type] == "footnote" }
 
-    # `id`, matching what footnote_ref already carries for the same string.
+    # `label`, not `id` (PART 12 section 7): PART 9 section 16 calls it a label
+    # throughout, and `id` collides with the attribute of that name. The INLINE
+    # reference still carries `id`; they are two different node types.
     refute_nil definition
-    assert_equal "r", definition[:id]
+    assert_equal "r", definition[:label]
+    refute definition.key?(:id)
     assert_kind_of Array, definition[:children]
   end
 
@@ -385,17 +388,22 @@ class CarveTest < Minitest::Test
     heading = Carve.parse("# Hello *world*")[:children].first
     assert_equal "heading", heading[:type]
     assert_equal 1, heading[:level]
+    # The KIND is the type (PART 12 section 3): `strong`, `emphasis`,
+    # `underline`, ... The gem used to publish `emphasis` for all of them with a
+    # `kind` field beside it, which is an internal enum the reference shape does
+    # not have - a consumer switching on `type` saw one node type where the
+    # vocabulary defines seven.
     kinds = heading[:children].map { |n| n[:type] }
-    assert_equal %w[text emphasis], kinds
+    assert_equal %w[text strong], kinds
     strong = heading[:children].last
-    assert_equal "strong", strong[:kind]
+    refute strong.key?(:kind)
     assert_equal "world", strong[:children].first[:value]
   end
 
   def test_parse_emphasis_kinds
     para = Carve.parse("*b* /i/")[:children].first
-    kinds = para[:children].select { |n| n[:type] == "emphasis" }.map { |n| n[:kind] }
-    assert_equal %w[strong italic], kinds
+    marks = para[:children].reject { |n| n[:type] == "text" }.map { |n| n[:type] }
+    assert_equal %w[strong emphasis], marks
   end
 
   # A typographic substitution is its own node carrying BOTH halves: the
@@ -473,7 +481,8 @@ class CarveTest < Minitest::Test
   def test_parse_splits_the_two_footnote_forms
     # `footnote` is the BLOCK definition type in the vocabulary, so using it for
     # the inline forms named three things with one identifier.
-    para = Carve.parse("a[^r] and ^[n]\n\n[^r]: def\n")[:children].first
+    para = Carve.parse("a[^r] and ^[n]\n\n[^r]: def\n")[:children]
+                .find { |n| n[:type] == "paragraph" }
     types = para[:children].map { |n| n[:type] }
 
     assert_includes types, "footnote_ref"
@@ -521,8 +530,11 @@ class CarveTest < Minitest::Test
   def test_parse_does_not_leak_engine_internals_on_a_link
     node = Carve.parse("[t](/u)\n")[:children][0][:children][0]
 
-    assert_equal %i[children href type], node.keys.sort
+    # `pos` is spec surface (PART 12 section 4), so it belongs here; the
+    # engine's own bookkeeping does not.
+    assert_equal %i[children href pos type], node.keys.sort
     refute node.key?(:from_crossref)
+    refute node.key?(:raw_ref)
   end
 
   def test_parse_publishes_cell_positions
@@ -563,7 +575,7 @@ class CarveTest < Minitest::Test
 
     definition = ast[:children].find { |node| node[:type] == "footnote" }
     refute_nil definition
-    assert_equal "r", definition[:id]
+    assert_equal "r", definition[:label]
   end
 
   def test_parse_critic_nodes_expose_attrs
@@ -628,7 +640,7 @@ class CarveTest < Minitest::Test
     node = Carve.parse(%Q{::: note "Heads *up*"\nBody.\n:::\n})[:children].first
     assert_equal "admonition", node[:type]
     assert_equal "text", node[:title].first[:type]
-    assert_equal "emphasis", node[:title].last[:type]
+    assert_equal "strong", node[:title].last[:type]
   end
 
 
