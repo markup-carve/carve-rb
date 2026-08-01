@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`Carve.parse` now publishes source positions.** Every block node the engine
+  can place carries `pos` with `startLine`, `endLine`, `startColumn`,
+  `endColumn`, `startOffset` and `endOffset`, as PART 12 section 4 spells it:
+  lines and columns 1-based, offsets 0-based, all counted in Unicode
+  codepoints, with `endColumn` and `endOffset` exclusive.
+
+  The section lets an engine gate position TRACKING behind a parse option but
+  not serialization, so the AST entry point turns tracking on. `to_html` and
+  the other render paths do not, since they would pay for spans nobody reads.
+
+  A node whose span carve-rs could not determine has no `pos` key at all,
+  rather than one holding placeholder numbers. The same section requires that:
+  an absent position is a fact a consumer can act on, an invented one is not.
+
+  Inline nodes do not carry positions yet, because carve-rs does not track them
+  (markup-carve/carve-rs#333). Against the spec's own conformance checker this
+  takes carve-rb from 3413 findings to 2535 over the 507-document corpus, and
+  what remains is almost entirely inline.
+
 ### Changed
 
 - **BREAKING (AST JSON): node types and root field names now match the

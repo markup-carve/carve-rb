@@ -208,8 +208,15 @@ fn to_html(source: String) -> String {
 /// The pure-Ruby wrapper (`Carve.parse`) turns this into a tree of Ruby
 /// Hashes/Arrays. Parsing uses the default profile (no extensions); the AST is
 /// the raw parse tree, so render-stage extension rewrites are not applied.
+///
+/// Position tracking is ON here and nowhere else. PART 12 section 4 lets an
+/// engine gate tracking behind an option but requires the serialized form to
+/// carry it, and this is the only entry point that serializes; `to_html` and
+/// friends would pay for spans nobody reads.
 fn to_ast_json(source: String) -> String {
-    document_to_json(&carve_rs::parse(&source))
+    let mut options = Options::new();
+    options.positions = true;
+    document_to_json(&carve_rs::parse_with_options(&source, &options))
 }
 
 /// Render Carve source to HTML with the named extensions enabled.
