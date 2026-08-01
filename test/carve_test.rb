@@ -471,10 +471,18 @@ class CarveTest < Minitest::Test
   def test_parse_root_uses_reference_field_names
     ast = Carve.parse("a[^r]\n\n[^r]: def\n")
 
-    assert ast.key?(:footnoteDefs)
+    # PART 12 §7: the root is exactly type, children and srcByteLength, so the
+    # definition lives in the tree rather than in a root map (carve#411). What
+    # this test still guards is the SPELLING: reference field names, not this
+    # engine's internal snake_case.
     assert ast.key?(:srcByteLength)
-    refute ast.key?(:footnote_defs)
     refute ast.key?(:source_len)
+    refute ast.key?(:footnoteDefs)
+    refute ast.key?(:footnote_defs)
+
+    definition = ast[:children].find { |node| node[:type] == "footnote" }
+    refute_nil definition
+    assert_equal "r", definition[:id]
   end
 
   def test_parse_critic_nodes_expose_attrs

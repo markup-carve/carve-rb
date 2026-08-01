@@ -46,9 +46,9 @@ pub fn document_to_json(doc: &Document) -> String {
     // is RAW: section 7 forbids emitting parsed key/values in its place, since
     // parsing YAML or TOML is not the markup parser's job and a parsed map
     // cannot represent a malformed block at all. `Document::frontmatter` holds
-    // the parsed pairs this engine still exposes to Ruby; `frontmatter_source`
+    // the parsed pairs this engine still exposes to Ruby; `frontmatter_raw`
     // is what the author actually wrote.
-    if let Some(source) = &doc.frontmatter_source {
+    if let Some(source) = &doc.frontmatter_raw {
         children.push(obj(vec![
             ("type", "frontmatter".into()),
             ("format", Value::String(source.format.clone())),
@@ -151,7 +151,7 @@ fn inlines(list: &[InlineNode]) -> Value {
 
 fn block(b: &BlockNode) -> Value {
     match b {
-        BlockNode::Heading(Heading { attrs: a, level, children }) => obj(vec![
+        BlockNode::Heading(Heading { attrs: a, level, children, .. }) => obj(vec![
             ("type", "heading".into()),
             ("level", Value::from(*level)),
             ("children", inlines(children)),
@@ -160,8 +160,7 @@ fn block(b: &BlockNode) -> Value {
         BlockNode::Paragraph(Paragraph {
             attrs: a,
             children,
-            at_content_column: _,
-        }) => obj(vec![
+            at_content_column: _, .. }) => obj(vec![
             ("type", "paragraph".into()),
             ("children", inlines(children)),
             ("attrs", attrs(a)),
@@ -175,8 +174,7 @@ fn block(b: &BlockNode) -> Value {
             tight,
             items,
             delim: _,
-            bullet_char: _,
-        }) => obj(vec![
+            bullet_char: _, .. }) => obj(vec![
             ("type", "list".into()),
             ("ordered", Value::Bool(*ordered)),
             ("start", opt_usize(start)),
@@ -190,7 +188,7 @@ fn block(b: &BlockNode) -> Value {
         ]),
         BlockNode::BlockQuote(q) => block_quote(q),
         BlockNode::Table(t) => table(t),
-        BlockNode::Admonition(Admonition { attrs: a, kind, title, label, children }) => obj(vec![
+        BlockNode::Admonition(Admonition { attrs: a, kind, title, label, children, .. }) => obj(vec![
             ("type", "admonition".into()),
             ("kind", Value::String(kind.clone())),
             ("title", opt_inlines(title)),
@@ -198,7 +196,7 @@ fn block(b: &BlockNode) -> Value {
             ("children", blocks(children)),
             ("attrs", attrs(a)),
         ]),
-        BlockNode::Div(Div { attrs: a, label, children }) => obj(vec![
+        BlockNode::Div(Div { attrs: a, label, children, .. }) => obj(vec![
             ("type", "div".into()),
             ("label", opt_str(label)),
             ("children", blocks(children)),
@@ -208,7 +206,7 @@ fn block(b: &BlockNode) -> Value {
         // rather than a div carrying a `.line-block` class: a plain div with
         // that class keeps soft breaks, so the class alone cannot say which one
         // this is (carve#359).
-        BlockNode::LineBlock(LineBlock { attrs: a, children }) => obj(vec![
+        BlockNode::LineBlock(LineBlock { attrs: a, children, .. }) => obj(vec![
             ("type", "line_block".into()),
             ("children", blocks(children)),
             ("attrs", attrs(a)),
@@ -239,7 +237,7 @@ fn block(b: &BlockNode) -> Value {
             ),
             ("attrs", attrs(a)),
         ]),
-        BlockNode::Figure(Figure { attrs: a, target, caption }) => obj(vec![
+        BlockNode::Figure(Figure { attrs: a, target, caption, .. }) => obj(vec![
             ("type", "figure".into()),
             ("target", figure_target(target)),
             ("caption", inlines(caption)),
@@ -250,12 +248,12 @@ fn block(b: &BlockNode) -> Value {
             ("abbr", Value::String(abbr.clone())),
             ("expansion", Value::String(expansion.clone())),
         ]),
-        BlockNode::RawBlock(RawBlock { format, content }) => obj(vec![
+        BlockNode::RawBlock(RawBlock { format, content, .. }) => obj(vec![
             ("type", "raw_block".into()),
             ("format", Value::String(format.clone())),
             ("content", Value::String(content.clone())),
         ]),
-        BlockNode::Comment(Comment { block, content }) => obj(vec![
+        BlockNode::Comment(Comment { block, content, .. }) => obj(vec![
             ("type", "comment".into()),
             ("block", Value::Bool(*block)),
             ("content", Value::String(content.clone())),
@@ -279,7 +277,7 @@ fn block(b: &BlockNode) -> Value {
             }
             v
         }
-        BlockNode::ThematicBreak(ThematicBreak { attrs: a }) => obj(vec![
+        BlockNode::ThematicBreak(ThematicBreak { attrs: a, .. }) => obj(vec![
             ("type", "thematic_break".into()),
             ("attrs", attrs(a)),
         ]),
@@ -379,7 +377,7 @@ fn figure_target(t: &FigureTarget) -> Value {
         FigureTarget::Paragraph(Paragraph {
             attrs: a,
             children,
-            at_content_column: _,
+            ..
         }) => obj(vec![
             ("type", "paragraph".into()),
             ("children", inlines(children)),
