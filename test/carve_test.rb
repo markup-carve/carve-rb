@@ -485,6 +485,15 @@ class CarveTest < Minitest::Test
   # table around them. carve-rs had the fields and never wrote to them, and this
   # serializer never published them either - so both halves had to change before
   # a consumer saw anything (carve-rs#356).
+  def test_parse_publishes_cell_positions
+    source = "| a | b |\n|---|---|\n| c | d |\n"
+    cell = Carve.parse(source)[:children][0][:rows][0][:cells][0]
+
+    assert cell[:pos], "a table cell carries a position"
+    chars = source.chars
+    assert_equal " a ", chars[cell[:pos][:startOffset]...cell[:pos][:endOffset]].join
+  end
+
   def test_parse_publishes_item_and_row_positions
     ast = Carve.parse("- one\n- two\n\n| a | b |\n|---|---|\n| c | d |\n")
     item = ast[:children][0][:items][0]
