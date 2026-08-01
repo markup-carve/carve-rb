@@ -20,6 +20,7 @@ use carve_rs::{
     InlineExtension, InlineNode, LineBlock, Link, List, ListItem, Math, Mention,
     OrderedListType,
     Paragraph,
+    Pos,
     LiteralInline, RawBlock, RawInline, SmartPunctuation, Span, Symbol, Table, TableAlign,
     TableCell,
     TableCellSpan, TableRow, Tag,
@@ -29,30 +30,34 @@ use serde_json::{Map, Value};
 
 /// Public entry point: a full `Document` to a JSON string.
 ///
-/// PART 12 section 7: the root carries EXACTLY `type`, `children` and
-/// `srcByteLength`. Frontmatter and footnote definitions are block nodes in the
-/// tree, not root fields, because a root field cannot carry the position
-/// section 4 requires of every node - and both are source an editor navigates
-/// to (carve#411).
-///
-/// This emitted both on the root until that was settled.
+/// Source positions are published as `pos` on every node that carries one.
+/// PART 12 section 4 allows tracking to be gated behind a parse option but not
+/// serialization, so the AST entry point parses with positions enabled. A node
+/// whose span the engine could not determine has NO `pos` key at all rather
+/// than one holding placeholder numbers, which the same section requires:
+/// absent is a fact a consumer can act on, an invented span is not.
 pub fn document_to_json(doc: &Document) -> String {
     let mut m = Map::new();
     m.insert("type".into(), "document".into());
 
+    // PART 12 section 7: the root carries EXACTLY `type`, `children` and
+    // `srcByteLength`. Frontmatter and footnote definitions are block nodes in
+    // the tree, not root fields, because a root field cannot carry the position
+    // section 4 requires of every node - and both are source an editor
+    // navigates to (carve#411, carve#418).
     let mut children = Vec::new();
 
-    // Frontmatter is the FIRST child, which is where it was written. The text
-    // is RAW: section 7 forbids emitting parsed key/values in its place, since
-    // parsing YAML or TOML is not the markup parser's job and a parsed map
-    // cannot represent a malformed block at all. `Document::frontmatter` holds
-    // the parsed pairs this engine still exposes to Ruby; `frontmatter_raw`
-    // is what the author actually wrote.
-    if let Some(source) = &doc.frontmatter_raw {
+    // Frontmatter is the FIRST child, which is where it was written, and it is
+    // RAW. The parsed mapping cannot stand in: it is built by splitting each
+    // line on the first colon, so key order, comments and anything that is not
+    // `key: value` are gone, and a typed (`---json`, `---toml`) block is not
+    // parsed into it at all - leaving it empty for a document that plainly has
+    // frontmatter.
+    if let Some(raw) = &doc.frontmatter_raw {
         children.push(obj(vec![
             ("type", "frontmatter".into()),
-            ("format", Value::String(source.format.clone())),
-            ("content", Value::String(source.content.clone())),
+            ("format", Value::String(raw.format.clone())),
+            ("content", Value::String(raw.content.clone())),
         ]));
     }
 
@@ -78,6 +83,7 @@ pub fn document_to_json(doc: &Document) -> String {
 
     Value::Object(m).to_string()
 }
+
 
 // ---- helpers ---------------------------------------------------------------
 
@@ -108,6 +114,24 @@ fn opt_str(o: &Option<String>) -> Value {
 fn opt_usize(o: &Option<usize>) -> Value {
     match o {
         Some(n) => Value::from(*n),
+        None => Value::Null,
+    }
+}
+
+/// A span as PART 12 section 4 spells it: 1-based lines and columns, 0-based
+/// offsets, all in Unicode codepoints, `end*` exclusive.
+fn pos(p: &Option<Pos>) -> Value {
+    match p {
+        Some(p) => {
+            let mut m = Map::new();
+            m.insert("startLine".into(), Value::from(p.start_line));
+            m.insert("endLine".into(), Value::from(p.end_line));
+            m.insert("startColumn".into(), Value::from(p.start_column));
+            m.insert("endColumn".into(), Value::from(p.end_column));
+            m.insert("startOffset".into(), Value::from(p.start_offset));
+            m.insert("endOffset".into(), Value::from(p.end_offset));
+            Value::Object(m)
+        }
         None => Value::Null,
     }
 }
@@ -151,19 +175,23 @@ fn inlines(list: &[InlineNode]) -> Value {
 
 fn block(b: &BlockNode) -> Value {
     match b {
-        BlockNode::Heading(Heading { attrs: a, level, children, .. }) => obj(vec![
+        BlockNode::Heading(Heading { attrs: a, level, children, pos: p }) => obj(vec![
             ("type", "heading".into()),
             ("level", Value::from(*level)),
             ("children", inlines(children)),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
         BlockNode::Paragraph(Paragraph {
             attrs: a,
             children,
-            at_content_column: _, .. }) => obj(vec![
+            at_content_column: _,
+            pos: p,
+        }) => obj(vec![
             ("type", "paragraph".into()),
             ("children", inlines(children)),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
         BlockNode::CodeBlock(c) => code_block(c),
         BlockNode::List(List {
@@ -174,7 +202,9 @@ fn block(b: &BlockNode) -> Value {
             tight,
             items,
             delim: _,
-            bullet_char: _, .. }) => obj(vec![
+            bullet_char: _,
+            pos: p,
+        }) => obj(vec![
             ("type", "list".into()),
             ("ordered", Value::Bool(*ordered)),
             ("start", opt_usize(start)),
@@ -185,31 +215,35 @@ fn block(b: &BlockNode) -> Value {
                 Value::Array(items.iter().map(list_item).collect()),
             ),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
         BlockNode::BlockQuote(q) => block_quote(q),
         BlockNode::Table(t) => table(t),
-        BlockNode::Admonition(Admonition { attrs: a, kind, title, label, children, .. }) => obj(vec![
+        BlockNode::Admonition(Admonition { attrs: a, kind, title, label, children, pos: p }) => obj(vec![
             ("type", "admonition".into()),
             ("kind", Value::String(kind.clone())),
             ("title", opt_inlines(title)),
             ("label", opt_str(label)),
             ("children", blocks(children)),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
-        BlockNode::Div(Div { attrs: a, label, children, .. }) => obj(vec![
+        BlockNode::Div(Div { attrs: a, label, children, pos: p }) => obj(vec![
             ("type", "div".into()),
             ("label", opt_str(label)),
             ("children", blocks(children)),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
         // A `::: |` fence, where every newline is a hard break. Its own type
         // rather than a div carrying a `.line-block` class: a plain div with
         // that class keeps soft breaks, so the class alone cannot say which one
         // this is (carve#359).
-        BlockNode::LineBlock(LineBlock { attrs: a, children, .. }) => obj(vec![
+        BlockNode::LineBlock(LineBlock { attrs: a, children, pos: p }) => obj(vec![
             ("type", "line_block".into()),
             ("children", blocks(children)),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
         BlockNode::DefinitionList(DefinitionList { attrs: a, items }) => obj(vec![
             ("type", "definition_list".into()),
@@ -237,26 +271,29 @@ fn block(b: &BlockNode) -> Value {
             ),
             ("attrs", attrs(a)),
         ]),
-        BlockNode::Figure(Figure { attrs: a, target, caption, .. }) => obj(vec![
+        BlockNode::Figure(Figure { attrs: a, target, caption, pos: p }) => obj(vec![
             ("type", "figure".into()),
             ("target", figure_target(target)),
             ("caption", inlines(caption)),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
         BlockNode::AbbreviationDef(AbbreviationDef { abbr, expansion }) => obj(vec![
             ("type", "abbreviation_def".into()),
             ("abbr", Value::String(abbr.clone())),
             ("expansion", Value::String(expansion.clone())),
         ]),
-        BlockNode::RawBlock(RawBlock { format, content, .. }) => obj(vec![
+        BlockNode::RawBlock(RawBlock { format, content, pos: p }) => obj(vec![
             ("type", "raw_block".into()),
             ("format", Value::String(format.clone())),
             ("content", Value::String(content.clone())),
+            ("pos", pos(p)),
         ]),
-        BlockNode::Comment(Comment { block, content, .. }) => obj(vec![
+        BlockNode::Comment(Comment { block, content, pos: p }) => obj(vec![
             ("type", "comment".into()),
             ("block", Value::Bool(*block)),
             ("content", Value::String(content.clone())),
+            ("pos", pos(p)),
         ]),
         BlockNode::Extension(BlockExtension { attrs: a, name, children, summary, label }) => {
             obj(vec![
@@ -277,9 +314,10 @@ fn block(b: &BlockNode) -> Value {
             }
             v
         }
-        BlockNode::ThematicBreak(ThematicBreak { attrs: a, .. }) => obj(vec![
+        BlockNode::ThematicBreak(ThematicBreak { attrs: a, pos: p }) => obj(vec![
             ("type", "thematic_break".into()),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
     }
 }
@@ -292,6 +330,7 @@ fn code_block(c: &CodeBlock) -> Value {
         ("label", opt_str(&c.label)),
         ("content", Value::String(c.content.clone())),
         ("attrs", attrs(&c.attrs)),
+        ("pos", pos(&c.pos)),
     ])
 }
 
@@ -301,6 +340,7 @@ fn block_quote(q: &BlockQuote) -> Value {
         ("children", blocks(&q.children)),
         ("attribution", opt_inlines(&q.attribution)),
         ("attrs", attrs(&q.attrs)),
+        ("pos", pos(&q.pos)),
     ])
 }
 
@@ -328,6 +368,7 @@ fn table(t: &Table) -> Value {
             Value::Array(t.rows.iter().map(table_row).collect()),
         ),
         ("attrs", attrs(&t.attrs)),
+        ("pos", pos(&t.pos)),
     ])
 }
 
@@ -377,11 +418,13 @@ fn figure_target(t: &FigureTarget) -> Value {
         FigureTarget::Paragraph(Paragraph {
             attrs: a,
             children,
-            ..
+            at_content_column: _,
+            pos: p,
         }) => obj(vec![
             ("type", "paragraph".into()),
             ("children", inlines(children)),
             ("attrs", attrs(a)),
+            ("pos", pos(p)),
         ]),
     }
 }

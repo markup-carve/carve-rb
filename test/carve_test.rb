@@ -366,6 +366,19 @@ class CarveTest < Minitest::Test
     types = ast[:children].map { |node| node[:type] }
     refute_includes types, "frontmatter"
     refute_includes types, "footnote"
+
+  # A typed block is what makes raw-versus-parsed load-bearing rather than
+  # cosmetic: the engine does not parse json/toml into its mapping at all, so
+  # publishing the mapping meant this document came back with NO frontmatter
+  # (kept from #23, moved to the tree by PART 12 §7).
+  def test_parse_publishes_a_typed_frontmatter_block
+    ast = Carve.parse("---json\n{\"a\": 1}\n---\n\nbody\n")
+    frontmatter = ast[:children].first
+
+    assert_equal "frontmatter", frontmatter[:type]
+    assert_equal "json", frontmatter[:format]
+    assert_equal "{\"a\": 1}", frontmatter[:content]
+  end
   end
 
   def test_parse_heading_with_inline_children
