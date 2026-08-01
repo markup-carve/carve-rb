@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Engine bumped to carve-rs `5308d86`** (from `aad11cc`, 15 commits). Two of
+  them change what this binding produces.
+
+  A heading that carries no `<section>` wrapper now renders its attributes in
+  the canonical order: the author's own first, the generated id last
+  (`<h1 a="b" class="c" id="Auto">`). carve-rs had been emitting the id first,
+  which agreed with neither carve-js nor carve-php - the combination was only
+  reachable through a heading inside a container, and no corpus case gave such a
+  heading attributes, so three engines held three answers and every suite stayed
+  green (markup-carve/carve-rs#379, spec PART 10 §1). An id the author wrote
+  keeps its authored position.
+
+  `Carve.parse` publishes definition lists as `definition_term` and
+  `definition_description` nodes (markup-carve/carve-rs#374). No edit was needed
+  here for that: `to_ast_json` delegates to the engine's serializer rather than
+  walking the tree itself, which is exactly why that delegation replaced this
+  binding's own walker.
+
+  The remaining commits place source positions on constructs that lacked them
+  (block images, quoted figures, footnote definition bodies, the pieces an
+  abbreviation splits a text node into, resolved cross-reference spans, list
+  items, definition lists, line-block stanzas, frontmatter) plus a profile fix
+  for `deny_block(["frontmatter"])` and two spec-corpus submodule bumps.
+
+  Not included: the new `sections` render option. This binding builds `Options`
+  internally and exposes no render options, so the switch is not reachable from
+  Ruby. Surfacing it is a separate decision about what the entry points accept.
+
 ### Added
 
 - **`Carve.parse` now publishes source positions.** Every block node the engine
