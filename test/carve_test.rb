@@ -481,6 +481,25 @@ class CarveTest < Minitest::Test
     refute_includes types, "footnote"
   end
 
+  # A list item and a table row carry their own spans, not only the list and
+  # table around them. carve-rs had the fields and never wrote to them, and this
+  # serializer never published them either - so both halves had to change before
+  # a consumer saw anything (carve-rs#356).
+  def test_parse_publishes_item_and_row_positions
+    ast = Carve.parse("- one\n- two\n\n| a | b |\n|---|---|\n| c | d |\n")
+    item = ast[:children][0][:items][0]
+    row = ast[:children][1][:rows][0]
+
+    assert item[:pos], "a list item carries a position"
+    assert row[:pos], "a table row carries a position"
+    # Selecting the source with the span is what catches an unfilled offset
+    # pair: 0..0 reads as present and slices nothing.
+    source = "- one\n- two\n\n| a | b |\n|---|---|\n| c | d |\n"
+    chars = source.chars
+    assert_equal "- one", chars[item[:pos][:startOffset]...item[:pos][:endOffset]].join
+    assert_equal "| a | b |", chars[row[:pos][:startOffset]...row[:pos][:endOffset]].join
+  end
+
   def test_parse_root_uses_reference_field_names
     ast = Carve.parse("a[^r]\n\n[^r]: def\n")
 

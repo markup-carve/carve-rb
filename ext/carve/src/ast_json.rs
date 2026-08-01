@@ -356,6 +356,7 @@ fn list_item(it: &ListItem) -> Value {
         ),
         ("children", blocks(&it.children)),
         ("attrs", attrs(&it.attrs)),
+        ("pos", pos(&it.pos)),
     ])
 }
 
@@ -380,6 +381,7 @@ fn table_row(r: &TableRow) -> Value {
             Value::Array(r.cells.iter().map(table_cell).collect()),
         ),
         ("attrs", attrs(&r.attrs)),
+        ("pos", pos(&r.pos)),
     ])
 }
 
