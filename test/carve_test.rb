@@ -493,6 +493,23 @@ class CarveTest < Minitest::Test
   # makes them semantic: a sibling with a different marker starts a NEW list.
   # This binding dropped both, so `- a` and `* a` serialized identically, and
   # published `ol_type` under its own spelling rather than `olType`.
+  # PART 12 §3 makes field names spec surface. These carried this engine's
+  # snake_case spelling, so a consumer reading the reference's name got nothing
+  # and no error - the same failure mode as the link internals.
+  def test_parse_uses_reference_field_names_throughout
+    span = Carve.parse("a [x]{#i .c k=v} b\n")[:children][0][:children].find { |c| c[:attrs] }
+
+    assert span[:attrs].key?(:keyValues)
+    refute span[:attrs].key?(:key_values)
+
+    sub = Carve.parse("a {~old~>new~} b\n")[:children][0][:children]
+      .find { |c| c[:type] == "substitution" }
+
+    assert_equal "old", sub[:oldText]
+    assert_equal "new", sub[:newText]
+    refute sub.key?(:old_text)
+  end
+
   def test_parse_publishes_the_author_s_list_marker
     assert_equal "-", Carve.parse("- a\n")[:children][0][:bulletChar]
     assert_equal "*", Carve.parse("* a\n")[:children][0][:bulletChar]

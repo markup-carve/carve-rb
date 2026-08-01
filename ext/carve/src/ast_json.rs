@@ -7,7 +7,7 @@
 //!
 //! Every node becomes a JSON object with a `"type"` tag plus its fields.
 //! Inline text is `{"type":"text","value":"..."}`. Child collections are
-//! JSON arrays. `Attrs` become `{"id","classes","key_values"}` or `null`.
+//! JSON arrays. `Attrs` become `{"id","classes","keyValues"}` or `null`.
 //!
 //! This walker lives in the binding (not carve-rs) so the engine stays free of
 //! a serde dependency; only the gem's native extension pulls in `serde_json`.
@@ -150,7 +150,9 @@ fn attrs(a: &Option<Attrs>) -> Value {
                     "classes",
                     Value::Array(at.classes.iter().map(|c| Value::String(c.clone())).collect()),
                 ),
-                ("key_values", Value::Object(kv)),
+                // `keyValues` in the reference, not this engine's `key_values`
+                // (PART 12 §3).
+                ("keyValues", Value::Object(kv)),
             ])
         }
     }
@@ -597,8 +599,8 @@ fn inline(n: &InlineNode) -> Value {
         ]),
         InlineNode::CriticSubstitute(CriticSubstitute { old_text, new_text }) => obj(vec![
             ("type", "substitution".into()),
-            ("old_text", Value::String(old_text.clone())),
-            ("new_text", Value::String(new_text.clone())),
+            ("oldText", Value::String(old_text.clone())),
+            ("newText", Value::String(new_text.clone())),
         ]),
         InlineNode::CriticComment(CriticComment { text }) => obj(vec![
             ("type", "critic_comment".into()),
