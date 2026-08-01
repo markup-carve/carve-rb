@@ -408,6 +408,7 @@ fn table_cell(c: &TableCell) -> Value {
         ),
         ("children", inlines(&c.children)),
         ("attrs", attrs(&c.attrs)),
+        ("pos", pos(&c.pos)),
     ])
 }
 
