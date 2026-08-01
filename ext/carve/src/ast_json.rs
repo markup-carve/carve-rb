@@ -600,9 +600,11 @@ fn link(l: &Link) -> Value {
         ("href", Value::String(l.href.clone())),
         ("title", opt_str(&l.title)),
         ("children", inlines(&l.children)),
-        ("ref_label", opt_str(&l.ref_label)),
-        ("raw_ref", opt_str(&l.raw_ref)),
-        ("from_crossref", Value::Bool(l.from_crossref)),
+        // PART 12 section 3 names these `ref` and `rawRef`. Publishing this
+        // engine's own spelling meant a consumer reading `ref` got nothing here
+        // and a value from carve-js, with no error anywhere.
+        ("ref", opt_str(&l.ref_label)),
+        ("rawRef", opt_str(&l.raw_ref)),
         ("attrs", attrs(&l.attrs)),
     ])
 }
