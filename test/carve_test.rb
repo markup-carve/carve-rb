@@ -321,35 +321,64 @@ class CarveTest < Minitest::Test
     assert_equal 4, ast[:srcByteLength]
   end
 
-  # PART 12 section 2: the root carries `frontmatter` and `footnoteDefs`
-  # EXACTLY when the document has them. This used to emit an empty object for
-  # every document, which says "this document has frontmatter, and it is empty"
-  # - a different claim, and one the reference does not make (carve#411).
-  def test_parse_omits_root_fields_the_document_does_not_have
+  # PART 12 section 7: the root carries EXACTLY type, children and
+  # srcByteLength. Frontmatter and footnote definitions are block nodes in the
+  # tree, because a root FIELD cannot carry the position section 4 requires of
+  # every node, and both are source an editor navigates to (carve#411).
+  def test_parse_root_carries_exactly_three_keys
+    ast = Carve.parse("---\ntitle: x\n---\n\nbody[^r]\n\n[^r]: d\n")
+
+    assert_equal %i[children srcByteLength type], ast.keys.sort
+  end
+
+  def test_parse_puts_frontmatter_in_the_tree_raw
+    ast = Carve.parse("---\ntitle: x\n---\n\nbody\n")
+    frontmatter = ast[:children].first
+
+    # RAW, not the parsed key/values: section 7 forbids emitting a parsed map,
+    # which cannot represent a malformed or non-yaml block at all.
+    assert_equal "frontmatter", frontmatter[:type]
+    assert_equal "yaml", frontmatter[:format]
+    assert_equal "title: x", frontmatter[:content]
+  end
+
+  def test_parse_keeps_a_typed_frontmatter_block_the_parsed_map_could_not_hold
+    ast = Carve.parse("---toml\nx = 1\n---\n\nbody\n")
+    frontmatter = ast[:children].first
+
+    assert_equal "toml", frontmatter[:format]
+    assert_equal "x = 1", frontmatter[:content]
+  end
+
+  def test_parse_puts_a_footnote_definition_in_the_tree
+    ast = Carve.parse("a[^r]\n\n[^r]: d\n")
+    definition = ast[:children].find { |node| node[:type] == "footnote" }
+
+    # `id`, matching what footnote_ref already carries for the same string.
+    refute_nil definition
+    assert_equal "r", definition[:id]
+    assert_kind_of Array, definition[:children]
+  end
+
+  def test_parse_emits_neither_node_when_the_document_has_neither
     ast = Carve.parse("# Hi")
 
-    refute ast.key?(:frontmatter)
-    refute ast.key?(:footnoteDefs)
-  end
+    types = ast[:children].map { |node| node[:type] }
+    refute_includes types, "frontmatter"
+    refute_includes types, "footnote"
 
-  # The RAW block, not the parsed mapping (spec PART 12 §2). A typed block is
-  # the case that makes the difference load-bearing rather than cosmetic: the
-  # engine does not parse json/toml into its mapping at all, so publishing the
-  # mapping meant this document came back with NO frontmatter.
+  # A typed block is what makes raw-versus-parsed load-bearing rather than
+  # cosmetic: the engine does not parse json/toml into its mapping at all, so
+  # publishing the mapping meant this document came back with NO frontmatter
+  # (kept from #23, moved to the tree by PART 12 §7).
   def test_parse_publishes_a_typed_frontmatter_block
     ast = Carve.parse("---json\n{\"a\": 1}\n---\n\nbody\n")
+    frontmatter = ast[:children].first
 
-    assert_equal({ content: "{\"a\": 1}", format: "json" }, ast[:frontmatter])
+    assert_equal "frontmatter", frontmatter[:type]
+    assert_equal "json", frontmatter[:format]
+    assert_equal "{\"a\": 1}", frontmatter[:content]
   end
-
-  def test_parse_carries_root_fields_the_document_does_have
-    with_frontmatter = Carve.parse("---\ntitle: x\n---\n\nbody\n")
-    with_footnote = Carve.parse("a[^r]\n\n[^r]: d\n")
-
-    assert_equal({ content: "title: x", format: "yaml" }, with_frontmatter[:frontmatter])
-    refute with_frontmatter.key?(:footnoteDefs)
-    assert with_footnote.key?(:footnoteDefs)
-    refute with_footnote.key?(:frontmatter)
   end
 
   def test_parse_heading_with_inline_children
@@ -455,10 +484,18 @@ class CarveTest < Minitest::Test
   def test_parse_root_uses_reference_field_names
     ast = Carve.parse("a[^r]\n\n[^r]: def\n")
 
-    assert ast.key?(:footnoteDefs)
+    # PART 12 §7: the root is exactly type, children and srcByteLength, so the
+    # definition lives in the tree rather than in a root map (carve#411). What
+    # this test still guards is the SPELLING: reference field names, not this
+    # engine's internal snake_case.
     assert ast.key?(:srcByteLength)
-    refute ast.key?(:footnote_defs)
     refute ast.key?(:source_len)
+    refute ast.key?(:footnoteDefs)
+    refute ast.key?(:footnote_defs)
+
+    definition = ast[:children].find { |node| node[:type] == "footnote" }
+    refute_nil definition
+    assert_equal "r", definition[:id]
   end
 
   def test_parse_critic_nodes_expose_attrs

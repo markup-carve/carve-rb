@@ -40,38 +40,50 @@ pub fn document_to_json(doc: &Document) -> String {
     let mut m = Map::new();
     m.insert("type".into(), "document".into());
 
-    // PART 12 section 2: the root carries `frontmatter` and `footnoteDefs`
-    // EXACTLY when the document has them. Emitting an empty object for a
-    // document with neither says "this document has frontmatter, and it is
-    // empty" - a different claim, and one the reference does not make.
-    //
-    // The RAW block, not the parsed mapping. The mapping is built by splitting
-    // each line on the first colon, so key order, comments and anything that is
-    // not `key: value` are gone - and a typed (`---json`, `---toml`) block is
-    // not parsed into it at all, leaving it EMPTY for a document that plainly
-    // has frontmatter. Publishing it under the same field name the reference
-    // uses for the raw form meant a consumer reading `frontmatter.content` got
-    // nothing here and a string from carve-js, with no error anywhere.
+    // PART 12 section 7: the root carries EXACTLY `type`, `children` and
+    // `srcByteLength`. Frontmatter and footnote definitions are block nodes in
+    // the tree, not root fields, because a root field cannot carry the position
+    // section 4 requires of every node - and both are source an editor
+    // navigates to (carve#411, carve#418).
+    let mut children = Vec::new();
+
+    // Frontmatter is the FIRST child, which is where it was written, and it is
+    // RAW. The parsed mapping cannot stand in: it is built by splitting each
+    // line on the first colon, so key order, comments and anything that is not
+    // `key: value` are gone, and a typed (`---json`, `---toml`) block is not
+    // parsed into it at all - leaving it empty for a document that plainly has
+    // frontmatter.
     if let Some(raw) = &doc.frontmatter_raw {
-        let mut fm = Map::new();
-        fm.insert("format".into(), Value::String(raw.format.clone()));
-        fm.insert("content".into(), Value::String(raw.content.clone()));
-        m.insert("frontmatter".into(), Value::Object(fm));
+        children.push(obj(vec![
+            ("type", "frontmatter".into()),
+            ("format", Value::String(raw.format.clone())),
+            ("content", Value::String(raw.content.clone())),
+        ]));
     }
 
-    if !doc.footnote_defs.is_empty() {
-        let mut fdefs = Map::new();
-        for (k, v) in &doc.footnote_defs {
-            fdefs.insert(k.clone(), blocks(v));
-        }
-        m.insert("footnoteDefs".into(), Value::Object(fdefs));
+    if let Value::Array(body) = blocks(&doc.children) {
+        children.extend(body);
     }
 
-    m.insert("children".into(), blocks(&doc.children));
+    // A definition is a child of the DOCUMENT even when it was authored inside
+    // a container: PART 9 section 16 already collects it out of that container,
+    // which then renders empty, so the tree follows the same rule. The field is
+    // `id` rather than `label` because `footnote_ref` already carries the same
+    // string as `id`.
+    for (label, body) in &doc.footnote_defs {
+        children.push(obj(vec![
+            ("type", "footnote".into()),
+            ("id", Value::String(label.clone())),
+            ("children", blocks(body)),
+        ]));
+    }
+
+    m.insert("children".into(), Value::Array(children));
     m.insert("srcByteLength".into(), Value::from(doc.source_len));
 
     Value::Object(m).to_string()
 }
+
 
 // ---- helpers ---------------------------------------------------------------
 

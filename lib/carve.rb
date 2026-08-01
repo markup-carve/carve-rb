@@ -194,8 +194,11 @@ module Carve
     #   #                 children: [{type: "text", value: "Hi"}], attrs: nil}],
     #   #     srcByteLength: 4}
     #
-    # The root carries +:srcByteLength+ always, and +:frontmatter+ and
-    # +:footnoteDefs+ exactly when the document has them (spec PART 12 §2).
+    # The root carries exactly +:type+, +:children+ and +:srcByteLength+ (spec
+    # PART 12 §7). Frontmatter and footnote definitions are block nodes in
+    # +:children+, not root fields: a root field cannot carry the position §4
+    # requires of every node, and both are source an editor navigates to.
+    # Frontmatter is the first child, carrying +:format+ and RAW +:content+.
     #
     # Every node is a Hash with a +:type+ key plus its fields; child collections
     # are Arrays; +:attrs+ is +nil+ or a Hash of +{id:, classes:, key_values:}+.
