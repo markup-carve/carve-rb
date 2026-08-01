@@ -18,11 +18,7 @@ crate-type = ["cdylib"]
 magnus = { version = "0.8", features = ["rb-sys"] }
 rb-sys = "0.9"
 
-# AST -> JSON serialization for `Carve.parse`. Kept in the binding so the
-# carve-rs engine itself stays free of a serde dependency.
-serde_json = "1"
-
 # The Carve engine. Imported under the Rust crate alias `carve_rs` so the
 # binding's own crate name (`carve-rb`) does not collide with the engine's
 # package name (`carve`) in the Cargo lockfile.
-carve_rs = { package = "carve-lang", git = "https://github.com/markup-carve/carve-rs", rev = "3d9f6c4033b0d8a541c76b1247ca1182f2299b95" }
+carve_rs = { package = "carve-lang", git = "https://github.com/markup-carve/carve-rs", rev = "caef1715a29a79cd9553921f2a525df93330eb61" }

@@ -21,9 +21,7 @@
 //! `Carve.to_html(source, extensions: [...], mode: ..., renderers: {...},
 //! symbols: {...}, safe: ..., profile: ...)` on top of these primitives.
 
-mod ast_json;
 
-use ast_json::document_to_json;
 use carve_rs::{
     Autolink, CarveExtension, Citations, CodeCallouts, Details, ExternalLinks, FencedRender,
     HeadingPermalinks, ListTable, MathBlock, Mode, Options, Profile, Spoiler, StaticRenderers,
@@ -209,6 +207,14 @@ fn to_html(source: String) -> String {
 /// Hashes/Arrays. Parsing uses the default profile (no extensions); the AST is
 /// the raw parse tree, so render-stage extension rewrites are not applied.
 ///
+/// The serialization itself is the ENGINE's (`carve_rs::to_json`). This binding
+/// used to carry its own walker over the same tree, written when carve-rs had
+/// none - and a shape kept in two places drifts: that copy published `kind`
+/// beside an emphasis type that already encodes it, and `from_crossref` where
+/// the wire says `fromCrossref`, neither of which anything here could have
+/// caught. Every binding over carve-rs now publishes the same bytes, and a
+/// PART 12 change is one edit in the engine rather than one per binding.
+///
 /// Position tracking is ON here and nowhere else. PART 12 section 4 lets an
 /// engine gate tracking behind an option but requires the serialized form to
 /// carry it, and this is the only entry point that serializes; `to_html` and
@@ -216,7 +222,7 @@ fn to_html(source: String) -> String {
 fn to_ast_json(source: String) -> String {
     let mut options = Options::new();
     options.positions = true;
-    document_to_json(&carve_rs::parse_with_options(&source, &options))
+    carve_rs::to_json(&carve_rs::parse_with_options(&source, &options))
 }
 
 /// Render Carve source to HTML with the named extensions enabled.
