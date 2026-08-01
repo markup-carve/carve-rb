@@ -201,14 +201,27 @@ fn block(b: &BlockNode) -> Value {
             ol_type,
             tight,
             items,
-            delim: _,
-            bullet_char: _,
+            delim,
+            bullet_char,
             pos: p,
         }) => obj(vec![
             ("type", "list".into()),
             ("ordered", Value::Bool(*ordered)),
             ("start", opt_usize(start)),
-            ("ol_type", ol_type.map(ol_type_str).map(Value::from).unwrap_or(Value::Null)),
+            // `olType` in the reference, not this engine's `ol_type` (PART 12
+            // §3). The AUTHOR-CHOICE fields below were dropped entirely, so a
+            // consumer could not tell `- a` from `* a`, nor `1.` from `1)` -
+            // and §11 makes that distinction semantic: a sibling with a
+            // different marker starts a NEW list.
+            ("olType", ol_type.map(ol_type_str).map(Value::from).unwrap_or(Value::Null)),
+            (
+                "bulletChar",
+                bullet_char.map(|c| Value::from(c.to_string())).unwrap_or(Value::Null),
+            ),
+            (
+                "delim",
+                delim.map(|c| Value::from(c.to_string())).unwrap_or(Value::Null),
+            ),
             ("tight", Value::Bool(*tight)),
             (
                 "items",

@@ -489,6 +489,18 @@ class CarveTest < Minitest::Test
   # reference does not have". `from_crossref` is this engine's own bookkeeping -
   # whether a link was synthesized from a cross-reference - and it was on every
   # link the binding published.
+  # PART 12 §3 lists `bulletChar` and `delim` as AUTHOR-CHOICE fields, and §11
+  # makes them semantic: a sibling with a different marker starts a NEW list.
+  # This binding dropped both, so `- a` and `* a` serialized identically, and
+  # published `ol_type` under its own spelling rather than `olType`.
+  def test_parse_publishes_the_author_s_list_marker
+    assert_equal "-", Carve.parse("- a\n")[:children][0][:bulletChar]
+    assert_equal "*", Carve.parse("* a\n")[:children][0][:bulletChar]
+    assert_equal ".", Carve.parse("1. a\n")[:children][0][:delim]
+    assert_equal ")", Carve.parse("1) a\n")[:children][0][:delim]
+    refute Carve.parse("- a\n")[:children][0].key?(:ol_type)
+  end
+
   def test_parse_does_not_leak_engine_internals_on_a_link
     node = Carve.parse("[t](/u)\n")[:children][0][:children][0]
 
