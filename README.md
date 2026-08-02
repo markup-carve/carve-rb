@@ -286,8 +286,14 @@ rake test      # runs the minitest suite
 builds:
 
 ```toml
-carve_rs = { package = "carve-lang", git = "https://github.com/markup-carve/carve-rs", rev = "0e157ad81ee273af3038f7fa7213b451397fca67" }
+carve_rs = { package = "carve-lang", git = "https://github.com/markup-carve/carve-rs", rev = "..." }
 ```
+
+Read the current revision out of `ext/carve/Cargo.toml` rather than from a copy
+here. This section used to quote one, and it drifted three bumps behind the
+manifest before anyone noticed - a duplicated value goes stale the first time
+someone edits the original, and a stale one here is worse than none because it
+reads as authoritative.
 
 The crate is imported under the alias `carve_rs`. It is published as `carve-lang`
 (carve-rs renamed it from `carve`), so a pin at any revision past that rename
