@@ -38,7 +38,7 @@ checksum = "b4388bee8683e3d04af747c73422af53102d2bd24d9eadb6cbc100baef4b43f8"
 [[package]]
 name = "carve-lang"
 version = "0.1.1"
-source = "git+https://github.com/markup-carve/carve-rs?rev=68f985f33324e5bbce60f2695d3d53d9a77392bc#68f985f33324e5bbce60f2695d3d53d9a77392bc"
+source = "git+https://github.com/markup-carve/carve-rs?rev=098c18d90aa6c8526fad225f2f2641ee5c743769#098c18d90aa6c8526fad225f2f2641ee5c743769"
 
 [[package]]
 name = "carve-rb"
