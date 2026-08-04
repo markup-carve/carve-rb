@@ -4,6 +4,17 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The corpus job below is the only check that can tell a drifted pin from a
+  # current one, and it can start failing without a single commit here: the
+  # SPEC moves, the pinned engine does not, and a push-triggered run reports
+  # the state of the day someone last touched this repo. A scheduled run is
+  # what turns that into a red build instead of silence.
+  #
+  # This one GATES rather than reports. A corpus divergence is not upstream
+  # being ahead, it is this artifact rendering documents wrongly today.
+  schedule:
+    - cron: "15 6 * * *"
+  workflow_dispatch:
 
 jobs:
   build:
