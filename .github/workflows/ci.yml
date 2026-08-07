@@ -17,6 +17,45 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Which carve-rs is this gem running, and is that a revision that really
+  # exists on `main`? The corpus job below answers whether a drifted pin
+  # MATTERS; it is blind to any engine change no corpus document exercises
+  # (markup-carve/carve-rs#449 is the concrete case, where openers past the
+  # nesting cap were discarded and the rendered HTML was byte-identical either
+  # way). This job answers whether the pin is real, and it keeps asserting that
+  # with the pin sitting exactly on the engine's tip.
+  #
+  # It is deliberately NOT a distance check. carve-rs merges continuously, so
+  # "fail when behind main" would be red from the moment any PR opens there and
+  # unclearable by the action it recommends. The lag is printed as a number;
+  # only AGE can fail this job.
+  engine-pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # fetch-depth: 0 is required. The guard runs `merge-base --is-ancestor`
+      # against main, which needs the history to be there.
+      - name: Check out carve-rs
+        uses: actions/checkout@v4
+        with:
+          repository: markup-carve/carve-rs
+          path: carve-rs
+          fetch-depth: 0
+
+      # --max-age-days 14: this repository has bumped the pin every one to three
+      # days since it started tracking it (the widest gap on record is three),
+      # so fourteen is roughly five times the observed cadence -- wide enough
+      # that a quiet fortnight is not a false alarm, tight enough to catch the
+      # failure that actually happened here, where the pin sat months behind
+      # while CI stayed green. Age rather than commit count, because age is what
+      # bumping the pin clears.
+      - name: Check the pinned engine revision
+        run: |
+          python3 carve-rs/tools/check-engine-pin.py \
+            --engine carve-rs --github --max-age-days 14 \
+            --form cargo --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -47,9 +86,11 @@ jobs:
       - name: Install libclang (rb-sys bindgen)
         run: sudo apt-get update && sudo apt-get install -y libclang-dev
 
-      # The corpus is the only check that can tell a drifted pin from a current
-      # one: everything above asserts hand-written expectations, which a drifted
-      # engine satisfies happily.
+      # The corpus is the only check that can tell whether a drifted pin renders
+      # documents wrongly TODAY: everything above asserts hand-written
+      # expectations, which a drifted engine satisfies happily. Whether the pin
+      # names a real, merged revision at all is the engine-pin job's question,
+      # and the two are complementary rather than redundant.
       - name: Check out the spec corpus
         uses: actions/checkout@v4
         with:
