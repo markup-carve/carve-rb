@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Engine bumped to carve-rs `19cc87c`** (from `fa4d3f7`, one commit), which
+  moves the canonical writer's bytes twice. A frontmatter block whose opener
+  named no format is written back as `---yaml` rather than as a bare `---`
+  (PART 11 section 6b), and a blank line inside a fenced block under a footnote
+  definition or a definition-list description is written EMPTY rather than
+  indented to the content column (PART 11 section 7). Both were this engine
+  alone against the other two.
+
 - **Engine bumped to carve-rs `9fa8870`** (from `c94f808`, 33 commits). The pin
   had gone stale enough to render documents differently from the spec: against
   the corpus at carve `59b12e8`, 17 of 866 documents came out wrong, and the
