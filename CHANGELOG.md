@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Engine bumped to carve-rs `9fa8870`** (from `c94f808`, 33 commits). The pin
+  had gone stale enough to render documents differently from the spec: against
+  the corpus at carve `59b12e8`, 17 of 866 documents came out wrong, and the
+  AST this binding publishes differed from the engine's own on the same
+  documents. Both are back to zero.
+
+  What moves for a caller, in four groups. A fence opened inside a container
+  keeps that container open, so a boundary line, a list marker at the content
+  column and a closed fence's residue land where PART 9 §24 puts them rather
+  than folding into the code text. A lazy line folded into a container leaves
+  that container open. A caption attaches across at most one blank line, so two
+  blank lines detach it and the image stays an image. A definition body is an
+  indented-block collector, so a line below its column ends it.
+
+  For `Carve.parse` specifically, a nested link and an autolink stay nodes and
+  the renderers unwrap them, rather than being unwrapped in the tree; a
+  collapsed reference publishes the label it resolves by; and a heading's
+  derived display text (what a numbered cross-reference expands to) clones the
+  heading's nodes instead of re-rendering them, so an escaped character in a
+  heading reaches the label.
+
+  Neither of carve-rs's two Breaking entries reaches a caller here. The AST
+  ingest tightening (a decoder that refuses every property the schema does not
+  name, `footnote.id` among them) applies to reading a stored tree back, and
+  this binding exposes no ingest entry point - `Carve.parse` writes trees and
+  nothing reads one. `BlockQuote` losing its `attribution` field breaks a Rust
+  struct literal naming it, and this extension constructs no engine types at
+  all; it calls nine free functions. Both were checked against the source
+  rather than assumed, and the extension compiles unchanged.
+
 ### Added
 
 - **`Carve.to_html(source, sections: false)` renders headings without the
