@@ -251,8 +251,30 @@ class CarveTest < Minitest::Test
   def test_constants_advertise_modes_and_renderer_keys
     assert_equal %i[interactive static], Carve::MODES
     assert_equal %i[mermaid chart graphviz math], Carve::RENDERER_KEYS
-    # The canonical graphviz fenced-render preset is advertised.
-    assert_includes Carve::EXTENSIONS, :fenced_render_graphviz
+    # EXTENSIONS lists the engine's canonical kebab-case keys.
+    assert_includes Carve::EXTENSIONS, :"fenced-render-graphviz"
+  end
+
+  def test_extensions_cover_what_the_engine_registers
+    # These were unreachable from Ruby while the binding kept its own list:
+    # the engine had them, neither the match arm nor EXTENSIONS knew.
+    %i[glossary index table-of-contents heading-numbers code-group
+       heading-reference img-fence smart-quotes tabs].each do |name|
+      assert_includes Carve::EXTENSIONS, name
+    end
+  end
+
+  def test_snake_case_and_alias_spellings_still_work
+    # Registry keys are kebab-case, but Ruby callers have always written
+    # symbols like :math_block, and the short aliases predate the registry.
+    source = "# Heading\n"
+    canonical = Carve.to_html(source, extensions: [:"heading-permalinks"])
+    assert_equal canonical, Carve.to_html(source, extensions: [:heading_permalinks])
+    assert_equal canonical, Carve.to_html(source, extensions: [:permalinks])
+
+    dot = Carve.to_html("``` dot\nA -> B\n```", extensions: [:dot])
+    assert_equal dot, Carve.to_html("``` dot\nA -> B\n```",
+                                    extensions: [:"fenced-render-graphviz"])
   end
 
   # ---- Byte-identical parity vs the carve-rs CLI ----------------------------

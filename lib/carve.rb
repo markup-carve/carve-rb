@@ -13,24 +13,18 @@ require_relative "carve/version"
 require_relative "carve/carve"
 
 module Carve
-  # Extension names the native binding understands (snake_case or hyphenated).
-  EXTENSIONS = %i[
-    autolink
-    details
-    list_table
-    math_block
-    heading_permalinks
-    citations
-    code_callouts
-    tab_normalize
-    wikilinks
-    external_links
-    fenced_render
-    fenced_render_graphviz
-    fenced_render_chart
-    spoiler
-    table_of_contents
-  ].freeze
+  # Extension names the native binding understands.
+  #
+  # Taken from the engine itself rather than typed out here. This was a literal
+  # array, and the native binding had its own match arm listing the same names,
+  # so an extension carve-rs gained was unreachable from Ruby until somebody
+  # updated both by hand - and nothing failed in the meantime.
+  #
+  # The names are the engine's kebab-case keys, exposed as symbols
+  # (`:"math-block"`). The snake_case spellings this binding has always taken
+  # (`:math_block`) and its short aliases (`:mermaid`, `:dot`, `:toc`) still
+  # work as ARGUMENTS; this constant lists the canonical names.
+  EXTENSIONS = _extension_names.map(&:to_sym).freeze
 
   # Render modes the native binding understands.
   #

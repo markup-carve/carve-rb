@@ -25,11 +25,8 @@
 //! primitives.
 
 
-use carve_rs::{
-    Autolink, CarveExtension, Citations, CodeCallouts, Details, ExternalLinks, FencedRender,
-    HeadingPermalinks, ListTable, MathBlock, Mode, Options, Profile, Spoiler, StaticRenderers,
-    TabNormalize, TableOfContents, Wikilinks,
-};
+use carve_rs::extensions::registry;
+use carve_rs::{CarveExtension, Mode, Options, Profile, StaticRenderers};
 use magnus::value::{InnerValue, Opaque};
 use magnus::{function, prelude::*, Error, RArray, RHash, Ruby, Value};
 
@@ -59,42 +56,41 @@ fn escape_html(s: &str) -> String {
 
 /// Build an owned, boxed extension instance from a Ruby-facing name.
 ///
-/// Accepts both snake_case (`math_block`) and hyphenated (`math-block`) forms
-/// so symbols and strings map cleanly. Returns `None` for an unknown name; the
-/// caller turns that into a Ruby `ArgumentError`.
+/// The engine's registry owns the list; this only translates spellings. Ruby
+/// callers pass symbols (`:math_block`), the registry keys are kebab-case
+/// (`math-block`), and a handful of short aliases predate both. Returns `None`
+/// for an unknown name; the caller turns that into a Ruby `ArgumentError`.
+///
+/// This used to be a match arm per extension, beside a `Carve::EXTENSIONS`
+/// array in `lib/carve.rb` that repeated the same names a third time. Nothing
+/// compared any of them against carve-rs, so extensions the engine gained were
+/// simply unreachable from Ruby until someone noticed by hand.
 fn extension_for(name: &str) -> Option<Box<dyn CarveExtension>> {
-    // Normalize: lowercase, hyphens -> underscores, strip surrounding space.
-    let key = name.trim().to_ascii_lowercase().replace('-', "_");
-    let ext: Box<dyn CarveExtension> = match key.as_str() {
-        "autolink" => Box::new(Autolink::new()),
-        "details" => Box::new(Details::new()),
-        "list_table" | "listtable" => Box::new(ListTable::new()),
-        "math_block" | "mathblock" | "math" => Box::new(MathBlock::new()),
-        "heading_permalinks" | "permalinks" => Box::new(HeadingPermalinks::new()),
-        "citations" => Box::new(Citations::new()),
-        "code_callouts" | "codecallouts" => Box::new(CodeCallouts::new()),
-        "tab_normalize" | "tabnormalize" => Box::new(TabNormalize::new()),
-        "wikilinks" => Box::new(Wikilinks::new()),
-        "external_links" | "externallinks" => Box::new(ExternalLinks::new()),
-        // The mermaid preset carries the static-renderer key, so a static
-        // render can consult `renderers: {'mermaid' => ...}`. (Plain
-        // `FencedRender::new("text")`/`new("mermaid")` would degrade to source
-        // even with a renderer supplied, since it has no static-renderer key.)
-        // `fenced_render` now maps to the mermaid preset (was the no-key
-        // `text` claim before static mode) to match the carve-py sibling and
-        // expose a renderer-capable default; `mermaid` is an explicit alias.
-        "fenced_render" | "fencedrender" | "mermaid" => Box::new(FencedRender::mermaid()),
-        // Graphviz/DOT preset; its static path consults
-        // `renderers: {'graphviz' => ...}`, else degrades to the DOT source.
-        "fenced_render_graphviz" | "graphviz" | "dot" => Box::new(FencedRender::graphviz()),
-        // Chart.js preset (JSON mode); its static path consults
-        // `renderers: {'chart' => ...}`, else degrades to the JSON source.
-        "fenced_render_chart" | "chart" => Box::new(FencedRender::chart()),
-        "spoiler" => Box::new(Spoiler::new()),
-        "table_of_contents" | "tableofcontents" | "toc" => Box::new(TableOfContents::new()),
-        _ => return None,
+    let normalized = name.trim().to_ascii_lowercase().replace('_', "-");
+    let key = match normalized.as_str() {
+        // Short aliases this binding has accepted since before the registry.
+        // They stay so existing Ruby code keeps working.
+        "math" | "mathblock" => "math-block",
+        "permalinks" => "heading-permalinks",
+        "listtable" => "list-table",
+        "codecallouts" => "code-callouts",
+        "tabnormalize" => "tab-normalize",
+        "externallinks" => "external-links",
+        "fencedrender" | "mermaid" => "fenced-render",
+        "graphviz" | "dot" => "fenced-render-graphviz",
+        "chart" => "fenced-render-chart",
+        "tableofcontents" => "table-of-contents",
+        other => other,
     };
-    Some(ext)
+    registry::by_key(key)
+}
+
+/// Every extension name the engine registers, in registry order.
+///
+/// `Carve::EXTENSIONS` is built from this, so the Ruby-visible list cannot
+/// drift from what the binding actually accepts.
+fn extension_names() -> Vec<String> {
+    registry::keys().map(str::to_string).collect()
 }
 
 /// Map a Ruby-facing mode string to a carve-rs [`Mode`].
@@ -467,6 +463,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
         function!(to_html_full_with_symbols, 5),
     )?;
     module.define_singleton_method("_to_html_safe", function!(to_html_safe, 8))?;
+    module.define_singleton_method("_extension_names", function!(extension_names, 0))?;
     module.define_singleton_method("_read_stamp", function!(read_stamp, 1))?;
     module.define_singleton_method("_stamp_needs_review", function!(stamp_needs_review, 2))?;
     Ok(())
