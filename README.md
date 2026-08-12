@@ -54,10 +54,18 @@ Carve.to_html(src, extensions: %w[math-block list-table])
 
 ### Recognized extensions
 
-`autolink`, `details`, `list_table`, `math_block`, `heading_permalinks`,
-`citations`, `code_callouts`, `tab_normalize`, `wikilinks`, `external_links`,
-`fenced_render`, `fenced_render_graphviz`, `fenced_render_chart`, `spoiler`,
-`table_of_contents` (see `Carve::EXTENSIONS`).
+`Carve::EXTENSIONS` is the list, and it comes from the engine rather than from
+a copy kept here that could fall behind it:
+
+```ruby
+Carve::EXTENSIONS
+# => [:autolink, :citations, :"code-callouts", :"code-group", ...]
+```
+
+The canonical names are kebab-case (`:"math-block"`, `:"table-of-contents"`).
+Snake_case spellings (`:math_block`) work as arguments, as do the short aliases
+this binding has always taken: `:math`, `:permalinks`, `:mermaid`, `:dot`,
+`:graphviz`, `:chart`, `:toc`.
 
 An unknown extension name raises `ArgumentError`.
 

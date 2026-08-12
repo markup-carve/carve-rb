@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Every extension the engine registers is reachable from Ruby. `Carve::EXTENSIONS`
+  now lists 31 names instead of 15, adding glossary, index, table-of-contents
+  placement (`::: toc`), heading numbers, heading references, heading level
+  shift, code groups, tabs, the img fence, color swatches, smart quotes, and the
+  remaining fenced-render presets (PlantUML, D2, WaveDrom, Vega-Lite, ABC).
+
 ### Changed
+
+- **Engine bumped to carve-rs `6f1d9bf`**, which adds the name-keyed extension
+  registry this binding now reads, and the compact semantic spans of PART 10
+  §10 (`[Tab]{kbd}` renders `<kbd>Tab</kbd>`).
+- The extension list comes from the engine's registry instead of being typed out
+  in the native binding and again in `lib/carve.rb`. Canonical names are the
+  engine's kebab-case keys; snake_case spellings and the short aliases
+  (`:math`, `:permalinks`, `:mermaid`, `:dot`, `:chart`, `:toc`) still work as
+  arguments.
 
 - **Engine bumped to carve-rs `19cc87c`** (from `fa4d3f7`, one commit), which
   moves the canonical writer's bytes twice. A frontmatter block whose opener
