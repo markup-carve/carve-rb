@@ -17,8 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Engine bumped to carve-rs `17300594`**, which adds the name-keyed extension
-  registry this binding now reads.
+- **Engine bumped to carve-rs `6f1d9bf`**, which adds the name-keyed extension
+  registry this binding now reads, and the compact semantic spans of PART 10
+  §10 (`[Tab]{kbd}` renders `<kbd>Tab</kbd>`).
 - The extension list comes from the engine's registry instead of being typed out
   in the native binding and again in `lib/carve.rb`. Canonical names are the
   engine's kebab-case keys; snake_case spellings and the short aliases
