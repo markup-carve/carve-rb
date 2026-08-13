@@ -38,10 +38,11 @@ checksum = "b4388bee8683e3d04af747c73422af53102d2bd24d9eadb6cbc100baef4b43f8"
 [[package]]
 name = "carve-lang"
 version = "0.1.2"
-source = "git+https://github.com/markup-carve/carve-rs?rev=6f1d9bfb1fcd821724d5f22cf7d1c199678531d6#6f1d9bfb1fcd821724d5f22cf7d1c199678531d6"
+source = "git+https://github.com/markup-carve/carve-rs?rev=9130a7c70249a44bc68bf39eab30b5f92ae1d1b7#9130a7c70249a44bc68bf39eab30b5f92ae1d1b7"
 dependencies = [
  "html5ever",
  "markup5ever_rcdom",
+ "pulldown-cmark",
 ]
 
 [[package]]
@@ -321,6 +322,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pulldown-cmark"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9f068eba8e7071c5f9511831b44f32c740d5adf574e990f946ddb53db2f314e"
+dependencies = [
+ "bitflags",
+ "memchr",
+ "unicase",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -540,6 +552,12 @@ dependencies = [
  "mac",
  "utf-8",
 ]
+
+[[package]]
+name = "unicase"
+version = "2.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbc4bc3a9f746d862c45cb89d705aa10f187bb96c76001afab07a0d35ce60142"
 
 [[package]]
 name = "unicode-ident"
