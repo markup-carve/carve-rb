@@ -88,6 +88,14 @@ shipped them.
   `kbd` in core and `samp`, `var`, `cite` and `dfn` behind the `semantic-span`
   extension.
 
+  A `^` line under a block quote is an ATTRIBUTION rather than a caption: it
+  renders `<footer>` inside the `<blockquote>` instead of wrapping the quote in
+  `<figure>` / `<figcaption>`, so a captioned quote is no longer numbered as a
+  figure. Every `<th>` carries a `scope` - `col` in the header run, `row` for a
+  `|=` cell in a body row. A mandatory base class merges into the author's class
+  slot at its authored position rather than leading it, so `:widget[x]{#i .c}`
+  keeps `id` first.
+
 - **Rendering corrections carried in from the engine.** A fence opened inside a
   container keeps that container open, so a boundary line, a list marker at the
   content column and a closed fence's residue land where PART 9 §24 puts them
