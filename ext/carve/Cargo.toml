@@ -21,4 +21,4 @@ rb-sys = "0.9"
 # The Carve engine. Imported under the Rust crate alias `carve_rs` so the
 # binding's own crate name (`carve-rb`) does not collide with the engine's
 # package name (`carve`) in the Cargo lockfile.
-carve_rs = { package = "carve-lang", git = "https://github.com/markup-carve/carve-rs", rev = "e988b3aa85d2e9f2622308211ee9fcdf3c492039" }
+carve_rs = { package = "carve-lang", git = "https://github.com/markup-carve/carve-rs", rev = "971aecf3ee381c35b6430a885adffa7d91e1154a" }
