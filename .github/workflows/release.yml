@@ -12,6 +12,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Guard: the gem version AND the CHANGELOG must match the tag being
+      # released, so a mistyped tag, a forgotten constant bump, or an un-cut
+      # changelog cannot publish a gem that reports the wrong version. The
+      # gemspec derives spec.version from Carve::VERSION, so this is the version
+      # RubyGems would serve. carve-js published three releases whose exported
+      # constant named 0.1.0 for want of this step (markup-carve/carve-js#1074).
+      # test/release_version_test.rb checks the same constant against the same
+      # two files on every push; this is the last chance to catch it.
+      - name: Verify version and changelog match the release tag
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          VER="$(sed -n 's/.*VERSION[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' lib/carve/version.rb | head -1)"
+          if [ "$TAG" != "$VER" ]; then
+            echo "::error::Release tag $GITHUB_REF_NAME does not match Carve::VERSION $VER."
+            exit 1
+          fi
+          # Compare the extracted heading literally rather than grepping the tag
+          # as a pattern: a tag is not a regex, so `1.2.3` must not be satisfied
+          # by a `## [1.2.3-rc1]` heading, and a tag carrying SemVer build
+          # metadata must not be rejected for containing a `+`.
+          if ! awk -v want="$TAG" '
+                /^## / {
+                  heading = $0
+                  sub(/^## \[?/, "", heading)
+                  sub(/\].*$/, "", heading)
+                  sub(/ .*$/, "", heading)
+                  if (heading == want) found = 1
+                }
+                END { exit !found }
+              ' CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [$TAG]' section; cut it from [Unreleased] before releasing."
+            exit 1
+          fi
+
       - name: Install Ruby
         uses: ruby/setup-ruby@v1
         with:
