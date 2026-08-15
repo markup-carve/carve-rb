@@ -41,6 +41,16 @@ shipped them.
   are the engine's kebab-case keys; snake_case spellings and the short aliases
   (`:math`, `:permalinks`, `:mermaid`, `:dot`, `:chart`, `:toc`) still work.
 
+- **Composite figures** (PART 9 §4c). A **bare** `::: figure` fence is no longer
+  a generic container: it is one figure of ordered panels, rendering
+  `<figure class="carve-figure-group">` around a
+  `<div class="carve-figure-panels">` whose members are each a
+  `<figure class="carve-figure-panel">`, and a `^ ` line following the closer
+  becomes the group's `<figcaption>` instead of an ordinary paragraph. A fence
+  carrying a title or a `[label]` keeps the old shape, so a document that named
+  its figure divs renders as before. `Carve.parse` publishes the group as a new
+  `figure_group` node type.
+
 ### Changed
 
 - **Breaking (`Carve.parse`): the published tree now matches the reference
@@ -89,9 +99,11 @@ shipped them.
   extension.
 
   Every `<th>` carries a `scope` - `col` in the header run, `row` for a
-  `|=` cell in a body row. A mandatory base class merges into the author's class
-  slot at its authored position rather than leading it, so `:widget[x]{#i .c}`
-  keeps `id` first.
+  `|=` cell in a body row. A cell's attribute block binds after its kind and
+  alignment markers, so a `{...}` following a cell's `=` marker is read as
+  attributes rather than rendered as cell text. A mandatory base class merges
+  into the author's class slot at its authored position rather than leading it,
+  so `:widget[x]{#i .c}` keeps `id` first.
 
 - **Rendering corrections carried in from the engine.** A fence opened inside a
   container keeps that container open, so a boundary line, a list marker at the

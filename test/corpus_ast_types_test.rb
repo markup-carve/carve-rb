@@ -40,8 +40,8 @@ class CorpusAstTypesTest < Minitest::Test
   EXPECTED = %w[
     abbreviation abbreviation_def admonition autolink block_quote caption_number
     code code_block comment critic_comment definition_description definition_list
-    definition_term delete div document emphasis escaped_text figure footnote
-    footnote_ref frontmatter hard_break heading heading_ref highlight image
+    definition_term delete div document emphasis escaped_text figure figure_group
+    footnote footnote_ref frontmatter hard_break heading heading_ref highlight image
     inline_extension inline_footnote insert line_block link
     link_reference_definition list list_item literal_inline math mention
     paragraph raw_block raw_inline smart_punctuation soft_break span strike
