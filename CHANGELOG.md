@@ -88,10 +88,7 @@ shipped them.
   `kbd` in core and `samp`, `var`, `cite` and `dfn` behind the `semantic-span`
   extension.
 
-  A `^` line under a block quote is an ATTRIBUTION rather than a caption: it
-  renders `<footer>` inside the `<blockquote>` instead of wrapping the quote in
-  `<figure>` / `<figcaption>`, so a captioned quote is no longer numbered as a
-  figure. Every `<th>` carries a `scope` - `col` in the header run, `row` for a
+  Every `<th>` carries a `scope` - `col` in the header run, `row` for a
   `|=` cell in a body row. A mandatory base class merges into the author's class
   slot at its authored position rather than leading it, so `:widget[x]{#i .c}`
   keeps `id` first.
@@ -108,11 +105,19 @@ shipped them.
   `---yaml`, and a blank line inside a fenced block under a footnote definition
   or a definition-list description is written empty rather than indented.
 
+  Reference resolution reaches three places it used to stop short of: a
+  reference inside an inline note, a critic insertion or a critic deletion
+  resolves against the document's definitions; a footnote inside an unresolved
+  reference stays a footnote rather than being swallowed by the failed
+  reference; and a reference tail no longer seals its own link text, so the
+  text a reference link carries survives the frame that resolves it.
+
   For `Carve.parse` specifically: a nested link and an autolink stay nodes and
   the renderers unwrap them; a collapsed reference publishes the label it
-  resolves by; and a heading's derived display text clones the heading's nodes
+  resolves by; a heading's derived display text clones the heading's nodes
   instead of re-rendering them, so an escaped character in a heading reaches the
-  label.
+  label; and `attrs.keyValues` is published in the author's source order, the
+  same order the sibling `attrs.order` field states.
 
 
 ## [0.1.0] - 2026-07-12
