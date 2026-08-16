@@ -90,6 +90,13 @@ shipped them.
   These are additive for a consumer with a default branch and a compile error
   for one without.
 
+- **Delimited inline comments carried in from the engine.** `{% … %}` is an
+  inline comment that ends at its closer, alongside the trailing `%%` form that
+  runs to the end of its inline run (PART 9 §21a). Both render nothing; in
+  `Carve.parse` they are the same `comment` node, told apart by a `delimited`
+  field, because the two spell different documents and a writer has to
+  reproduce the one that was written.
+
 - **Language changes carried in from the engine.** Superscript and subscript are
   braced-only - bare `^x^` and `,x,` are literal text, the markup is `{^x^}` and
   `{,x,}`. The `:name:` symbol inline was added, with a leading word-boundary
@@ -105,7 +112,12 @@ shipped them.
   into the author's class slot at its authored position rather than leading it,
   so `:widget[x]{#i .c}` keeps `id` first.
 
-- **Rendering corrections carried in from the engine.** A fence opened inside a
+- **Rendering corrections carried in from the engine.** A block-attribute line
+  reaches the nested list it was written for, and a flush-left attribute line is
+  read as attributes rather than as paragraph text. A figure group holds its
+  panels directly. A table's sections and rows keep the attributes they have a
+  slot for. A code block resolves the no-break-space sentinel instead of
+  emitting it. A fence opened inside a
   container keeps that container open, so a boundary line, a list marker at the
   content column and a closed fence's residue land where PART 9 §24 puts them
   rather than folding into the code text. A lazy line folded into a container
