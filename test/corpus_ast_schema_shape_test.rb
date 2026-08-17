@@ -34,8 +34,11 @@
 require "minitest/autorun"
 require "carve"
 require "json"
+require "corpus_population"
 
 class CorpusAstSchemaShapeTest < Minitest::Test
+  include CorpusPopulation
+
   CORPUS = ENV.fetch("CARVE_SPEC_CORPUS", nil)
   # Defaults beside the corpus, so CI needs no second variable: the corpus lives
   # at <spec>/tests/corpus and the schema at <spec>/resources/ast-schema.json.
@@ -58,9 +61,13 @@ class CorpusAstSchemaShapeTest < Minitest::Test
     end
   end
 
+  def corpus_files
+    Dir.glob(File.join(CORPUS, "*.crv")).sort
+  end
+
   def findings
     found = Hash.new(0)
-    Dir.glob(File.join(CORPUS, "*.crv")).sort.each do |file|
+    corpus_files.each do |file|
       each_node(Carve.parse(File.read(file))) do |node|
         type = node[:type].to_s
         schema = defs[type]
@@ -92,6 +99,22 @@ class CorpusAstSchemaShapeTest < Minitest::Test
     assert_operator defs.length, :>=, 40,
                     "the schema has only #{defs.length} type definitions, which is too few to be " \
                     "the spec's - check CARVE_SPEC_SCHEMA"
+  end
+
+  def test_the_corpus_is_actually_walked
+    skip "CARVE_SPEC_CORPUS not set (see .github/workflows/ci.yml)" unless CORPUS
+
+    # The schema half of this file already refuses to run against a schema that
+    # is not there. The corpus half had no equivalent: an empty, truncated or
+    # mistyped CARVE_SPEC_CORPUS makes the glob return fewer files (or none),
+    # every assertion below still passes, and the run reports that the AST shape
+    # was verified across a corpus it never read. The stronger the assertions in
+    # the loop, the more convincing that empty green looks.
+    #
+    # Equality against what the spec's example pages DECLARE, not a floor and
+    # not a count taken from the corpus directory itself; see
+    # test/corpus_population.rb for why both of those guard nothing.
+    assert_whole_corpus(CORPUS, corpus_files.length, "corpus documents walked")
   end
 
   def test_every_node_uses_field_names_the_schema_names
