@@ -38,8 +38,11 @@
 require "minitest/autorun"
 require "carve"
 require "set"
+require "corpus_population"
 
 class CorpusAstFieldsTest < Minitest::Test
+  include CorpusPopulation
+
   CORPUS = ENV.fetch("CARVE_SPEC_CORPUS", nil)
 
   # Recorded by walking every corpus document through this gem. An explicit
@@ -110,10 +113,7 @@ class CorpusAstFieldsTest < Minitest::Test
 
     # Without this an empty or mistyped directory produces an empty set, the
     # assertion below reads as clean, and the check joins the ones it replaces.
-    found = corpus_files.length
-    assert_operator found, :>=, 400,
-                    "only #{found} corpus documents under #{CORPUS}; the corpus has ~1000, " \
-                    "so this is a wiring problem, not a clean run"
+    assert_whole_corpus(CORPUS, corpus_files.length, "corpus documents walked")
   end
 
   def test_every_recorded_field_name_still_reaches_the_tree

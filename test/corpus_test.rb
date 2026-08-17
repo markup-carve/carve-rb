@@ -15,13 +15,12 @@
 
 require "minitest/autorun"
 require "carve"
+require "corpus_population"
 
 class CorpusTest < Minitest::Test
-  CORPUS = ENV.fetch("CARVE_SPEC_CORPUS", nil)
+  include CorpusPopulation
 
-  # The corpus has ~500 pairs. Far fewer means the path is wrong rather than
-  # that the run was clean.
-  MIN_PAIRS = 400
+  CORPUS = ENV.fetch("CARVE_SPEC_CORPUS", nil)
 
   def pairs
     Dir.glob(File.join(CORPUS, "*.crv")).sort.filter_map do |crv|
@@ -34,12 +33,10 @@ class CorpusTest < Minitest::Test
     skip "CARVE_SPEC_CORPUS not set (see .github/workflows/ci.yml)" unless CORPUS
 
     assert File.directory?(CORPUS), "CARVE_SPEC_CORPUS=#{CORPUS} is not a directory"
-    found = pairs.length
-    # Without this, an empty or mistyped directory would report zero mismatches
-    # and read as a clean run -- the same shape of check this gate replaces.
-    assert_operator found, :>=, MIN_PAIRS,
-                    "only #{found} corpus pairs under #{CORPUS}; the corpus has ~500, " \
-                    "so this is a wiring problem, not a clean run"
+    # Equality against what the spec declares, not a floor. `>= 400` against a
+    # corpus of over a thousand passed with two thirds of it missing, which is
+    # the condition this test exists to reject; see test/corpus_population.rb.
+    assert_whole_corpus(CORPUS, pairs.length, "corpus pairs found")
   end
 
   def test_corpus_renders_byte_identically
