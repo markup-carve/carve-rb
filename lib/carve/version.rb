@@ -8,5 +8,5 @@ module Carve
   # compares it against ext/carve/Cargo.toml and against the newest cut
   # CHANGELOG section on every run, and .github/workflows/release.yml refuses to
   # publish a gem whose version is not the tag being released.
-  VERSION = "0.1.0"
+  VERSION = "0.1.1"
 end

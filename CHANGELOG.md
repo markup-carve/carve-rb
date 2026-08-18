@@ -7,10 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-18
+
 Everything below is the delta from `v0.1.0`, which is the only version a
-reader can be upgrading from. The engine pin moved six times inside this
-window; the intermediate revisions are not listed, because no release ever
-shipped them.
+reader can be upgrading from. The engine pin moved seven times inside this
+window and lands on carve-rs `0.1.3` (`a33c42ad`); the intermediate revisions
+are not listed, because no release ever shipped them.
+
+### Security
+
+- **A list-valued URL attribute is probed at every candidate, not at its head**
+  (PART 9 §25, markup-carve/carve#1320). The sanitizer read only the value's
+  leading scheme, which vouches for the whole value only where the whole value
+  is one URL, so `srcset="safe.png 1x, javascript:alert(1) 2x"` passed on its
+  second entry. `srcset`, `imagesrcset`, `ping` and `attributionsrc` are now
+  split into tokens and every candidate is read, and any hit blanks the whole
+  value. The engine embedded in `0.1.0` predates the fix, so the gem published
+  on 2026-07-12 carries the defect.
 
 ### Added
 
@@ -155,5 +168,6 @@ shipped them.
   Arrays (every AST node type is covered), enabling custom renderers such as
   [carve-hexapdf](https://github.com/markup-carve/carve-hexapdf).
 
-[Unreleased]: https://github.com/markup-carve/carve-rb/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/markup-carve/carve-rb/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/markup-carve/carve-rb/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/markup-carve/carve-rb/releases/tag/v0.1.0
