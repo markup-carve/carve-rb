@@ -77,10 +77,67 @@ jobs:
       - name: Build gem
         run: gem build carve.gemspec
 
-      - name: Check out the spec corpus
+      # AGAINST THE SPEC COMMIT THE PINNED ENGINE PINS, not against spec main.
+      # This is a deliberate NARROWING of what this gate refuses, and it is the
+      # reason the gate exists at all rather than being switched off.
+      #
+      # It used to check out markup-carve/carve at its default branch, which
+      # asks whether the gem is conformant with the spec as it stands right now.
+      # No change in this repository can answer yes to that: the spec adds
+      # documents continuously and an engine implements them some time later, so
+      # between those two moments the gate cannot pass by construction, and a
+      # gate that cannot pass gets skipped - the "check that cannot fail" of
+      # markup-carve/carve#755 arriving from the opposite direction.
+      #
+      # It had already fired that way. The spec gained corpus category 367 on
+      # 2026-08-18, and #77 - which does nothing but bump the engine pin and cut
+      # the changelog, and is what moves Carve::VERSION off 0.1.0 so this
+      # workflow can publish at all - went red on two documents that no engine
+      # revision available that day rendered. The sibling binding carve-py went
+      # further and half-shipped: v0.1.1 published its GitHub release and then
+      # skipped the PyPI upload for the same two documents, leaving the registry
+      # serving the release the security fix was for.
+      #
+      # So it now holds the gem to the spec the engine inside it was written
+      # against: scripts/pinned-spec-commit.py reads the carve-rs revision
+      # ext/carve/Cargo.toml pins, cross-checks it against what
+      # ext/carve/Cargo.lock resolved, and takes that revision's tests/spec
+      # gitlink. Every input is pinned in this repository, so the answer cannot
+      # change while this repository does not, and a failure is cleared by
+      # bumping the pin - an action taken here.
+      #
+      # WHAT IT STILL REFUSES, unchanged: a gem whose engine renders any of the
+      # documents that engine claims to implement differently, a corpus that is
+      # truncated or stale relative to what the spec's example pages declare, a
+      # `require "carve"` that resolves anywhere but the isolated install, and a
+      # package whose files differ from that install.
+      #
+      # WHAT MOVED TO NON-BLOCKING: how far this gem is from spec MAIN. That is
+      # reported by the corpus-drift job in ci.yml, on every push, every pull
+      # request and a daily schedule.
+      - name: Check out carve-rs
+        uses: actions/checkout@v4
+        with:
+          repository: markup-carve/carve-rs
+          path: carve-rs
+          # fetch-depth: 0 so the pinned revision can be read as a tree. A
+          # shallow clone has the tip's tree and nothing else, and the pin is
+          # deliberately not required to be the tip.
+          fetch-depth: 0
+
+      - name: Resolve the spec commit the pinned engine pins
+        id: pin
+        run: |
+          spec="$(python3 scripts/pinned-spec-commit.py \
+            --engine carve-rs \
+            --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock)"
+          echo "spec=$spec" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the spec corpus that engine was written against
         uses: actions/checkout@v4
         with:
           repository: markup-carve/carve
+          ref: ${{ steps.pin.outputs.spec }}
           path: spec
 
       # THE gate. It installs the .gem built above the way an embedder would,
