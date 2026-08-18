@@ -4,10 +4,19 @@ on:
   push:
     tags:
       - "v*"
+  # A tag-triggered workflow is unexercisable between releases, which is how a
+  # release job rots. This lets the whole gate run on demand against `main`; the
+  # publish job below is tag-only, so a manual run builds and verifies the gem
+  # and stops there.
+  workflow_dispatch:
 
 jobs:
-  publish:
-    name: Build and publish to RubyGems
+  # Everything up to, but not including, making the artifact public. It ends by
+  # uploading the exact .gem it verified, and the publish job pushes that file
+  # rather than building its own -- so what RubyGems serves is the bytes this
+  # job rendered the corpus through, not a second build of the same source.
+  verify:
+    name: Build the gem and run the corpus through it
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,6 +30,7 @@ jobs:
       # test/release_version_test.rb checks the same constant against the same
       # two files on every push; this is the last chance to catch it.
       - name: Verify version and changelog match the release tag
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           TAG="${GITHUB_REF_NAME#v}"
           VER="$(sed -n 's/.*VERSION[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' lib/carve/version.rb | head -1)"
@@ -50,7 +60,6 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.2"
-          bundler-cache: true
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -58,11 +67,73 @@ jobs:
       - name: Guard against panic = "abort"
         run: bash scripts/check-panic-unwind.sh
 
-      - name: Compile native extension
-        run: bundle exec rake compile
+      # rb-sys runs bindgen while `gem install` compiles the packaged extension,
+      # which is the only compile in this workflow. Nothing here builds the
+      # source tree with `rake compile`: a gem is not its checkout, and a
+      # separately compiled copy is not what gets published.
+      - name: Install libclang (rb-sys bindgen)
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
 
       - name: Build gem
         run: gem build carve.gemspec
+
+      - name: Check out the spec corpus
+        uses: actions/checkout@v4
+        with:
+          repository: markup-carve/carve
+          path: spec
+
+      # THE gate. It installs the .gem built above the way an embedder would,
+      # asserts the `carve` it loaded resolved into that install and not into
+      # this checkout, checks the package's files against the install byte for
+      # byte, and renders the whole spec corpus through it -- population and
+      # content both, the population derived by test/corpus_population.rb from
+      # the spec's own example pages rather than written down here.
+      #
+      # It fails the job. It does not warn: laravel-carve, symfony-carve and
+      # shopware-carve each carry a correct corpus comparison that runs on a
+      # schedule and reports divergence while exiting 0, so every required check
+      # is green while the shipped engine renders a sixth of the corpus
+      # differently. And publishing is not reversible -- RubyGems indexes within
+      # minutes and a yank is itself a public event -- so the only useful place
+      # to find out is before the push, with a non-zero exit.
+      - name: Run the spec corpus through the built gem
+        env:
+          CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
+        run: bash scripts/verify-release-artifact.sh "$(ls carve-lang-*.gem)"
+
+      # The verified bytes, handed to the publish job. Uploading the artifact
+      # rather than rebuilding is what makes "verified" and "published" the same
+      # object.
+      - name: Upload the verified gem
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-gem
+          path: carve-lang-*.gem
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Push the verified gem to RubyGems
+    # `needs:` rather than step order. Ordering inside one job is not a gate: a
+    # step that fails ends the job, but so does a step someone marks
+    # continue-on-error, and neither arrangement makes the push structurally
+    # unreachable. As a separate job that needs `verify`, the push cannot start
+    # while the corpus gate is failing, and it has nothing to push except the
+    # artifact that job uploaded.
+    needs: verify
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the verified gem
+        uses: actions/download-artifact@v4
+        with:
+          name: verified-gem
+
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
 
       - name: Configure RubyGems credentials
         run: |

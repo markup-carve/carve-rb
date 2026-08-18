@@ -104,3 +104,23 @@ jobs:
           bundle install
           bundle exec rake compile
           bundle exec rake test
+
+      # Everything above tests the CHECKOUT: `rake compile` builds the extension
+      # into lib/carve/ from the working tree and the suite drives that. What
+      # gets published is a .gem, whose contents the gemspec's globs decide and
+      # whose extension `gem install` compiles under its own toolchain. Those
+      # are two artifacts, and release.yml used to push the second one having
+      # only ever tested the first.
+      #
+      # The gate that closed that lives in release.yml, where it fires on a tag.
+      # A check that only ever runs during a release is a check nobody has seen
+      # work: it rots between releases, and the run that discovers it is broken
+      # is the run where a version is waiting to go out. So it also runs here,
+      # every push, over a gem built from this commit -- the same script, the
+      # same corpus, the same refusal.
+      - name: Build the gem and run the release gate over it
+        env:
+          CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
+        run: |
+          gem build carve.gemspec
+          bash scripts/verify-release-artifact.sh "$(ls carve-lang-*.gem)"
