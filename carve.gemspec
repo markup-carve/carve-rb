@@ -27,6 +27,15 @@ Gem::Specification.new do |spec|
     "LICENSE"
   ].reject { |f| f.start_with?("ext/carve/target/") }
   spec.require_paths = ["lib"]
+  # Every push must come from an account with MFA enabled. With the trusted
+  # publisher on rubygems.org this is satisfied by the provenance of the CI
+  # request rather than by a human typing a code, and a leaked credential
+  # cannot publish this gem at all. That matters most for carve-lang: it is the
+  # native engine every Ruby consumer compiles.
+  spec.metadata = (spec.metadata || {}).merge(
+    "rubygems_mfa_required" => "true",
+  )
+
 
   # Tells RubyGems this gem ships a Rust native extension built via extconf.rb.
   spec.extensions = ["ext/carve/extconf.rb"]
