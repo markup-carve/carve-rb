@@ -84,7 +84,25 @@ jobs:
       # is exactly what happened: the carve-rs pin sat months behind and had
       # even fallen behind two breaking AST changes, while CI stayed green.
       - name: Install libclang (rb-sys bindgen)
-        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+        # BOUNDED AND RETRIED. Bare `apt-get` has no timeout, so a wedged
+        # mirror hangs the job until the 6h runner limit - it produces no
+        # output, which makes it indistinguishable from a slow compile. On
+        # 2026-08-19 this step hung nine times across the two repositories that
+        # install libclang, for 28 to 113 minutes each, and every one was
+        # cleared only by cancelling and re-running.
+        #
+        # Three tries, each capped at 4 minutes. A hung mirror now costs 12
+        # minutes worst case and says so, instead of an hour of silence.
+        run: |
+          for attempt in 1 2 3; do
+            if timeout 240 sudo apt-get update && timeout 240 sudo apt-get install -y libclang-dev; then
+              exit 0
+            fi
+            echo "::warning::apt attempt ${attempt} failed or timed out; retrying"
+            sleep 10
+          done
+          echo "::error::apt-get could not install libclang-dev after 3 attempts"
+          exit 1
 
       # The corpus is the only check that can tell whether a drifted pin renders
       # documents wrongly TODAY: everything above asserts hand-written
@@ -232,7 +250,25 @@ jobs:
       # `gem install` compiles the packaged extension, which runs rb-sys's
       # bindgen. Same reason the verify job installs it.
       - name: Install libclang (rb-sys bindgen)
-        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+        # BOUNDED AND RETRIED. Bare `apt-get` has no timeout, so a wedged
+        # mirror hangs the job until the 6h runner limit - it produces no
+        # output, which makes it indistinguishable from a slow compile. On
+        # 2026-08-19 this step hung nine times across the two repositories that
+        # install libclang, for 28 to 113 minutes each, and every one was
+        # cleared only by cancelling and re-running.
+        #
+        # Three tries, each capped at 4 minutes. A hung mirror now costs 12
+        # minutes worst case and says so, instead of an hour of silence.
+        run: |
+          for attempt in 1 2 3; do
+            if timeout 240 sudo apt-get update && timeout 240 sudo apt-get install -y libclang-dev; then
+              exit 0
+            fi
+            echo "::warning::apt attempt ${attempt} failed or timed out; retrying"
+            sleep 10
+          done
+          echo "::error::apt-get could not install libclang-dev after 3 attempts"
+          exit 1
 
       - name: Download the gem the corpus gate ran over
         uses: actions/download-artifact@v4
