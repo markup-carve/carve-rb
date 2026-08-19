@@ -72,7 +72,25 @@ jobs:
       # source tree with `rake compile`: a gem is not its checkout, and a
       # separately compiled copy is not what gets published.
       - name: Install libclang (rb-sys bindgen)
-        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+        # BOUNDED AND RETRIED. Bare `apt-get` has no timeout, so a wedged
+        # mirror hangs the job until the 6h runner limit - it produces no
+        # output, which makes it indistinguishable from a slow compile. On
+        # 2026-08-19 this step hung nine times across the two repositories that
+        # install libclang, for 28 to 113 minutes each, and every one was
+        # cleared only by cancelling and re-running.
+        #
+        # Three tries, each capped at 4 minutes. A hung mirror now costs 12
+        # minutes worst case and says so, instead of an hour of silence.
+        run: |
+          for attempt in 1 2 3; do
+            if timeout 240 sudo apt-get update && timeout 240 sudo apt-get install -y libclang-dev; then
+              exit 0
+            fi
+            echo "::warning::apt attempt ${attempt} failed or timed out; retrying"
+            sleep 10
+          done
+          echo "::error::apt-get could not install libclang-dev after 3 attempts"
+          exit 1
 
       - name: Build gem
         run: gem build carve.gemspec
@@ -181,6 +199,11 @@ jobs:
     needs: verify
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    # `id-token: write` is required for the OIDC exchange and is never
+    # granted implicitly, not even when the repository default is read-write.
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Download the verified gem
         uses: actions/download-artifact@v4
@@ -192,11 +215,23 @@ jobs:
         with:
           ruby-version: "3.2"
 
-      - name: Configure RubyGems credentials
-        run: |
-          mkdir -p ~/.gem
-          printf -- '---\n:rubygems_api_key: %s\n' "${{ secrets.RUBYGEMS_API_KEY }}" > ~/.gem/credentials
-          chmod 0600 ~/.gem/credentials
+      # OIDC TRUSTED PUBLISHING. This replaced a hand-written
+      # ~/.gem/credentials holding a long-lived API key, and the replacement is
+      # not additive: a credentials FILE takes precedence over the environment
+      # variables this action exports, so leaving it in place would silently
+      # keep using the key and make the OIDC path look like it worked.
+      #
+      # GitHub mints a short-lived token naming this repository and workflow,
+      # RubyGems exchanges it for a credential valid for minutes. The key can
+      # then be deleted from the repository - which matters most here of the
+      # three Ruby gems, because carve-lang is the native engine every Ruby
+      # consumer compiles, so a hijacked push reaches the most people.
+      #
+      # Skipped on a dispatch: a rehearsal must not mint a publishing
+      # credential.
+      - name: Exchange the OIDC token for a RubyGems credential
+        if: github.event_name != 'workflow_dispatch'
+        uses: rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a # v2.1.0
 
       - name: Push gem to RubyGems
         run: gem push carve-lang-*.gem
