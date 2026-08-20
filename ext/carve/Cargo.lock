@@ -38,7 +38,7 @@ checksum = "b4388bee8683e3d04af747c73422af53102d2bd24d9eadb6cbc100baef4b43f8"
 [[package]]
 name = "carve-lang"
 version = "0.1.3"
-source = "git+https://github.com/markup-carve/carve-rs?rev=9705274c306bdf6a554d80e7705692af700b51a6#9705274c306bdf6a554d80e7705692af700b51a6"
+source = "git+https://github.com/markup-carve/carve-rs?rev=54f596f2564d918a3eae0e0073189f56a2e1b232#54f596f2564d918a3eae0e0073189f56a2e1b232"
 dependencies = [
  "html5ever",
  "markup5ever_rcdom",
