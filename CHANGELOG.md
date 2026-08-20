@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The engine moves from carve-rs `9705274c` to `54f596f2`, 28 commits. Rendering
+  changes with it: tables gained semantic row partitions and two cell rulings, a
+  braced hyphen pair is an en dash, the doubled run is the canonical arrow, a
+  continuation marker attaches only a flush-left block, and the footnote
+  backlink carries an accessible name. The stale pin is what made this gem the
+  only implementation failing PART 12 conformance in
+  markup-carve/carve#1451 - a binding has no vote of its own, and this one was
+  voting with an engine from 24 commits ago.
+
 ## [0.1.1] - 2026-08-18
 
 Everything below is the delta from `v0.1.0`, which is the only version a
