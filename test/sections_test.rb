@@ -65,7 +65,10 @@ class SectionsTest < Minitest::Test
     html = flat("# A\n\nText[^n].\n\n[^n]: Note.\n")
 
     assert_includes html, "<h1 id=\"A\">A</h1>"
-    assert_includes html, "<section role=\"doc-endnotes\">"
+    # The open tag, not the whole element: the region gained an accessible name
+    # (`aria-label="Footnotes"`, markup-carve/carve-rs#1189), and what this test
+    # is about is that the endnotes region survives `sections: false` at all.
+    assert_includes html, "<section role=\"doc-endnotes\""
     refute_includes html, "<section id="
   end
 
