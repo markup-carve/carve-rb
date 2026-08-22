@@ -320,7 +320,3 @@ that has fallen behind fails a build. Locally:
 ```sh
 CARVE_SPEC_CORPUS=/path/to/carve/tests/corpus bundle exec rake test
 ```
-
-## License
-
-MIT, markup-carve.
