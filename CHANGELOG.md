@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The engine moves from carve-rs `0.1.3` (`a33c42ad`), which `0.1.1` shipped, to
-  `3250454b` - 88 commits across three pin bumps (#80, #82, #84). Rendering
+  `bd19414d` - 106 commits across four pin bumps (#80, #82, #84, #87). Rendering
   changes an existing document can see: a column's alignment defaults come from
   the header section, an explicit alignment run is validated and inherited, and
   a table cell's marker run must end at a space; tables gained semantic row
@@ -37,11 +37,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   group takes the mode option; and a `%%` line a verbatim run has already
   swallowed no longer produces a comment node after that run, which changes the
   tree without changing the HTML (#84).
+  The fourth bump is 18 further commits, and over the spec corpus exactly one
+  document's HTML moves with it: a list marker at an item's content column
+  opens a sublist whether or not it is the item's first, so a marker that
+  follows a blank line and a paragraph inside an item no longer joins that
+  paragraph (markup-carve/carve-rs#1251). A further 104 documents change only
+  their reported positions, because a container's span now starts at its
+  opening markup and ends at its last placed child, and a definition list's
+  likewise (markup-carve/carve-rs#1238, markup-carve/carve-rs#1248,
+  markup-carve/carve-rs#1252). Nothing else an existing document can see
+  changes (#87).
 - The stale pin is what made this gem the only implementation failing PART 12
   conformance in markup-carve/carve#1451 - a binding has no vote of its own, and
   this one was voting with an engine 28 commits behind (#82). It recurred within
   two days, on three documents and a pin one day old, because nothing in this
   repository compares the tree this gem produces against the engine's own (#84).
+  It recurred again the next day, on one document, with that comparison still
+  unmerged (#86) and the pin 18 commits behind (#87).
 
 ## [0.1.1] - 2026-08-18
 
