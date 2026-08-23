@@ -24,7 +24,6 @@
 //! symbols: {...}, safe: ..., profile: ..., sections: ...)` on top of these
 //! primitives.
 
-
 use carve_rs::extensions::registry;
 use carve_rs::{CarveExtension, Mode, Options, Profile, StaticRenderers};
 use magnus::value::{InnerValue, Opaque};
@@ -200,6 +199,22 @@ fn to_html(source: String) -> String {
     carve_rs::to_html(&source)
 }
 
+fn to_markdown(source: String) -> String {
+    carve_rs::to_markdown(&source)
+}
+
+fn to_plain_text(source: String) -> String {
+    carve_rs::to_plain_text(&source)
+}
+
+fn to_ansi(source: String) -> String {
+    carve_rs::to_ansi(&source)
+}
+
+fn to_carve(source: String) -> String {
+    carve_rs::to_carve(&source)
+}
+
 /// Parse Carve source and return its AST as a JSON string.
 ///
 /// The pure-Ruby wrapper (`Carve.parse`) turns this into a tree of Ruby
@@ -319,7 +334,9 @@ fn to_html_full_with_symbols(
     // The safe-render arguments default off and section wrapping stays on, so
     // this signature stays as published; `to_html_safe` is the one that takes
     // them.
-    to_html_safe(ruby, source, names, mode, renderers, symbols, false, None, true)
+    to_html_safe(
+        ruby, source, names, mode, renderers, symbols, false, None, true,
+    )
 }
 
 /// Map a profile name to a [`Profile`], or raise Ruby ArgumentError.
@@ -407,7 +424,6 @@ fn to_html_safe(
         .map_err(|e| Error::new(ruby.exception_arg_error(), e.to_string()))
 }
 
-
 /// Read a document's provenance marker.
 ///
 /// Returns a Hash `{version:, generated_by:}` or nil when the document carries
@@ -452,6 +468,10 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     // these. `_to_html` is the no-extension fast path; the wrapper owns the
     // bare `to_html` name.
     module.define_singleton_method("_to_html", function!(to_html, 1))?;
+    module.define_singleton_method("to_markdown", function!(to_markdown, 1))?;
+    module.define_singleton_method("to_plain_text", function!(to_plain_text, 1))?;
+    module.define_singleton_method("to_ansi", function!(to_ansi, 1))?;
+    module.define_singleton_method("to_carve", function!(to_carve, 1))?;
     module.define_singleton_method("_to_ast_json", function!(to_ast_json, 1))?;
     module.define_singleton_method(
         "to_html_with_extensions",
