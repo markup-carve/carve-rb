@@ -40,6 +40,13 @@ spellings of one rule is how they come to disagree.
     python3 scripts/pinned-spec-commit.py \
         --engine carve-rs --manifest Cargo.toml --lock Cargo.lock
 
+`--print engine` prints the carve-rs revision itself instead of the spec commit
+it pins, and needs no checkout to do it. That is the other half of the same
+resolution, and it lives here rather than in a shell snippet for the reason
+this file exists at all: the binding-parity gate has to build the engine at the
+revision the LOCK resolved, cross-checked against the manifest, and a second
+reader of the same two files is how the two come to disagree.
+
 Exit codes: 0 the commit was resolved and printed on stdout, 1 the pin or the
 gitlink could not be resolved, 2 usage or setup error.
 """
@@ -193,9 +200,17 @@ def spec_gitlink(engine: Path, revision: str) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Resolve the spec commit the pinned engine pins.")
-    parser.add_argument("--engine", required=True, type=Path, help="path to a carve-rs checkout")
+    parser.add_argument("--engine", type=Path, help="path to a carve-rs checkout")
     parser.add_argument("--manifest", required=True, type=Path, help="path to Cargo.toml")
     parser.add_argument("--lock", required=True, type=Path, help="path to Cargo.lock")
+    parser.add_argument(
+        "--print",
+        dest="what",
+        choices=("spec", "engine"),
+        default="spec",
+        help="`spec` (default) prints the spec commit the pinned engine pins; "
+        "`engine` prints the pinned carve-rs revision itself",
+    )
     arguments = parser.parse_args(argv)
 
     manifest_rev = manifest_revision(arguments.manifest)
@@ -218,6 +233,21 @@ def main(argv: list[str] | None = None) -> int:
             f"{locked_rev}. The build follows the lock, so it is not the revision the manifest "
             "advertises; regenerate the lock and commit it."
         )
+
+    if arguments.what == "engine":
+        # Deliberately after the manifest/lock agreement check above, not
+        # before it: the revision worth building is the one BOTH files name.
+        print(f"carve-rs is pinned at {locked_rev}", file=sys.stderr)
+        print(locked_rev)
+        return 0
+
+    if arguments.engine is None:
+        print(
+            "pinned-spec-commit: --print spec resolves the `tests/spec` gitlink at the pinned "
+            "revision, which needs --engine pointing at a carve-rs checkout with full history.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
 
     spec = spec_gitlink(arguments.engine, locked_rev)
     print(f"carve-rs {locked_rev} pins spec {spec}", file=sys.stderr)

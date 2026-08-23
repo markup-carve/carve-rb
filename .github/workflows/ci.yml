@@ -207,6 +207,106 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # DOES THE GEM STILL REPORT WHAT CARVE-RS PARSES? Nothing here asked.
+  #
+  # Every check above compares this gem to its own PINNED WORLD - the corpus the
+  # pinned engine's spec gitlink names, walked by ledgers built from that same
+  # corpus - and a stale pin is self-consistent inside it. So the drift was
+  # found twice inside a week by markup-carve/carve's nightly
+  # `scripts/ast-conformance.mjs`, in another repository: once on a pin 28
+  # commits behind (#82), once on a pin ONE DAY old (#84). The long comment at
+  # the top of test/binding_parity_test.rb goes through why each check here was
+  # blind to it, and shows the measurement that rules out comparing the gem
+  # against the engine it was BUILT FROM: one revision compared with itself
+  # agrees with itself, on the stale pin and the current one alike.
+  #
+  # So the reference is carve-rs at MAIN, and the corpus is spec main. Both are
+  # outside the pinned world, which is the whole point; either alone leaves half
+  # the drift invisible.
+  #
+  # WHY IT IS NOT ON pull_request, said plainly, because that is a real
+  # limitation and not an oversight. carve-rs merges AST-affecting changes
+  # daily: measured on 2026-08-23, the pin merged the DAY BEFORE already
+  # produced a different tree from carve-rs main on 105 of 1356 documents, all
+  # of them span changes nobody here caused. A pull-request gate in that state
+  # is red for a reason that has nothing to do with its diff, with the fix in
+  # another repository - the trap #78 had to re-aim the corpus gate out of, and
+  # the reason `engine-pin` is an age bound rather than a distance check.
+  #
+  # On the schedule, that same redness is exactly the signal wanted, and its
+  # clearing action is taken HERE: bump ext/carve/Cargo.toml and the lock. This
+  # does not widen what CI blocks; it moves a detector this repository was
+  # borrowing from another repository into this repository.
+  binding-parity:
+    name: The gem's tree is carve-rs's tree
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # main, deliberately unpinned: the reference is what carve-rs does TODAY.
+      - name: Check out carve-rs at main
+        uses: actions/checkout@v4
+        with:
+          repository: markup-carve/carve-rs
+          path: carve-rs
+
+      # main, deliberately: a document the spec gained after the pinned engine's
+      # `tests/spec` gitlink is precisely the one the gated corpus cannot hold,
+      # and one of the three documents the 2026-08-22 drift showed up on was
+      # exactly that.
+      - name: Check out the spec corpus at main
+        uses: actions/checkout@v4
+        with:
+          repository: markup-carve/carve
+          path: spec
+
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install libclang (rb-sys bindgen)
+        # BOUNDED AND RETRIED, for the reason spelled out in the build job: bare
+        # `apt-get` has no timeout, and a wedged mirror is indistinguishable
+        # from a slow compile until the 6h runner limit.
+        run: |
+          for attempt in 1 2 3; do
+            if timeout 240 sudo apt-get update && timeout 240 sudo apt-get install -y libclang-dev; then
+              exit 0
+            fi
+            echo "::warning::apt attempt ${attempt} failed or timed out; retrying"
+            sleep 10
+          done
+          echo "::error::apt-get could not install libclang-dev after 3 attempts"
+          exit 1
+
+      - name: Build the carve-rs CLI at main
+        id: engine
+        run: |
+          cargo build --release --bin carve --manifest-path carve-rs/Cargo.toml
+          echo "rev=$(git -C carve-rs rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Compile the extension from the pinned engine
+        run: |
+          bundle install
+          bundle exec rake compile
+
+      # The gem's tree against that binary's, over spec main. CARVE_REQUIRE_PARITY
+      # sits next to the two variables it guards so that dropping the wiring
+      # cannot quietly drop the guard with it: without it a renamed variable
+      # makes the comparison SKIP and exit 0.
+      - name: The gem's tree matches carve-rs at main
+        env:
+          CARVE_ENGINE_BIN: ${{ github.workspace }}/carve-rs/target/release/carve
+          CARVE_ENGINE_REV: ${{ steps.engine.outputs.rev }}
+          CARVE_PARITY_CORPUS: ${{ github.workspace }}/spec/tests/corpus
+          CARVE_REQUIRE_PARITY: "1"
+        run: bundle exec ruby -Ilib -Itest test/binding_parity_test.rb
+
   # The same corpus comparison against spec MAIN, REPORTED and not gated.
   #
   # This is the other half of re-aiming the corpus gate above, and it is not
