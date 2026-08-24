@@ -215,6 +215,57 @@ fn to_carve(source: String) -> String {
     carve_rs::to_carve(&source)
 }
 
+fn from_html_json(ruby: &Ruby, source: String, mode: String) -> Result<String, Error> {
+    let mode = carve_rs::HtmlImportMode::from_name(&mode).ok_or_else(|| {
+        Error::new(
+            ruby.exception_arg_error(),
+            "mode must be safe, semantic, or roundtrip".to_string(),
+        )
+    })?;
+    let result = carve_rs::html_to_carve(
+        &source,
+        &carve_rs::HtmlImportOptions {
+            mode,
+            ..Default::default()
+        },
+    )
+    .map_err(|error| {
+        Error::new(
+            ruby.exception_runtime_error(),
+            format!("HTML import failed: {error:?}"),
+        )
+    })?;
+    let diagnostics = result
+        .report
+        .diagnostics
+        .iter()
+        .map(|diagnostic| {
+            let mut value = serde_json::json!({
+                "code": diagnostic.code.as_str(),
+                "message": diagnostic.message,
+                "severity": diagnostic.severity.as_str(),
+            });
+            if let Some(path) = &diagnostic.path {
+                value["path"] = serde_json::json!(path);
+            }
+            value
+        })
+        .collect::<Vec<_>>();
+    Ok(serde_json::json!({
+        "value": result.value,
+        "report": {
+            "mode": result.report.mode.as_str(),
+            "adapter": result.report.adapter.as_str(),
+            "diagnostics": diagnostics,
+        }
+    })
+    .to_string())
+}
+
+fn from_markdown(source: String) -> String {
+    carve_rs::markdown_to_carve(&source)
+}
+
 /// Parse Carve source and return its AST as a JSON string.
 ///
 /// The pure-Ruby wrapper (`Carve.parse`) turns this into a tree of Ruby
@@ -472,6 +523,8 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     module.define_singleton_method("to_plain_text", function!(to_plain_text, 1))?;
     module.define_singleton_method("to_ansi", function!(to_ansi, 1))?;
     module.define_singleton_method("to_carve", function!(to_carve, 1))?;
+    module.define_singleton_method("_from_html_json", function!(from_html_json, 2))?;
+    module.define_singleton_method("_from_markdown", function!(from_markdown, 1))?;
     module.define_singleton_method("_to_ast_json", function!(to_ast_json, 1))?;
     module.define_singleton_method(
         "to_html_with_extensions",

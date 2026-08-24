@@ -42,6 +42,19 @@ module Carve
   RENDERER_KEYS = %i[mermaid chart graphviz math].freeze
 
   class << self
+    # Import HTML or Markdown into canonical Carve. Both methods return the
+    # shared migration shape `{ value:, report: }`.
+    def from_html(source, mode: :safe)
+      JSON.parse(_from_html_json(source, mode.to_s), symbolize_names: true)
+    end
+
+    def from_markdown(source)
+      {
+        value: _from_markdown(source),
+        report: { source_format: "markdown", diagnostics: [] }
+      }
+    end
+
     # Render Carve +source+ to an HTML string.
     #
     # With no extensions:
