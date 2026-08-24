@@ -47,18 +47,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   likewise (markup-carve/carve-rs#1238, markup-carve/carve-rs#1248,
   markup-carve/carve-rs#1252). Nothing else an existing document can see
   changes (#87).
+- The engine then moves from `bd19414d` to `f2fbb24c` - 39 further commits
+  (#91). A container with no closer ends at its last placed child rather than
+  one codepoint past it, which is the PART 12 §4 extent defect this gem was
+  still the one implementation reporting (markup-carve/carve-rs#1308, #89); a
+  footnote continuation survives a blank run (markup-carve/carve-rs#1295); and
+  a list takes PART 9 §17 L7's consumed `loose` attribute, which loosens the
+  list instead of being emitted on it and which `Carve.parse` publishes on a
+  definition list as a `loose` field (markup-carve/carve-rs#1304). Seven corpus
+  documents move with the bump and all seven are documents the corpus gained,
+  so nothing that already rendered correctly changed.
+- The embedded engine moves to carve-rs `42a952cb`. An indented lone image now
+  parses as a paragraph holding an inline image rather than a block image
+  (markup-carve/carve#1660, markup-carve/carve-rs#1347). AST only - the
+  rendered HTML is unchanged on every corpus document (#93).
 - The stale pin is what made this gem the only implementation failing PART 12
   conformance in markup-carve/carve#1451 - a binding has no vote of its own, and
   this one was voting with an engine 28 commits behind (#82). It recurred within
   two days, on three documents and a pin one day old, because nothing in this
   repository compares the tree this gem produces against the engine's own (#84).
   It recurred again the next day, on one document, with that comparison still
-  unmerged (#86) and the pin 18 commits behind (#87).
+  unmerged (#86) and the pin 18 commits behind (#87). It recurred twice more
+  inside this window: at 39 commits behind, still carrying the PART 12 §4
+  extent defect (#89, #91), and again on a ruling only the tree can see,
+  which a byte-for-byte HTML comparison cannot detect (#93).
 
 ### Added
 
-- `Carve.from_html` and `Carve.from_markdown` expose migration through the
-  shared `{value:, report:}` result.
+- `Carve.from_html(source, mode: :safe)` and `Carve.from_markdown(source)`
+  import an existing document into canonical Carve (#92). Both return the
+  shared migration shape `{value:, report:}`: `value` is the Carve source, and
+  `report` carries `diagnostics`, each with `code`, `message`, `severity` and,
+  where the engine placed one, `path`. `from_html` takes `:safe`, `:semantic`
+  or `:roundtrip` and reports back the `mode` and `adapter` it ran with; any
+  other mode raises `ArgumentError`. `from_markdown` reports
+  `source_format: "markdown"` and diagnoses nothing.
 - `Carve.to_markdown`, `to_plain_text`, `to_ansi` and `to_carve`, so every core
   render target the embedded engine already understood is reachable from Ruby
   (#88). `Carve.to_html` and the AST entry points are unchanged.
