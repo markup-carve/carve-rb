@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Carve.to_markdown`, `to_plain_text`, `to_ansi`, and `to_carve`, completing
+  the core carve-rs render-target surface exposed by the gem.
+
 ### Security
 
 - The gem is published through RubyGems trusted publishing rather than a

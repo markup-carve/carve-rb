@@ -37,6 +37,12 @@ time via `rb_sys`.
 require "carve"
 
 Carve.to_html("# Hello *world*")
+
+# Every core engine target is available from the binding.
+Carve.to_markdown(source)
+Carve.to_plain_text(source)
+Carve.to_ansi(source)
+Carve.to_carve(source)
 # => "<section id=\"Hello-world\">\n  <h1>Hello <strong>world</strong></h1>\n</section>"
 
 # Carve syntax note: *...* is STRONG (bold), /.../ is EMPHASIS (italic).

@@ -5,6 +5,14 @@ require "open3"
 require "carve"
 
 class CarveTest < Minitest::Test
+  def test_all_core_render_targets_are_exposed
+    source = "# Hi\n\nBody\n"
+    assert_includes Carve.to_markdown(source), "# Hi"
+    assert_includes Carve.to_plain_text(source), "Hi"
+    assert_includes Carve.to_ansi(source), "Hi"
+    assert_equal source, Carve.to_carve("# Hi\n\n\nBody")
+  end
+
   # Path to the carve-rs CLI binary, used for byte-identical checks.
   # Override with the CARVE_CLI env var; the test is skipped when absent.
   CARVE_CLI = ENV.fetch("CARVE_CLI", "../carve-rs/target/release/carve")
