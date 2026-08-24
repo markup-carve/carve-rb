@@ -43,6 +43,8 @@ Carve.to_markdown(source)
 Carve.to_plain_text(source)
 Carve.to_ansi(source)
 Carve.to_carve(source)
+Carve.from_html('<p>Hello <strong>world</strong></p>')
+Carve.from_markdown('*em* and **strong**')
 # => "<section id=\"Hello-world\">\n  <h1>Hello <strong>world</strong></h1>\n</section>"
 
 # Carve syntax note: *...* is STRONG (bold), /.../ is EMPHASIS (italic).

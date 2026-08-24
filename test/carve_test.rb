@@ -11,6 +11,14 @@ class CarveTest < Minitest::Test
     assert_includes Carve.to_plain_text(source), "Hi"
     assert_includes Carve.to_ansi(source), "Hi"
     assert_equal source, Carve.to_carve("# Hi\n\n\nBody")
+
+    html = Carve.from_html("<p>Hello <strong>world</strong></p>")
+    assert_equal "Hello *world*\n", html[:value]
+    assert_empty html[:report][:diagnostics]
+
+    markdown = Carve.from_markdown("*em* and **strong**")
+    assert_equal "/em/ and *strong*\n", markdown[:value]
+    assert_empty markdown[:report][:diagnostics]
   end
 
   # Path to the carve-rs CLI binary, used for byte-identical checks.

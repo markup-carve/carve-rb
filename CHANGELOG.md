@@ -57,6 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Carve.from_html` and `Carve.from_markdown` expose migration through the
+  shared `{value:, report:}` result.
 - `Carve.to_markdown`, `to_plain_text`, `to_ansi` and `to_carve`, so every core
   render target the embedded engine already understood is reachable from Ruby
   (#88). `Carve.to_html` and the AST entry points are unchanged.
