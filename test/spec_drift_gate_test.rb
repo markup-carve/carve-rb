@@ -37,6 +37,15 @@ class SpecDriftGateTest < Minitest::Test
     "#{lines.join("\n")}\n"
   end
 
+  # The shape a real run actually produces: minitest's progress dots arrive with
+  # no newline, so the first printed line is glued to them. A reader anchored at
+  # the line start drops that document, which is what happened on the first run
+  # of this gate - one of three went missing, and only the count check saw it.
+  def dot_glued_log(*names)
+    log = diverging_log(*names)
+    log.sub("corpus mismatch:", "..F.corpus mismatch:")
+  end
+
   def clean_log
     "packaged gem carve-lang-0.1.2.gem: 1475 of 1475 declared corpus documents byte-identical\n"
   end
@@ -71,6 +80,17 @@ class SpecDriftGateTest < Minitest::Test
     ledger = "367-002\n"
     assert_equal 1, run_gate(diverging_log("367-002", "412-001"), ledger),
                  "the verdict is per document, not a count against a threshold"
+  end
+
+  def test_the_first_line_is_found_when_minitest_glues_its_progress_dots_to_it
+    ledger = "367-002\n412-001\n"
+    assert_equal 0, run_gate(dot_glued_log("367-002", "412-001"), ledger),
+                 "a progress dot in front of the first line must not hide that document"
+  end
+
+  def test_a_dot_glued_line_that_is_undeclared_still_fails
+    assert_equal 1, run_gate(dot_glued_log("367-002", "412-001"), "412-001\n"),
+                 "the glued line is the one that would go missing, so it must be the one that fails"
   end
 
   def test_a_clean_run_passes

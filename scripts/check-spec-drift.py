@@ -52,7 +52,15 @@ from pathlib import Path
 # is deliberate: the message truncates at twenty names and appends `...`, so a
 # ledger comparison built on it would call every document past the twentieth
 # undeclared no matter what the ledger says.
-MISMATCH = re.compile(r"^corpus mismatch: (\S+)\s*$", re.M)
+#
+# NOT ANCHORED AT THE LINE START, because minitest writes its progress dots with
+# no newline, so the first printed line arrives as `.corpus mismatch: <name>` and
+# a `^`-anchored pattern silently drops it. That is not hypothetical - it dropped
+# one of three documents on the first run of this gate, and the count check below
+# is what turned a silent undercount into a failure. The Ruby side now prints a
+# leading newline as well; both halves are kept, because either alone leaves the
+# other's failure mode open.
+MISMATCH = re.compile(r"corpus mismatch: (\S+)\s*$", re.M)
 # The two headline counts. Their presence is the evidence that a comparison ran
 # at all; only the mismatch lines decide the verdict.
 DIVERGING = re.compile(r"(\d+) of (\d+) corpus documents render differently")

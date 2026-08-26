@@ -172,6 +172,11 @@ class PackagedGemTest < Minitest::Test
     # would make every document past the twentieth look undeclared. It also has
     # to be printed rather than only asserted, because the drift job runs this
     # same script for its measurement and a passing run prints nothing at all.
+    # The leading newline is load-bearing: minitest writes its progress dots
+    # without one, so the first line would arrive as `.corpus mismatch: <name>`
+    # and a reader anchoring at the line start drops it. It dropped one of three
+    # documents on the first run of scripts/check-spec-drift.py.
+    $stdout.puts "" unless mismatches.empty?
     mismatches.each { |name| $stdout.puts "corpus mismatch: #{name}" }
 
     assert_empty mismatches,
