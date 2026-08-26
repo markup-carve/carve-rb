@@ -138,18 +138,26 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write("".join(log.splitlines(keepends=True)[-40:]))
         return 1
 
-    # A headline that counts divergence but no per-document lines is the same
-    # hole one layer in: the verdict would be computed from an empty set.
-    if headline_diverging and int(headline_diverging.group(1)) and not diverging:
-        annotate(
-            "error",
-            f"the log reports {headline_diverging.group(1)} diverging document(s) but printed "
-            "no `corpus mismatch:` lines, so the ledger comparison had nothing to compare. "
-            "scripts/verify-packaged-gem.rb prints one line per mismatch; that print is what "
-            "this gate reads.",
-            args.github,
-        )
-        return 1
+    # THE PER-DOCUMENT LINES MUST ACCOUNT FOR THE WHOLE HEADLINE. Requiring
+    # merely that SOME line was printed is the same hole one layer in: a
+    # truncated list - or a verifier that later regresses to printing fewer
+    # lines - would leave the omitted documents uncompared, and a ledger
+    # declaring the subset that did print would pass the gate with undeclared
+    # drift on the machine. So the counts have to agree exactly. The names are
+    # unique corpus basenames, so a set of them is the same size as the count.
+    if headline_diverging:
+        counted = int(headline_diverging.group(1))
+        if counted != len(diverging):
+            annotate(
+                "error",
+                f"the log reports {counted} diverging document(s) but printed "
+                f"{len(diverging)} `corpus mismatch:` line(s), so the ledger comparison would "
+                "cover only part of the divergence. scripts/verify-packaged-gem.rb prints one "
+                "line per mismatch before it asserts; that print is what this gate reads, and "
+                "an incomplete one is not a measurement.",
+                args.github,
+            )
+            return 1
 
     at_spec = f" at spec main ({args.spec})" if args.spec else ""
     total = headline_diverging.group(2) if headline_diverging else (

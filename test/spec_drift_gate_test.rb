@@ -89,6 +89,16 @@ class SpecDriftGateTest < Minitest::Test
                  "a divergence count with no mismatch lines would be compared against an empty set"
   end
 
+  # The same hole one layer in, and the one that would let a declared subset
+  # certify undeclared drift: requiring merely that SOME line printed leaves the
+  # omitted documents uncompared.
+  def test_a_partial_mismatch_list_fails_even_when_every_printed_row_is_declared
+    log = "corpus mismatch: 367-002\n" \
+          "50 of 1475 corpus documents render differently from the spec\n"
+    assert_equal 1, run_gate(log, "367-002\n"),
+                 "one printed line out of fifty counted is not a measurement of the fifty"
+  end
+
   def test_a_stale_declaration_is_reported_and_does_not_fail
     assert_equal 0, run_gate(clean_log, "367-002  # closed by a bump, row not yet dropped\n"),
                  "a row to delete is a notice per-PR; the release gate is what refuses it"
