@@ -61,6 +61,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parses as a paragraph holding an inline image rather than a block image
   (markup-carve/carve#1660, markup-carve/carve-rs#1347). AST only - the
   rendered HTML is unchanged on every corpus document (#93).
+- The embedded engine moves from `42a952cb` to `468e71af` - 70 further commits
+  across three pin bumps (#96, #97, #98), and each of the three changes what an
+  existing document renders as. The first two settle one rule between them: a
+  list item's content column is measured from the bare marker, so neither the
+  task checkbox nor a marker-attached attribute block widens it
+  (markup-carve/carve-rs#1364, markup-carve/carve-rs#1374,
+  markup-carve/carve-rs#1379). `-{#k} [x] a` has content column 2, so a `# h`
+  written under it at column 2 opens a heading inside the item where the wider
+  column made it lazy paragraph text. Also in those two: a lone image at an
+  item's content column keeps the item's looseness, restoring the `<p>` wrapper
+  the item used to drop (markup-carve/carve-rs#1359); the ANSI quote bar
+  reports containment, so a quoted heading, code block, table, thematic break
+  and lone image keep the bar and a quoted list's bar sits outside its marker
+  (markup-carve/carve-rs#1363); and on the import side an imported heading
+  records its id, an imported task item comes back a task item, an input's type
+  matches the checkbox keyword case-insensitively, an HTML comment imports as a
+  Carve comment, and an imported code block no longer gains a trailing blank
+  line on every pass (markup-carve/carve-rs#1361, markup-carve/carve-rs#1366,
+  markup-carve/carve-rs#1378, markup-carve/carve-rs#1386,
+  markup-carve/carve-rs#1384).
+  The third bump is 44 commits on its own, and rendered HTML moves on 50 corpus
+  documents with it. Measured against the corpus's own expected output at the
+  spec the new pin pins, the old pin differed on all 50 and the new pin on
+  none, so those 50 were being rendered wrongly and this is a correctness fix
+  rather than a preference. What an author notices is that a recognized block
+  opener written past a container's content column now opens that block inside
+  the container instead of folding into text: an indented `> q` under a list
+  item wrote `<p>&gt; q</p>` and now writes a block quote, an indented `# h`
+  wrote `<p># h</p>` and now writes a heading, an indented code fence folded
+  into inline code inside a paragraph and now writes a `<pre>` block, and a
+  tab-indented `> quote` wrote text on the item's own line and now writes a
+  block quote; where a blank line preceded the block, the item is no longer
+  reported loose either. The same authored base applies inside a footnote body
+  and a definition description, so a table or a link reference definition
+  written past the body's column registers there (markup-carve/carve-rs#1387,
+  markup-carve/carve-rs#1420, markup-carve/carve-rs#1422,
+  markup-carve/carve-rs#1425, markup-carve/carve-rs#1431,
+  markup-carve/carve-rs#1432, markup-carve/carve-rs#1433, measured over the
+  corpus that markup-carve/carve-rs#1417 pins). Four further changes an
+  existing document can see ride along: an explicit id or class may begin with
+  an ASCII digit, so `::: 123` opens a div with that class instead of staying a
+  paragraph (markup-carve/carve-rs#1393); `::: >` spells a block quote with no
+  marker column, and its closing fence takes a caption
+  (markup-carve/carve-rs#1399, markup-carve/carve-rs#1411); reference and
+  footnote labels differing only in ASCII whitespace resolve to one definition
+  (markup-carve/carve-rs#1397); and `{align=left|right|center}` on an element
+  whose `align` means text alignment renders a CSS declaration rather than the
+  deprecated presentational attribute (markup-carve/carve-rs#1412).
+  `Carve.to_carve` also writes one space after a definition separator
+  (markup-carve/carve-rs#1426) (#98).
 - The stale pin is what made this gem the only implementation failing PART 12
   conformance in markup-carve/carve#1451 - a binding has no vote of its own, and
   this one was voting with an engine 28 commits behind (#82). It recurred within
