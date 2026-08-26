@@ -25,10 +25,24 @@ jobs:
   # way). This job answers whether the pin is real, and it keeps asserting that
   # with the pin sitting exactly on the engine's tip.
   #
-  # It is deliberately NOT a distance check. carve-rs merges continuously, so
-  # "fail when behind main" would be red from the moment any PR opens there and
-  # unclearable by the action it recommends. The lag is printed as a number;
-  # only AGE can fail this job.
+  # NEITHER AGE NOR DISTANCE CAN FAIL IT. Both are proxies for "did the engine
+  # change in a way that matters", and both go red for upstream work the author
+  # of a pull request here did not cause: distance from the moment any PR opens
+  # in carve-rs, age on a quiet fortnight where nothing diverged. Age's failure
+  # was measured rather than argued - on 2026-08-23 this job passed with the pin
+  # 44 commits behind and the gem rendering 50 corpus documents wrongly, because
+  # the pin was 1.1 days old (markup-carve/carve-rb#100). markup-carve/carve-go#44
+  # DELETED its age gate for the same reading rather than tightening the number.
+  #
+  # So both are printed as numbers and neither is asserted. What still gates
+  # here is not a proxy: the pin is well formed, Cargo.lock resolved the same
+  # revision Cargo.toml names, that revision exists, and it is an ancestor of
+  # carve-rs main. A pin naming a revision that was never merged is wrong today
+  # regardless of any threshold.
+  #
+  # Staleness DOES fail at the release gate, where a consequence already lives -
+  # release.yml runs the same script with --max-age-days. A stale pin must not
+  # reach a tag; it must not hold a pull request hostage.
   engine-pin:
     runs-on: ubuntu-latest
     steps:
@@ -43,17 +57,11 @@ jobs:
           path: carve-rs
           fetch-depth: 0
 
-      # --max-age-days 14: this repository has bumped the pin every one to three
-      # days since it started tracking it (the widest gap on record is three),
-      # so fourteen is roughly five times the observed cadence -- wide enough
-      # that a quiet fortnight is not a false alarm, tight enough to catch the
-      # failure that actually happened here, where the pin sat months behind
-      # while CI stayed green. Age rather than commit count, because age is what
-      # bumping the pin clears.
-      - name: Check the pinned engine revision
+      - name: Report the pin's age and distance, and gate on it being real
         run: |
+          # --max-age-days omitted: 0 is the script's report-only default.
           python3 carve-rs/tools/check-engine-pin.py \
-            --engine carve-rs --github --max-age-days 14 \
+            --engine carve-rs --github \
             --form cargo --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock
 
   build:
@@ -237,6 +245,30 @@ jobs:
   # clearing action is taken HERE: bump ext/carve/Cargo.toml and the lock. This
   # does not widen what CI blocks; it moves a detector this repository was
   # borrowing from another repository into this repository.
+  #
+  # THE PULL-REQUEST BLOCK LIVES IN corpus-drift BELOW, and that is the answer
+  # to markup-carve/carve-rb#100 rather than dropping this `if:`. Two reasons,
+  # in order of weight:
+  #
+  #   - UNIT. This job compares AST TREES, which carry byte offsets, so a span
+  #     change nobody here caused moves a hundred documents with the rendered
+  #     HTML byte-identical: 105 of 1356 on a pin merged the day before. There
+  #     is no honest way to declare that window document by document, because
+  #     the rows would turn over daily and describe nothing a reader of this
+  #     repository can act on. corpus-drift asks the question a consumer of the
+  #     gem can feel - does the published artifact still render the spec - and
+  #     that answer is stable enough to be written down.
+  #   - COST, secondary but real. This job does TWO Rust builds: `cargo build
+  #     --release` of carve-rs main's CLI plus `rake compile` of the extension,
+  #     each behind an apt install of libclang. corpus-drift reuses the .gem the
+  #     build job already produced and compiles once, inside `gem install`. So
+  #     the cheaper detector is also the one with the right unit; if it were only
+  #     cost, the answer would have been to run this on pull requests anyway.
+  #
+  # What that costs, stated rather than hidden: a carve-rs change that alters no
+  # rendered HTML still reaches main here unblocked, and is caught the next
+  # morning by this job. That is a narrower hole than the one #100 measured,
+  # where NOTHING blocked and 50 documents rendered wrongly through a green PR.
   binding-parity:
     name: The gem's tree is carve-rs's tree
     if: github.event_name != 'pull_request'
@@ -307,27 +339,56 @@ jobs:
           CARVE_REQUIRE_PARITY: "1"
         run: bundle exec ruby -Ilib -Itest test/binding_parity_test.rb
 
-  # The same corpus comparison against spec MAIN, REPORTED and not gated.
+  # The same corpus comparison against spec MAIN. IT GATES, on the divergences
+  # nobody has written down.
   #
-  # This is the other half of re-aiming the corpus gate above, and it is not
-  # optional. The question that gate no longer asks - how far is this gem from
-  # the spec as it stands today - is still worth knowing; it is simply not
-  # something a pull request here can fix, so it must not block one. Deleting
-  # this job would leave the drift invisible and turn the re-aiming into a
-  # loosening. carve-go carries the identical pair for the identical reason.
+  # It used to only report, and that is the defect markup-carve/carve-rb#100
+  # measured: it discarded the gate's exit status and failed only when NO count
+  # had been logged, so the one thing it could not do was fail on a count. On
+  # 2026-08-23 it printed
   #
-  # The schedule at the top of this file is what makes it useful: the spec moves
-  # without a commit here, so a push-triggered run alone would report the state
-  # of the day someone last touched this repository.
+  #     50 of 1475 corpus documents render differently at spec main (2b213fc)
   #
-  # IT IS NOT A CHECK THAT CANNOT FAIL. It never fails ON the number, but it
-  # fails when it did not MEASURE one: a corpus that moved, a spec layout this
-  # no longer finds, a gem that will not install. Those are the ways a reporting
-  # job silently becomes decoration, and the guard against them is requiring
-  # evidence of a measurement rather than an exit status - the run has to have
-  # logged either a divergence count or a byte-identical count.
+  # and passed, in the run where `engine-pin` also passed on a 1.1-day-old pin
+  # 44 commits behind. On a pull request the blocking detector (binding-parity)
+  # did not run and the running detector could not block, so the drift landed
+  # through a fully green PR.
+  #
+  # THE SPLIT IT NOW ENFORCES is markup-carve/carve#1811's ruling, applied here:
+  #
+  #   a DECLARED divergence passes.   The spec leads the engine by construction -
+  #     a rule lands in markup-carve/carve, carve-rs implements it later, this gem
+  #     picks it up later still - and resources/spec-drift.txt exists to describe
+  #     that window. Declaring a row is the act that makes the window known, so a
+  #     declared row has done its job and must not also be a failure. This is why
+  #     it is not option 2 of the ticket: the threshold is not a count, it is
+  #     whether anybody looked.
+  #   an UNDECLARED divergence FAILS. That is the state nobody knows they are in,
+  #     and it is the state #100 found: a pinned build rendering 50 documents
+  #     wrongly with every required check green.
+  #   pin age and distance report and do not fail, in engine-pin above.
+  #
+  # Both verdicts are cleared by an action taken in THIS repository - bump the
+  # carve-rs revision in ext/carve/Cargo.toml, or write the row down with its
+  # reason - which is the property age and distance lacked and the reason
+  # markup-carve/carve-go#44 deleted them rather than retuning them.
+  #
+  # The release gate closes the other half: release.yml refuses a NON-EMPTY
+  # ledger, so a declared window cannot reach a tag, and it is where pin
+  # staleness fails.
+  #
+  # The schedule at the top of this file is still what makes this useful on a
+  # quiet day: the spec moves without a commit here, so a push-triggered run
+  # alone would report the state of the day someone last touched this repository.
+  #
+  # THE OLD GUARD IS KEPT, because it was real and is not superseded by gating on
+  # the count: a run that logged NEITHER a divergence count nor a byte-identical
+  # count measured nothing, and an empty diverging set then means "the comparison
+  # never happened", not "nothing is wrong". scripts/check-spec-drift.py fails on
+  # that, and on the same hole one layer in - a headline that counts divergence
+  # while no per-document line was printed.
   corpus-drift:
-    name: Report the drift against spec main
+    name: The gem's drift from spec main is declared
     runs-on: ubuntu-latest
     needs: build
     steps:
@@ -375,32 +436,41 @@ jobs:
         with:
           name: ci-gem
 
-      - name: Report the drift
+      # MEASURE. The exit status is discarded HERE and only here: this run's job
+      # is to produce the log, and divergence is what is being measured, so a
+      # non-zero exit is the expected shape of a measurement that found some.
+      # The verdict is a separate step that reads its own exit code, because
+      # deciding from a grep is exactly the bug #100 was.
+      - name: Measure the gem against spec main
         env:
           CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
         run: |
           set -uo pipefail
-          # The gate exits non-zero on divergence. Here divergence is the thing
-          # being reported, so the exit status is discarded and the LOG is what
-          # is read; a run that logged no count at all still fails below.
           bash scripts/verify-release-artifact.sh "$(ls carve-lang-*.gem)" > drift.log 2>&1 || true
           cat drift.log
+
+      # DECIDE. Exits non-zero on an undeclared divergence, and on a log that
+      # measured nothing. Nothing downstream reads its output to work out what
+      # happened; the exit code is the verdict.
+      - name: Every divergence is declared
+        run: |
+          set -uo pipefail
           spec="$(git -C spec rev-parse --short HEAD)"
-          diverging="$(grep -oE '[0-9]+ of [0-9]+ corpus documents render differently' drift.log | tail -1 || true)"
-          identical="$(grep -oE '[0-9]+ of [0-9]+ declared corpus documents byte-identical' drift.log | tail -1 || true)"
-          if [ -n "$diverging" ]; then
-            headline="$diverging at spec main ($spec)"
-          elif [ -n "$identical" ]; then
-            headline="0 diverging, $identical at spec main ($spec)"
-          else
-            echo "::error::the drift run logged neither a divergence count nor a byte-identical count, so nothing was measured" >&2
-            tail -40 drift.log >&2
-            exit 1
-          fi
-          echo "$headline"
-          echo "::notice::$headline"
+          # errexit off around the pipeline only, so the summary below is
+          # written on a refusal too - that is the run whose summary matters.
+          # The status is then re-raised verbatim; it is never recomputed from
+          # the text.
+          set +e
+          python3 scripts/check-spec-drift.py \
+            --log drift.log --ledger resources/spec-drift.txt \
+            --spec "$spec" --github 2>&1 | tee drift-verdict.txt
+          status=${PIPESTATUS[0]}
+          set -e
           {
-            echo "## The published gem against spec main"
+            echo "## The published gem against spec main ($spec)"
             echo
-            echo "$headline"
+            echo '```'
+            cat drift-verdict.txt
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
