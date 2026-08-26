@@ -1,0 +1,40 @@
+# Corpus documents this gem is KNOWN to render differently from spec main.
+#
+# WHAT THIS FILE IS FOR
+#
+# The engine inside this gem is pinned. The spec is not. When a rule lands in
+# markup-carve/carve, carve-rs implements it some time later and this gem picks
+# it up later still, when ext/carve/Cargo.toml moves. Until then the gem renders
+# those documents by the older rule, and the corpus comparison against spec main
+# says so. That window is normal and the drift report exists to describe it.
+#
+# So the window is DECLARED rather than tolerated. Every document listed below
+# is a divergence somebody looked at and wrote down. A divergence that is NOT
+# listed is the state nobody knows they are in - a pinned build rendering
+# documents wrongly with nothing saying so - and that is what the per-PR gate
+# refuses (markup-carve/carve-rb#100, following the split ruled in
+# markup-carve/carve#1811).
+#
+# HOW IT IS ENFORCED
+#
+#   per-PR CI     an UNDECLARED diverging document FAILS. A declared one passes.
+#                 A declared document that no longer diverges is reported, so
+#                 the line can be dropped, and does not fail.
+#   release gate  this file must be EMPTY. A declared window is a window that is
+#                 still open, and a tag must not ship one.
+#
+# The clearing action for both is taken in THIS repository: bump the carve-rs
+# revision in ext/carve/Cargo.toml, commit the regenerated ext/carve/Cargo.lock,
+# and delete the rows the bump closed.
+#
+# FORMAT
+#
+# One corpus document basename per line, without the .crv extension, as
+# scripts/verify-packaged-gem.rb prints it. Anything after `#` is a comment and
+# is where the reason goes. Blank lines are ignored.
+#
+#   367-002  # spec gained `{=raw}` on attribute lines; carve-rs has not shipped it
+#
+# EMPTY IS THE GOAL STATE. An empty file means this gem renders every document
+# in spec main exactly as the spec does, and it is the only state that may be
+# tagged.

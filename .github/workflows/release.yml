@@ -56,6 +56,24 @@ jobs:
             exit 1
           fi
 
+      # EVERY DECLARED DRIFT WINDOW MUST BE CLOSED. resources/spec-drift.txt is
+      # where a divergence from spec main is written down so per-PR CI stops
+      # refusing it (markup-carve/carve-rb#100, the split ruled in
+      # markup-carve/carve#1811). A declared row is a window that is still open:
+      # the gem renders that document by an older rule and somebody knows. It is
+      # fine on a pull request, where the fix lives in a bump nobody is obliged
+      # to make today, and it is not fine in a tag, which is public within
+      # minutes and not reversible.
+      #
+      # This is the half of the split that keeps declaring from becoming a way
+      # to ship drift. The corpus gate further down cannot catch it, because it
+      # holds the gem to the spec the PINNED engine was written against, and a
+      # declared window is by definition outside that.
+      - name: Every declared drift window is closed
+        run: |
+          python3 scripts/check-spec-drift.py \
+            --require-empty-ledger --ledger resources/spec-drift.txt --github
+
       - name: Install Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -66,6 +84,7 @@ jobs:
 
       - name: Guard against panic = "abort"
         run: bash scripts/check-panic-unwind.sh
+
 
       # rb-sys runs bindgen while `gem install` compiles the packaged extension,
       # which is the only compile in this workflow. Nothing here builds the
@@ -142,6 +161,25 @@ jobs:
           # shallow clone has the tip's tree and nothing else, and the pin is
           # deliberately not required to be the tip.
           fetch-depth: 0
+
+      # PIN STALENESS FAILS HERE, and only here. In ci.yml the same script runs
+      # without --max-age-days, printing the age and the distance as numbers,
+      # because both are proxies that go red for upstream work a pull request
+      # here did not cause - the reading markup-carve/carve-go#44 acted on when
+      # it deleted its age gate rather than retuning it. A tag is the other
+      # case: nobody is held hostage by it, it is the maintainer's own action,
+      # and the consequence of shipping a stale engine is a published gem.
+      #
+      # Fourteen days is roughly five times this repository's observed bump
+      # cadence of one to three days. The number is not load-bearing the way it
+      # was when it was the ONLY detector: the drift ledger above already
+      # refuses a known-diverging tag whatever the pin's age, and this catches
+      # the case where the pin is simply old and nothing has diverged yet.
+      - name: The pinned engine is real and not stale
+        run: |
+          python3 carve-rs/tools/check-engine-pin.py \
+            --engine carve-rs --github --max-age-days 14 \
+            --form cargo --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock
 
       - name: Resolve the spec commit the pinned engine pins
         id: pin

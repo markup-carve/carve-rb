@@ -166,6 +166,14 @@ class PackagedGemTest < Minitest::Test
       got == want
     end.map { |crv, _| File.basename(crv, ".crv") }
 
+    # PRINTED, one line per document, BEFORE the assertion. The assertion
+    # message truncates at twenty names, and scripts/check-spec-drift.py reads
+    # this list to decide which divergences are declared - a truncated list
+    # would make every document past the twentieth look undeclared. It also has
+    # to be printed rather than only asserted, because the drift job runs this
+    # same script for its measurement and a passing run prints nothing at all.
+    mismatches.each { |name| $stdout.puts "corpus mismatch: #{name}" }
+
     assert_empty mismatches,
                  "#{mismatches.length} of #{all.length} corpus documents render differently " \
                  "from the spec through the gem this release would publish: " \
