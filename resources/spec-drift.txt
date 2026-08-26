@@ -38,3 +38,12 @@
 # EMPTY IS THE GOAL STATE. An empty file means this gem renders every document
 # in spec main exactly as the spec does, and it is the only state that may be
 # tagged.
+
+# Below a definition body's column, the link and abbreviation kinds answer one
+# rule. The spec added these two documents and carve-rs implemented the rule in
+# 4bf6d81c (markup-carve/carve-rs#1441), which is AFTER the revision
+# ext/carve/Cargo.toml pins (0c54d2ea). Measured on PR #102: 2 of 1492 at spec
+# main 570da01. Bumping the pin past 4bf6d81c closes both rows, and the release
+# gate refuses a tag until they are gone.
+430-below-a-definition-body-s-column-an-invisible-line-folds-as-text-3
+430-below-a-definition-body-s-column-an-invisible-line-folds-as-text-4
