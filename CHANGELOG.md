@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-27
+
 ### Security
 
 - The gem is published through RubyGems trusted publishing rather than a
@@ -111,6 +113,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deprecated presentational attribute (markup-carve/carve-rs#1412).
   `Carve.to_carve` also writes one space after a definition separator
   (markup-carve/carve-rs#1426) (#98).
+- The final release pin moves from `0c54d2ea` to the released carve-rs 0.1.4
+  (`2e9c43f2`). This closes every declared spec-drift window: link and
+  abbreviation definitions below a definition body's column follow the same
+  folding rule, a comment in a footnote body leaves no blank line behind, the
+  continuation marker's column gate reaches every container, an empty
+  description body writes the `{empty}` sentinel, citation items are typed and
+  positioned, and paragraph block-image promotion is published on the AST.
 - The stale pin is what made this gem the only implementation failing PART 12
   conformance in markup-carve/carve#1451 - a binding has no vote of its own, and
   this one was voting with an engine 28 commits behind (#82). It recurred within
