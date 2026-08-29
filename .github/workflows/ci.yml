@@ -474,3 +474,61 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
+
+  # The run knows before anyone does. Everything above already refuses correctly
+  # and says why - on 2026-08-29 the 06:15 scheduled run named a stale pin and
+  # the file to edit, and the person who acted on it read about it four hours
+  # later in markup-carve/carve#1877, filed by a DIFFERENT repository. Nothing
+  # here carried the verdict off the Actions tab (#107).
+  #
+  # So this job is not another check. It adds no coverage and can find nothing:
+  # it reports what the jobs above decided, into a ticket that a red run files,
+  # a later red run edits, and the first green run closes.
+  #
+  # It runs on the default branch only. A red topic branch belongs to whoever
+  # pushed it and they are already looking; filing there would open a ticket per
+  # broken push, which is how a filer gets muted and takes the real ones with it.
+  verdict:
+    name: The verdict reaches a person
+    # always(), because it is skipped by default exactly when a job ahead of it
+    # fails - the only run it has anything to say about.
+    if: always()
+    needs: [engine-pin, build, binding-parity, corpus-drift]
+    # Runs on this branch overlap - a push and the 06:15 schedule - and the
+    # filer's read-check-write over the ticket is not atomic. Two of them
+    # interleaved can file the ticket twice, or close one the other just wrote.
+    # This queues them instead: one verdict at a time per ref, none cancelled,
+    # because a cancelled verdict is a run that reported nothing. The run-id
+    # stamp in the ticket body still stands behind it - queue order is not the
+    # same promise as chronological order.
+    concurrency:
+      group: ci-verdict-${{ github.ref }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    permissions:
+      # A job-level block REPLACES the default set rather than adding to it, so
+      # every scope omitted here is `none`, and each of these three is load
+      # bearing: without `contents` the job dies at checkout, without `actions`
+      # it dies on the first API call reading this run's jobs, and without
+      # `issues` it dies on the write. Any of the three files nothing at all,
+      # which is the silence this job exists to end.
+      actions: read
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: File the verdict where someone reads it
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          HEAD_SHA: ${{ github.sha }}
+          REF_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          # Must equal this job's `name:` above. The script excludes itself by
+          # this string, and test/ci_verdict_test.rb asserts the two agree.
+          VERDICT_JOB_NAME: The verdict reaches a person
+        run: bash scripts/file-ci-verdict.sh
