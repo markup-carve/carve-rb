@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The engine moves from carve-rs `2e9c43f2` to `da45f9d2`, 20 commits. A colon
+  followed by a space and a tab opens no description, an authored task state
+  reaches the tree and the HTML, a titled medium emits one title attribute, an
+  empty external link target is omitted, and a table continuation survives Djot
+  migration. The stale pin is what failed PART 12 binding parity in
+  markup-carve/carve#1877 - a binding has no vote of its own.
+
 ## [0.1.2] - 2026-08-27
 
 ### Security
