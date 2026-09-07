@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The engine moves from carve-rs `da45f9d2` to `42df4092`, 46 commits, clearing
+  the binding-parity drift the nightly run found on 34 corpus documents (#110).
+  A comment leaf span begins at its markup, an emptied definition description
+  narrows to its marker line, a footnote nested past a footnote body becomes its
+  own note, a nested item's lead fence or colon container takes its flush-left
+  body, and an all-blank or lone-pipe row is no longer read as a table (the lone
+  pipe no longer panics).
 - The engine moves from carve-rs `2e9c43f2` to `da45f9d2`, 20 commits. A colon
   followed by a space and a tab opens no description, an authored task state
   reaches the tree and the HTML, a titled medium emits one title attribute, an
