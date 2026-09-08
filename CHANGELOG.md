@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-09-08
+
 ### Changed
 
 - The engine moves from carve-rs `da45f9d2` to `42df4092`, 46 commits, clearing
@@ -322,6 +324,8 @@ are not listed, because no release ever shipped them.
   Arrays (every AST node type is covered), enabling custom renderers such as
   [carve-hexapdf](https://github.com/markup-carve/carve-hexapdf).
 
-[Unreleased]: https://github.com/markup-carve/carve-rb/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/markup-carve/carve-rb/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/markup-carve/carve-rb/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/markup-carve/carve-rb/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/markup-carve/carve-rb/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/markup-carve/carve-rb/releases/tag/v0.1.0
