@@ -49,10 +49,10 @@ module Carve
     end
 
     def from_markdown(source)
-      {
-        value: _from_markdown(source),
-        report: { source_format: "markdown", diagnostics: [] }
-      }
+      result = JSON.parse(_from_markdown_json(source), symbolize_names: true)
+      # Keep the 0.1.x spelling while exposing the shared cross-language key.
+      result[:report][:source_format] = result[:report][:sourceFormat]
+      result
     end
 
     # Render Carve +source+ to an HTML string.

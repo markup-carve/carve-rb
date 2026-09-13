@@ -15,10 +15,22 @@ class CarveTest < Minitest::Test
     html = Carve.from_html("<p>Hello <strong>world</strong></p>")
     assert_equal "Hello *world*\n", html[:value]
     assert_empty html[:report][:diagnostics]
+    assert_equal 2, html[:report][:schemaVersion]
+    assert_equal "html", html[:report][:sourceFormat]
+
+    lossy = Carve.from_html('<p onclick="x">text</p>')
+    assert_equal "dropped", lossy[:report][:diagnostics][0][:fidelity]
+    assert_equal "exact", lossy[:report][:diagnostics][0][:confidence]
 
     markdown = Carve.from_markdown("*em* and **strong**")
     assert_equal "/em/ and *strong*\n", markdown[:value]
-    assert_empty markdown[:report][:diagnostics]
+    assert_equal "markdown", markdown[:report][:source_format]
+    assert_equal "markdown", markdown[:report][:sourceFormat]
+    assert_equal "fidelity-unverified", markdown[:report][:diagnostics][0][:code]
+    assert_equal "dropped", markdown[:report][:diagnostics][0][:fidelity]
+    assert_equal "fallback", markdown[:report][:diagnostics][0][:confidence]
+    assert_equal "warning", markdown[:report][:diagnostics][0][:severity]
+    assert_equal 1, markdown[:report][:diagnostics].length
   end
 
   # Path to the carve-rs CLI binary, used for byte-identical checks.
