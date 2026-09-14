@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- HTML and Markdown migration reports use schema version 2 with shared
+  preserved, normalized, degraded, and dropped fidelity plus confidence.
+  Markdown retains the existing `source_format` key as a compatibility alias
+  for the shared `sourceFormat` spelling and now emits a conservative
+  `fidelity-unverified` dropped/fallback finding on every import instead of
+  the previous empty diagnostics array.
+- The embedded carve-rs revision advances to the migration-report v2 commit;
+  rendering behavior is unchanged.
+
 ## [0.1.3] - 2026-09-08
 
 ### Changed

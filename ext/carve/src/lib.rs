@@ -222,7 +222,7 @@ fn from_html_json(ruby: &Ruby, source: String, mode: String) -> Result<String, E
             "mode must be safe, semantic, or roundtrip".to_string(),
         )
     })?;
-    let result = carve_rs::html_to_carve(
+    let result = carve_rs::migrate_html(
         &source,
         &carve_rs::HtmlImportOptions {
             mode,
@@ -239,31 +239,44 @@ fn from_html_json(ruby: &Ruby, source: String, mode: String) -> Result<String, E
         .report
         .diagnostics
         .iter()
-        .map(|diagnostic| {
-            let mut value = serde_json::json!({
-                "code": diagnostic.code.as_str(),
-                "message": diagnostic.message,
-                "severity": diagnostic.severity.as_str(),
-            });
-            if let Some(path) = &diagnostic.path {
-                value["path"] = serde_json::json!(path);
-            }
-            value
-        })
+        .map(migration_diagnostic_json)
         .collect::<Vec<_>>();
     Ok(serde_json::json!({
         "value": result.value,
         "report": {
-            "mode": result.report.mode.as_str(),
-            "adapter": result.report.adapter.as_str(),
+            "schemaVersion": result.report.schema_version,
+            "sourceFormat": result.report.source_format.as_str(),
+            "mode": result.report.mode.map(|value| value.as_str()),
+            "adapter": result.report.adapter.map(|value| value.as_str()),
             "diagnostics": diagnostics,
         }
     })
     .to_string())
 }
 
-fn from_markdown(source: String) -> String {
-    carve_rs::markdown_to_carve(&source)
+fn from_markdown_json(source: String) -> String {
+    let result = carve_rs::migrate_markdown(&source);
+    let diagnostics = result
+        .report
+        .diagnostics
+        .iter()
+        .map(migration_diagnostic_json)
+        .collect::<Vec<_>>();
+    serde_json::json!({"value": result.value, "report": {"schemaVersion": result.report.schema_version, "sourceFormat": result.report.source_format.as_str(), "diagnostics": diagnostics}}).to_string()
+}
+
+fn migration_diagnostic_json(diagnostic: &carve_rs::MigrationDiagnostic) -> serde_json::Value {
+    let mut value = serde_json::json!({
+        "code": diagnostic.code,
+        "message": diagnostic.message,
+        "severity": diagnostic.severity.as_str(),
+        "fidelity": diagnostic.fidelity.as_str(),
+        "confidence": diagnostic.confidence.as_str(),
+    });
+    if let Some(path) = &diagnostic.path {
+        value["path"] = serde_json::json!(path);
+    }
+    value
 }
 
 /// Parse Carve source and return its AST as a JSON string.
@@ -524,7 +537,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     module.define_singleton_method("to_ansi", function!(to_ansi, 1))?;
     module.define_singleton_method("to_carve", function!(to_carve, 1))?;
     module.define_singleton_method("_from_html_json", function!(from_html_json, 2))?;
-    module.define_singleton_method("_from_markdown", function!(from_markdown, 1))?;
+    module.define_singleton_method("_from_markdown_json", function!(from_markdown_json, 1))?;
     module.define_singleton_method("_to_ast_json", function!(to_ast_json, 1))?;
     module.define_singleton_method(
         "to_html_with_extensions",

@@ -37,15 +37,18 @@ time via `rb_sys`.
 require "carve"
 
 Carve.to_html("# Hello *world*")
+# => "<section id=\"Hello-world\">\n  <h1>Hello <strong>world</strong></h1>\n</section>"
 
 # Every core engine target is available from the binding.
 Carve.to_markdown(source)
 Carve.to_plain_text(source)
 Carve.to_ansi(source)
 Carve.to_carve(source)
+# Import reports use schema version 2, with fidelity and confidence per finding.
+# Markdown emits fidelity-unverified/dropped/fallback until its engine path
+# exposes construct-level fidelity.
 Carve.from_html('<p>Hello <strong>world</strong></p>')
 Carve.from_markdown('*em* and **strong**')
-# => "<section id=\"Hello-world\">\n  <h1>Hello <strong>world</strong></h1>\n</section>"
 
 # Carve syntax note: *...* is STRONG (bold), /.../ is EMPHASIS (italic).
 Carve.to_html("*bold* and /italic/")
