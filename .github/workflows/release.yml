@@ -240,7 +240,12 @@ jobs:
     # `id-token: write` is required for the OIDC exchange and is never
     # granted implicitly, not even when the repository default is read-write.
     permissions:
-      contents: read
+      # `write`, not `read`, and the gate below is the whole reason: a DRAFT
+      # release is invisible to a caller without push access, so under
+      # `contents: read` the listing comes back empty and the gate reports
+      # "no release" for a draft that is sitting right there with notes in
+      # it. See markup-carve/carve-wasm#80.
+      contents: write
       id-token: write
     steps:
       # GATE: the notes are not the workflow's to write. A CHANGELOG entry is
@@ -261,6 +266,8 @@ jobs:
           if [ -z "$release" ]; then
             echo "::error::no release for $GITHUB_REF_NAME. Write the notes first:" \
                  "gh release create $GITHUB_REF_NAME --draft --notes-file NOTES.md"
+            echo "::error::if a draft DOES exist, this job could not see it -" \
+                 "check that the job still declares contents: write"
             exit 1
           fi
           body="$(printf '%s' "$release" | jq -r '.body // ""' | tr -d '[:space:]')"
