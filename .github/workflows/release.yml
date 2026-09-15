@@ -237,6 +237,7 @@ jobs:
     needs: verify
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    environment: release
     # `id-token: write` is required for the OIDC exchange and is never
     # granted implicitly, not even when the repository default is read-write.
     permissions:
