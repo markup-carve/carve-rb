@@ -22,4 +22,4 @@ serde_json = "1"
 # The Carve engine. Imported under the Rust crate alias `carve_rs` so the
 # binding's own crate name (`carve-rb`) does not collide with the engine's
 # package name (`carve`) in the Cargo lockfile.
-carve_rs = { package = "carve-lang", git = "https://github.com/markup-carve/carve-rs", rev = "51b00117b932be85431bd5623ebfc55849d1a03c" }
+carve_rs = { package = "carve-lang", git = "https://github.com/markup-carve/carve-rs", rev = "cd03d1d7f8a33c2534469d3377ea2ea90d5b2439" }
