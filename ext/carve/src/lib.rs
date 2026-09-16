@@ -216,18 +216,57 @@ fn to_carve(source: String) -> String {
     carve_rs::to_carve(&source)
 }
 
+/// Which renderer runs over the expanded document.
+///
+/// `carve` is absent on purpose: spec I15 excludes the Carve writer from
+/// expansion, because inlining a child into the formatter's output rewrites the
+/// author's document rather than formatting it.
+#[derive(Clone, Copy, PartialEq)]
+enum IncludeTarget {
+    Html,
+    Markdown,
+    Plain,
+    Ansi,
+    Ast,
+}
+
+fn parse_include_target(ruby: &Ruby, name: &str) -> Result<IncludeTarget, Error> {
+    match name {
+        "html" => Ok(IncludeTarget::Html),
+        "markdown" => Ok(IncludeTarget::Markdown),
+        "plain" => Ok(IncludeTarget::Plain),
+        "ansi" => Ok(IncludeTarget::Ansi),
+        "ast" => Ok(IncludeTarget::Ast),
+        other => Err(Error::new(
+            ruby.exception_arg_error(),
+            format!(
+                "Unknown Carve include target: {other:?} \
+                 (supported: \"html\", \"markdown\", \"plain\", \"ansi\", \"ast\")"
+            ),
+        )),
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
-fn to_html_with_includes_json(
+fn render_with_includes_json(
     ruby: &Ruby,
     source: String,
     root: String,
     source_path: String,
+    target: String,
     names: RArray,
+    mode: String,
+    renderers: RHash,
+    symbols: RHash,
+    safe: bool,
+    profile: Option<String>,
+    sections: bool,
     max_depth: Option<usize>,
     max_bytes: Option<usize>,
     max_resolver_calls: Option<usize>,
     max_warnings: Option<usize>,
 ) -> Result<String, Error> {
+    let which = parse_include_target(ruby, &target)?;
     let root_path = Path::new(&root);
     let source_path = Path::new(&source_path);
     if !root_path.is_absolute() || !source_path.is_absolute() {
@@ -261,10 +300,35 @@ fn to_html_with_includes_json(
             "include root is not usable".to_string(),
         )
     })?;
+    // The same options `to_html` builds. A document rendered through the
+    // include path renders the way it would without one: jekyll-carve passes a
+    // symbol map on every conversion, and carve-hexapdf asks for one profile
+    // and extension set across parent and child alike.
+    let parsed_mode = parse_mode(ruby, &mode)?;
+    let parsed_profile = match profile.as_deref() {
+        None => None,
+        Some(name) => Some(parse_profile(ruby, name)?),
+    };
+    let static_renderers = build_renderers(ruby, renderers)?;
     let boxed = boxed_extensions(ruby, names)?;
-    let mut render_options = Options::new();
+    let symbol_pairs = build_symbols(symbols)?;
+    let mut render_options = Options::new()
+        .with_mode(parsed_mode)
+        .with_renderers(static_renderers);
     for extension in &boxed {
         render_options = render_options.with_extension(extension.as_ref());
+    }
+    for (name, value) in &symbol_pairs {
+        render_options = render_options.with_symbol(name.clone(), value.clone());
+    }
+    if safe {
+        render_options = render_options.with_raw_html(false);
+    }
+    if let Some(preset) = parsed_profile {
+        render_options = render_options.with_profile(preset);
+    }
+    if !sections {
+        render_options = render_options.with_sections(false);
     }
     let mut include_options = carve_rs::IncludeOptions::new()
         .with_resolver(&resolver)
@@ -282,16 +346,47 @@ fn to_html_with_includes_json(
         include_options = include_options.with_max_warnings(value);
     }
 
+    let target_is_html = which == IncludeTarget::Html;
     let prepared = carve_rs::prepare_doc_with_includes(
         &source,
         &render_options,
         &include_options,
-        Mode::Interactive,
-        true,
+        // Every target but HTML is inherently static, so it prepares under the
+        // interactive mode the other renderers assume.
+        if target_is_html {
+            render_options.mode
+        } else {
+            Mode::Interactive
+        },
+        target_is_html,
     )
     .map_err(|error| Error::new(ruby.exception_arg_error(), error.to_string()))?;
-    let value = carve_rs::render_html_with_options(&prepared.doc, &render_options)
-        .map_err(|error| Error::new(ruby.exception_runtime_error(), error.to_string()))?;
+    let rendered = match which {
+        IncludeTarget::Html => carve_rs::render_html_with_options(&prepared.doc, &render_options),
+        IncludeTarget::Markdown => {
+            carve_rs::render_markdown_with_options(&prepared.doc, &render_options)
+        }
+        IncludeTarget::Plain => {
+            carve_rs::render_plain_text_with_options(&prepared.doc, &render_options)
+        }
+        IncludeTarget::Ansi => carve_rs::render_ansi_with_options(&prepared.doc, &render_options),
+        // The AST is published as a tree, not as a string, so a caller does not
+        // parse JSON twice. Positions stay OFF, unlike `to_ast_json`: spec I4
+        // leaves position remapping out of scope in every engine, so a child's
+        // spans would point into a document the caller never passed.
+        IncludeTarget::Ast => Ok(carve_rs::to_json(&prepared.doc)),
+    }
+    .map_err(|error| Error::new(ruby.exception_runtime_error(), error.to_string()))?;
+    let value: serde_json::Value = if which == IncludeTarget::Ast {
+        serde_json::from_str(&rendered).map_err(|error| {
+            Error::new(
+                ruby.exception_runtime_error(),
+                format!("the engine's AST JSON did not parse: {error}"),
+            )
+        })?
+    } else {
+        serde_json::Value::String(rendered)
+    };
     let safe_path = |value: &str| {
         let path = PathBuf::from(value);
         if path.is_absolute() {
@@ -655,8 +750,8 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     module.define_singleton_method("to_ansi", function!(to_ansi, 1))?;
     module.define_singleton_method("to_carve", function!(to_carve, 1))?;
     module.define_singleton_method(
-        "_to_html_with_includes_json",
-        function!(to_html_with_includes_json, 8),
+        "_render_with_includes_json",
+        function!(render_with_includes_json, 15),
     )?;
     module.define_singleton_method("_from_html_json", function!(from_html_json, 2))?;
     module.define_singleton_method("_from_markdown_json", function!(from_markdown_json, 1))?;

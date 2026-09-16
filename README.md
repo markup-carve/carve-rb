@@ -97,6 +97,40 @@ result = Carve.to_html_with_includes(
 puts result[:value]
 ```
 
+Every render option `Carve.to_html` takes is accepted here and reaches the
+included children too, so a document renders the same way whether or not it
+went through the include path: `extensions:`, `symbols:`, `profile:`, `mode:`,
+`renderers:`, `safe:` and `sections:`.
+
+`Carve.parse_with_includes` gives the expanded document as an AST instead, in
+the shape `Carve.parse` returns, for a host that walks the tree rather than
+rendering HTML:
+
+```ruby
+result = Carve.parse_with_includes(
+  File.read("book.crv"),
+  root: File.expand_path("."),
+  source_path: File.expand_path("book.crv"),
+)
+result[:value][:children]
+```
+
+Its nodes carry no `:pos`, unlike `Carve.parse`. Spec I4 leaves position
+remapping out of scope in every engine, so a span on an included node would name
+an offset in a document the caller never passed.
+
+`Carve.render_with_includes` takes the same arguments plus `target:`, one of
+`"html"`, `"markdown"`, `"plain"`, `"ansi"` or `"ast"`. There is no `"carve"`
+target: spec I15 excludes the Carve writer from expansion, because inlining a
+child into the formatter's output rewrites the author's document rather than
+formatting it.
+
+The budgets `max_depth:`, `max_bytes:`, `max_resolver_calls:` and
+`max_warnings:` pass through to the engine; omit one to keep its default. A
+target refused by the byte budget still reports `resolved: true`, because
+section 19 charges the budget for what the resolver handed back and a target is
+resolved before its size is known.
+
 ## Parsing to an AST
 
 `Carve.parse` returns the parsed document as a tree of Ruby Hashes and Arrays,
@@ -288,6 +322,8 @@ a document change.
 | `Carve.to_html(source, safe: true, profile: :comment)` | Render untrusted input: escape `=html` raw blocks/spans, restrict constructs. |
 | `Carve.to_html(source, sections: false)` | Render headings flat, with the id on the `<h*>` instead of a `<section>` wrapper. |
 | `Carve.to_html_with_includes(source, root:, source_path:)` | Render contained file includes and return warnings and dependencies. |
+| `Carve.parse_with_includes(source, root:, source_path:)` | The same expansion, published as an AST instead of HTML. |
+| `Carve.render_with_includes(source, root:, source_path:, target:)` | The expansion over any render target: html, markdown, plain, ansi or ast. |
 | `Carve.read_stamp(source)` | Read a document's provenance marker: `{version:, generated_by:}` or `nil`. |
 | `Carve.needs_review?(source)` | Whether a document predates this engine's spec version (unstamped counts as yes). |
 | `Carve.to_html_with_extensions(source, names_array)` | Native primitive (Array of Strings). |
