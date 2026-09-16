@@ -42,21 +42,91 @@ module Carve
   RENDERER_KEYS = %i[mermaid chart graphviz math].freeze
 
   class << self
-    def to_html_with_includes(source, root:, source_path:, extensions: nil,
-                              max_depth: nil, max_bytes: nil,
+    # Render +source+ to HTML with its <tt>{{ path }}</tt> includes expanded,
+    # contained to +root:+.
+    #
+    #   Carve.to_html_with_includes(File.read(page), root: "/srv/site",
+    #                               source_path: page, symbols: {smile: "\u{1F604}"})
+    #
+    # +root:+ and +source_path:+ are absolute, and the source file lives inside
+    # the root. A relative value raises ArgumentError rather than rooting
+    # containment at the process working directory, which is arbitrary with
+    # respect to the document.
+    #
+    # Returns +{value:, warnings:, dependencies:, suppressedWarnings:}+. Paths
+    # in +warnings+ and +dependencies+ are relative to the root, so a report can
+    # be shown to a reader as it stands.
+    #
+    # Every render option +to_html+ takes is accepted and reaches the included
+    # children too: an extension, a symbol map or a profile means the same thing
+    # in a child as in the parent.
+    def to_html_with_includes(source, root:, source_path:, extensions: nil, mode: nil,
+                              renderers: nil, symbols: nil, safe: false, profile: nil,
+                              sections: true, max_depth: nil, max_bytes: nil,
                               max_resolver_calls: nil, max_warnings: nil)
+      render_with_includes(
+        source, target: "html", root: root, source_path: source_path,
+        extensions: extensions, mode: mode, renderers: renderers, symbols: symbols,
+        safe: safe, profile: profile, sections: sections, max_depth: max_depth,
+        max_bytes: max_bytes, max_resolver_calls: max_resolver_calls,
+        max_warnings: max_warnings
+      )
+    end
+
+    # The expanded document as an AST, in the shape +.parse+ returns.
+    #
+    #   Carve.parse_with_includes(File.read(page), root: root, source_path: page)
+    #   # => {value: {type: "document", ...}, warnings: [], dependencies: [...], ...}
+    #
+    # For a host that walks the tree rather than rendering HTML - carve-hexapdf
+    # draws its PDF from this shape.
+    #
+    # Nodes carry NO +:pos+, unlike +.parse+. Spec I4 leaves position remapping
+    # out of scope in every engine, so a span on an included node would name an
+    # offset in a document the caller never passed.
+    def parse_with_includes(source, root:, source_path:, extensions: nil, profile: nil,
+                            max_depth: nil, max_bytes: nil, max_resolver_calls: nil,
+                            max_warnings: nil)
+      render_with_includes(
+        source, target: "ast", root: root, source_path: source_path,
+        extensions: extensions, profile: profile, max_depth: max_depth,
+        max_bytes: max_bytes, max_resolver_calls: max_resolver_calls,
+        max_warnings: max_warnings
+      )
+    end
+
+    # The include pass over any render target: +"html"+, +"markdown"+,
+    # +"plain"+, +"ansi"+ or +"ast"+.
+    #
+    # There is no +"carve"+ target. Spec I15 excludes the Carve writer from
+    # expansion, because inlining a child into the formatter's output rewrites
+    # the author's document rather than formatting it.
+    def render_with_includes(source, root:, source_path:, target: "html", extensions: nil,
+                             mode: nil, renderers: nil, symbols: nil, safe: false,
+                             profile: nil, sections: true, max_depth: nil, max_bytes: nil,
+                             max_resolver_calls: nil, max_warnings: nil)
       JSON.parse(
-        _to_html_with_includes_json(
+        _render_with_includes_json(
           source.to_s,
           root.to_s,
           source_path.to_s,
+          target.to_s,
           Array(extensions).map(&:to_s),
+          (mode || :interactive).to_s,
+          renderers || {},
+          symbols || {},
+          !!safe,
+          profile&.to_s,
+          !!sections,
           max_depth,
           max_bytes,
           max_resolver_calls,
           max_warnings,
         ),
         symbolize_names: true,
+        # The engine bounds nesting itself, above Ruby JSON's default of 100, so
+        # a legal document would otherwise raise here. Same reason as .parse.
+        max_nesting: false,
       )
     end
 
