@@ -28,6 +28,7 @@ use carve_rs::extensions::registry;
 use carve_rs::{CarveExtension, Mode, Options, Profile, StaticRenderers};
 use magnus::value::{InnerValue, Opaque};
 use magnus::{function, prelude::*, Error, RArray, RHash, Ruby, Value};
+use std::path::{Path, PathBuf};
 
 /// HTML-escape a string for the renderer-failure fallback path.
 ///
@@ -213,6 +214,123 @@ fn to_ansi(source: String) -> String {
 
 fn to_carve(source: String) -> String {
     carve_rs::to_carve(&source)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn to_html_with_includes_json(
+    ruby: &Ruby,
+    source: String,
+    root: String,
+    source_path: String,
+    names: RArray,
+    max_depth: Option<usize>,
+    max_bytes: Option<usize>,
+    max_resolver_calls: Option<usize>,
+    max_warnings: Option<usize>,
+) -> Result<String, Error> {
+    let root_path = Path::new(&root);
+    let source_path = Path::new(&source_path);
+    if !root_path.is_absolute() || !source_path.is_absolute() {
+        return Err(Error::new(
+            ruby.exception_arg_error(),
+            "include root and source_path must be absolute".to_string(),
+        ));
+    }
+    let root_real = std::fs::canonicalize(root_path).map_err(|_| {
+        Error::new(
+            ruby.exception_arg_error(),
+            "include root is not a readable directory".to_string(),
+        )
+    })?;
+    let source_real = std::fs::canonicalize(source_path).map_err(|_| {
+        Error::new(
+            ruby.exception_arg_error(),
+            "include source_path is not a readable file".to_string(),
+        )
+    })?;
+    if !source_real.starts_with(&root_real) || !source_real.is_file() {
+        return Err(Error::new(
+            ruby.exception_arg_error(),
+            "include source_path must be a file inside the include root".to_string(),
+        ));
+    }
+
+    let resolver = carve_rs::FileSystemResolver::new(&root_real).map_err(|_| {
+        Error::new(
+            ruby.exception_arg_error(),
+            "include root is not usable".to_string(),
+        )
+    })?;
+    let boxed = boxed_extensions(ruby, names)?;
+    let mut render_options = Options::new();
+    for extension in &boxed {
+        render_options = render_options.with_extension(extension.as_ref());
+    }
+    let mut include_options = carve_rs::IncludeOptions::new()
+        .with_resolver(&resolver)
+        .with_source_path(source_real.to_string_lossy());
+    if let Some(value) = max_depth {
+        include_options = include_options.with_max_depth(value);
+    }
+    if let Some(value) = max_bytes {
+        include_options = include_options.with_max_bytes(value);
+    }
+    if let Some(value) = max_resolver_calls {
+        include_options = include_options.with_max_resolver_calls(value);
+    }
+    if let Some(value) = max_warnings {
+        include_options = include_options.with_max_warnings(value);
+    }
+
+    let prepared = carve_rs::prepare_doc_with_includes(
+        &source,
+        &render_options,
+        &include_options,
+        Mode::Interactive,
+        true,
+    )
+    .map_err(|error| Error::new(ruby.exception_arg_error(), error.to_string()))?;
+    let value = carve_rs::render_html_with_options(&prepared.doc, &render_options)
+        .map_err(|error| Error::new(ruby.exception_runtime_error(), error.to_string()))?;
+    let safe_path = |value: &str| {
+        let path = PathBuf::from(value);
+        if path.is_absolute() {
+            path.strip_prefix(&root_real)
+                .map(|relative| relative.to_string_lossy().replace('\\', "/"))
+                .unwrap_or_else(|_| "[outside-root]".to_string())
+        } else {
+            value.to_string()
+        }
+    };
+    let warnings = prepared
+        .warnings
+        .iter()
+        .map(|warning| {
+            serde_json::json!({
+                "rule": warning.rule,
+                "message": warning.message,
+                "file": warning.file.as_deref().map(&safe_path),
+            })
+        })
+        .collect::<Vec<_>>();
+    let dependencies = prepared
+        .dependencies
+        .iter()
+        .map(|dependency| {
+            serde_json::json!({
+                "path": safe_path(&dependency.id),
+                "resolved": dependency.resolved,
+                "denial": dependency.denial.map(|denial| denial.as_str()),
+            })
+        })
+        .collect::<Vec<_>>();
+    Ok(serde_json::json!({
+        "value": value,
+        "warnings": warnings,
+        "dependencies": dependencies,
+        "suppressedWarnings": prepared.suppressed_warnings,
+    })
+    .to_string())
 }
 
 fn from_html_json(ruby: &Ruby, source: String, mode: String) -> Result<String, Error> {
@@ -536,6 +654,10 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     module.define_singleton_method("to_plain_text", function!(to_plain_text, 1))?;
     module.define_singleton_method("to_ansi", function!(to_ansi, 1))?;
     module.define_singleton_method("to_carve", function!(to_carve, 1))?;
+    module.define_singleton_method(
+        "_to_html_with_includes_json",
+        function!(to_html_with_includes_json, 8),
+    )?;
     module.define_singleton_method("_from_html_json", function!(from_html_json, 2))?;
     module.define_singleton_method("_from_markdown_json", function!(from_markdown_json, 1))?;
     module.define_singleton_method("_to_ast_json", function!(to_ast_json, 1))?;

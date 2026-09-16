@@ -80,6 +80,23 @@ this binding has always taken: `:math`, `:permalinks`, `:mermaid`, `:dot`,
 
 An unknown extension name raises `ArgumentError`.
 
+### File includes
+
+Includes are opt-in and require an absolute containment root plus the absolute
+path of the source document. The result carries the rendered value, warnings,
+and root-relative dependencies. Other render methods leave include directives
+literal.
+
+```ruby
+result = Carve.to_html_with_includes(
+  File.read("book.crv"),
+  root: File.expand_path("."),
+  source_path: File.expand_path("book.crv"),
+  max_depth: 16,
+)
+puts result[:value]
+```
+
 ## Parsing to an AST
 
 `Carve.parse` returns the parsed document as a tree of Ruby Hashes and Arrays,
@@ -270,6 +287,7 @@ a document change.
 | `Carve.to_html(source, symbols: {...})` | Render with a `:name:` -> value symbol map (values are raw, see above). |
 | `Carve.to_html(source, safe: true, profile: :comment)` | Render untrusted input: escape `=html` raw blocks/spans, restrict constructs. |
 | `Carve.to_html(source, sections: false)` | Render headings flat, with the id on the `<h*>` instead of a `<section>` wrapper. |
+| `Carve.to_html_with_includes(source, root:, source_path:)` | Render contained file includes and return warnings and dependencies. |
 | `Carve.read_stamp(source)` | Read a document's provenance marker: `{version:, generated_by:}` or `nil`. |
 | `Carve.needs_review?(source)` | Whether a document predates this engine's spec version (unstamped counts as yes). |
 | `Carve.to_html_with_extensions(source, names_array)` | Native primitive (Array of Strings). |

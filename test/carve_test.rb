@@ -3,8 +3,78 @@
 require "minitest/autorun"
 require "open3"
 require "carve"
+require "tmpdir"
 
 class CarveTest < Minitest::Test
+  def test_include_expansion_requires_an_absolute_containment_root
+    Dir.mktmpdir("carve-rb-includes-") do |root|
+      File.write(File.join(root, "book.crv"), "{{ chapter.crv }}")
+      File.write(File.join(root, "chapter.crv"), "Included text.")
+      result = Carve.to_html_with_includes(
+        "{{ chapter.crv }}",
+        root: root,
+        source_path: File.join(root, "book.crv"),
+      )
+      assert_includes result[:value], "Included text."
+      assert_equal [{ path: "chapter.crv", resolved: true, denial: nil }], result[:dependencies]
+      assert_empty result[:warnings]
+      assert_equal 0, result[:suppressedWarnings]
+
+      assert_raises(ArgumentError) do
+        Carve.to_html_with_includes("{{ chapter.crv }}", root: ".", source_path: "book.crv")
+      end
+    end
+  end
+
+  def test_include_expansion_refuses_symlink_escape_and_reports_missing_targets
+    Dir.mktmpdir("carve-rb-includes-") do |root|
+      Dir.mktmpdir("carve-rb-outside-") do |outside|
+        File.write(File.join(root, "book.crv"), "{{ escape.crv }}\n\n{{ missing.crv }}")
+        File.write(File.join(outside, "secret.crv"), "secret")
+        File.symlink(File.join(outside, "secret.crv"), File.join(root, "escape.crv"))
+        result = Carve.to_html_with_includes(
+          "{{ escape.crv }}\n\n{{ missing.crv }}",
+          root: root,
+          source_path: File.join(root, "book.crv"),
+        )
+        assert_includes result[:value], "escape.crv"
+        assert_equal ["outside-root", "not-found"], result[:dependencies].map { |item| item[:denial] }
+        refute_includes result.to_s, outside
+      end
+    end
+  end
+
+  def test_include_expansion_handles_nested_relative_paths_cycles_and_budgets
+    Dir.mktmpdir("carve-rb-includes-") do |root|
+      Dir.mkdir(File.join(root, "chapters"))
+      Dir.mkdir(File.join(root, "shared"))
+      File.write(File.join(root, "book.crv"), "{{ chapters/one.crv }}")
+      File.write(File.join(root, "chapters", "one.crv"), "One.\n\n{{ ../shared/two.crv }}")
+      File.write(File.join(root, "shared", "two.crv"), "Two.\n\n{{ ../chapters/one.crv }}")
+
+      result = Carve.to_html_with_includes(
+        "{{ chapters/one.crv }}",
+        root: root,
+        source_path: File.join(root, "book.crv"),
+      )
+      assert_includes result[:value], "One."
+      assert_includes result[:value], "Two."
+      assert_includes result[:warnings].map { |warning| warning[:rule] }, "include-cycle"
+      assert_equal ["chapters/one.crv", "shared/two.crv"], result[:dependencies].map { |item| item[:path] }
+
+      bounded = Carve.to_html_with_includes(
+        "{{ chapters/one.crv }}",
+        root: root,
+        source_path: File.join(root, "book.crv"),
+        max_depth: 0,
+        max_resolver_calls: 1,
+        max_warnings: 1,
+      )
+      assert_includes bounded[:warnings].map { |warning| warning[:rule] }, "include-depth"
+      assert_includes bounded[:value], "chapters/one.crv"
+    end
+  end
+
   def test_all_core_render_targets_are_exposed
     source = "# Hi\n\nBody\n"
     assert_includes Carve.to_markdown(source), "# Hi"
