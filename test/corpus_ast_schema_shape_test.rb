@@ -46,12 +46,6 @@ class CorpusAstSchemaShapeTest < Minitest::Test
     CORPUS ? File.expand_path("../../resources/ast-schema.json", CORPUS) : nil
   end
 
-  # Renames carve-rs has shipped ahead of the pinned spec's schema. Drop an entry
-  # once the pin reaches a schema that names the new fields (markup-carve/carve#2095).
-  SCHEMA_ROLLOUT_PENDING = {
-    "substitution" => { added: %w[old new], removed: %w[oldText newText] },
-  }.freeze
-
   def defs
     @defs ||= JSON.parse(File.read(SCHEMA)).fetch("$defs")
   end
@@ -82,17 +76,12 @@ class CorpusAstSchemaShapeTest < Minitest::Test
           next
         end
         properties = schema["properties"] or next
-        pending = SCHEMA_ROLLOUT_PENDING.fetch(type, {})
         if schema["additionalProperties"] == false
           node.each_key do |key|
-            next if pending.fetch(:added, []).include?(key.to_s)
-
             found["#{type}.#{key}: not a property the schema names"] += 1 unless properties.key?(key.to_s)
           end
         end
         Array(schema["required"]).each do |name|
-          next if pending.fetch(:removed, []).include?(name)
-
           found["#{type}: required property #{name} is missing"] += 1 unless node.key?(name.to_sym)
         end
       end
@@ -138,17 +127,6 @@ class CorpusAstSchemaShapeTest < Minitest::Test
                  "The carve-rs rev in ext/carve/Cargo.toml is probably behind a rename; bump it " \
                  "and commit the regenerated ext/carve/Cargo.lock. If the spec renamed the field " \
                  "on purpose, this gem's pin has to move with it."
-  end
-
-  def test_every_pending_rollout_is_still_pending
-    skip "CARVE_SPEC_CORPUS not set (see .github/workflows/ci.yml)" unless CORPUS
-
-    SCHEMA_ROLLOUT_PENDING.each do |type, fields|
-      fields[:added].each do |name|
-        refute defs.fetch(type).fetch("properties").key?(name),
-               "the schema now names #{type}.#{name}; remove #{type} from SCHEMA_ROLLOUT_PENDING"
-      end
-    end
   end
 
   def test_the_check_can_fail
