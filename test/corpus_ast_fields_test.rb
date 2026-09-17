@@ -77,7 +77,7 @@ class CorpusAstFieldsTest < Minitest::Test
     raw_block.content raw_block.format raw_inline.content raw_inline.format
     smart_punctuation.glyph smart_punctuation.kind smart_punctuation.value
     span.attrs span.children strike.children strong.attrs strong.boldItalic
-    strong.children subscript.children substitution.newText substitution.oldText
+    strong.children subscript.children substitution.new substitution.old
     superscript.children symbol.attrs symbol.name table.attrs table.caption
     table.rows table_cell.align table_cell.attrs table_cell.children
     table_cell.header table_cell.span table_row.attrs table_row.cells tag.name
