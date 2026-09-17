@@ -644,9 +644,21 @@ class CarveTest < Minitest::Test
     sub = Carve.parse("a {~old~>new~} b\n")[:children][0][:children]
       .find { |c| c[:type] == "substitution" }
 
-    assert_equal "old", sub[:oldText]
-    assert_equal "new", sub[:newText]
+    assert_equal [%w[text old]], sub[:old].map { |n| [n[:type], n[:value]] }
+    assert_equal [%w[text new]], sub[:new].map { |n| [n[:type], n[:value]] }
+    refute sub.key?(:oldText)
     refute sub.key?(:old_text)
+  end
+
+  # markup-carve/carve-js#1827: each half is inline content, not a string.
+  def test_parse_reads_a_substitution_s_halves_as_inline_nodes
+    sub = Carve.parse("{~/old/~>*new*~}\n")[:children][0][:children].first
+
+    assert_equal "substitution", sub[:type]
+    assert_equal "emphasis", sub[:old].first[:type]
+    assert_equal "old", sub[:old].first[:children].first[:value]
+    assert_equal "strong", sub[:new].first[:type]
+    assert_equal "new", sub[:new].first[:children].first[:value]
   end
 
   def test_parse_publishes_the_author_s_list_marker

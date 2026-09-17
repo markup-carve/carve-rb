@@ -38,3 +38,9 @@
 # EMPTY IS THE GOAL STATE. An empty file means this gem renders every document
 # in spec main exactly as the spec does, and it is the only state that may be
 # tagged.
+
+471-a-forced-opener-of-an-open-kind-is-literal-2  # markup-carve/carve#2090; carve-rs has not shipped it (markup-carve/carve-rs#1741)
+471-a-forced-opener-of-an-open-kind-is-literal-3  # markup-carve/carve#2090; carve-rs has not shipped it (markup-carve/carve-rs#1741)
+471-a-forced-opener-of-an-open-kind-is-literal-5  # markup-carve/carve#2090; carve-rs has not shipped it (markup-carve/carve-rs#1741)
+471-a-forced-opener-of-an-open-kind-is-literal-6  # markup-carve/carve#2090; carve-rs has not shipped it (markup-carve/carve-rs#1741)
+471-a-forced-opener-of-an-open-kind-is-literal-8  # markup-carve/carve#2090; carve-rs has not shipped it (markup-carve/carve-rs#1741)
