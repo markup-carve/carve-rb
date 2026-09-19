@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-09-19
+
+### Added
+
+- `Carve.to_html_with_includes` renders a file-backed document with its
+  `{{ path }}` directives expanded, contained to an absolute root the caller
+  names. It returns the rendered HTML alongside sanitized warnings and
+  root-relative dependencies, and forwards extension and include budget
+  settings to the engine. The binding canonicalizes the root and the source
+  path and requires the source to sit inside the root (#123, #125).
+- `Carve.parse_with_includes` publishes the expanded document as a tree, in the
+  shape `Carve.parse` returns, and the include path takes the same render
+  options the string entry points take. A consumer that draws from the tree
+  rather than from HTML, such as carve-hexapdf, was blocked without it. Its
+  nodes carry no `pos`: spec I4 leaves position remapping across an include out
+  of scope in every engine (#126, #127).
+
 ### Changed
 
 - HTML and Markdown migration reports use schema version 2 with shared
@@ -14,9 +31,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Markdown retains the existing `source_format` key as a compatibility alias
   for the shared `sourceFormat` spelling and now emits a conservative
   `fidelity-unverified` dropped/fallback finding on every import instead of
-  the previous empty diagnostics array.
-- The embedded carve-rs revision advances to the migration-report v2 commit;
-  rendering behavior is unchanged.
+  the previous empty diagnostics array (#117).
+- **Breaking:** A substitution node in the tree carries `old` and `new` as
+  arrays of inline nodes, where it carried the strings `oldText` and `newText`.
+  A caller reading that node walks the halves instead of reading them (#130,
+  markup-carve/carve-rs#1756).
+- The engine moves from carve-rs `42df4092` to released 0.1.6 (`d7837249`).
+  Beyond the substitution change, the range brings the include pass this
+  release exposes, mention and tag handling (a nameless mention or tag is
+  dropped and reported, an unspellable name is refused, attributes survive the
+  editor bridge), and writer and parser fixes: the Markdown and Carve writers
+  escape what would reopen a construct on the way back in, and parsing tightens
+  around braced inlines, forced closers, escaped markers, adjacent links, blank
+  table rows and a code span's closer. 1740 of 1740 corpus documents render
+  byte-identically, and `resources/spec-drift.txt` is empty.
 
 ## [0.1.3] - 2026-09-08
 
@@ -335,7 +363,8 @@ are not listed, because no release ever shipped them.
   Arrays (every AST node type is covered), enabling custom renderers such as
   [carve-hexapdf](https://github.com/markup-carve/carve-hexapdf).
 
-[Unreleased]: https://github.com/markup-carve/carve-rb/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/markup-carve/carve-rb/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/markup-carve/carve-rb/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/markup-carve/carve-rb/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/markup-carve/carve-rb/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/markup-carve/carve-rb/compare/v0.1.0...v0.1.1
