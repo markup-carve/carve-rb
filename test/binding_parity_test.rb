@@ -105,6 +105,7 @@ class BindingParityTest < Minitest::Test
   def pinned_revision
     out, _err, status = Open3.capture3(
       "python3", "scripts/pinned-spec-commit.py", "--print", "engine",
+      "--engine", "carve-rs",
       "--manifest", "ext/carve/Cargo.toml", "--lock", "ext/carve/Cargo.lock"
     )
     status.success? ? out.strip : nil

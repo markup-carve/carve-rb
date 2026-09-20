@@ -114,21 +114,23 @@ def manifest_revision(manifest: Path) -> str:
             if not isinstance(entry, dict):
                 continue
             url = entry.get("git")
-            if not isinstance(url, str) or not ENGINE_REPO_RE.search(url.rstrip("/")):
-                continue
-            rev = entry.get("rev")
-            if not isinstance(rev, str):
-                fail(
-                    f"{manifest} declares `{name}` against {url} without a `rev`. "
-                    "A branch or tag dependency does not name a commit, so there is no "
-                    "spec commit to hold this artifact to."
-                )
-            found.append(rev)
+            if isinstance(url, str) and ENGINE_REPO_RE.search(url.rstrip("/")):
+                rev = entry.get("rev")
+                if not isinstance(rev, str):
+                    fail(f"{manifest} declares `{name}` against {url} without a `rev`.")
+                found.append(rev)
+            elif entry.get("package", name) == ENGINE_PACKAGE:
+                version = entry.get("version")
+                if not isinstance(version, str):
+                    fail(f"{manifest} declares `{name}` without an engine version.")
+                if not version.startswith("="):
+                    fail(f"{manifest} requires {version!r}, a range; use an exact requirement.")
+                found.append(version[1:])
     if not found:
         # A reader that quietly finds nothing is the defect this replaces: it
         # would resolve to "no divergence" and certify anything.
         fail(
-            f"{manifest} declares no git dependency on carve-rs. The engine pin is what "
+            f"{manifest} declares no dependency on {ENGINE_PACKAGE}. The engine pin is what "
             "names the spec this artifact is held to; without it there is nothing to gate on."
         )
     if len(set(found)) != 1:
@@ -147,16 +149,16 @@ def lock_revision(lock: Path) -> str:
         if not isinstance(source, str):
             continue
         match = LOCK_SOURCE_RE.match(source)
-        if not match or not ENGINE_REPO_RE.search(match.group("url").rstrip("/")):
-            continue
-        resolved = match.group("resolved") or match.group("rev")
-        if not resolved:
-            fail(f"{lock} has a git source for {ENGINE_PACKAGE} that names no commit: {source}")
-        found.append(resolved)
+        if match and ENGINE_REPO_RE.search(match.group("url").rstrip("/")):
+            resolved = match.group("resolved") or match.group("rev")
+            if not resolved:
+                fail(f"{lock} has a git source for {ENGINE_PACKAGE} that names no commit: {source}")
+            found.append(resolved)
+        elif source == "registry+https://github.com/rust-lang/crates.io-index":
+            found.append(str(package.get("version", "")))
     if not found:
         fail(
-            f"{lock} carries no git-sourced `{ENGINE_PACKAGE}` package. The crate publishes "
-            f"as `{ENGINE_PACKAGE}`, not `carve`; a lockfile without it is not this project's."
+            f"{lock} carries no sourced `{ENGINE_PACKAGE}` package."
         )
     if len(set(found)) != 1:
         fail(f"{lock} resolves more than one carve-rs revision: {', '.join(sorted(set(found)))}.")
@@ -216,14 +218,6 @@ def main(argv: list[str] | None = None) -> int:
     manifest_rev = manifest_revision(arguments.manifest)
     locked_rev = lock_revision(arguments.lock)
 
-    for label, revision in (("manifest", manifest_rev), ("lock", locked_rev)):
-        if not FULL_REV_RE.match(revision):
-            fail(
-                f"the {label} names carve-rs {revision!r}, which is not 40 lowercase hex "
-                "characters. An abbreviated or upper-case revision resolves locally and then "
-                "matches nothing."
-            )
-
     # Read from the lock's OWN source line rather than from the manifest twice:
     # reading one file twice is what makes two files "agree" without either
     # checking the other.
@@ -234,6 +228,27 @@ def main(argv: list[str] | None = None) -> int:
             "advertises; regenerate the lock and commit it."
         )
 
+    if not FULL_REV_RE.match(locked_rev):
+        if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?", locked_rev):
+            fail(f"the engine version {locked_rev!r} is not exact.")
+        if arguments.engine is None:
+            fail("a published engine version needs --engine to resolve its release tag.")
+        completed = subprocess.run(
+            [
+                "git", "-C", str(arguments.engine), "rev-parse", "--verify", "--quiet",
+                f"refs/tags/{locked_rev}^{{commit}}",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            fail(
+                f"carve-rs has no `{locked_rev}` tag, so the published crate cannot be tied "
+                "to source."
+            )
+        locked_rev = completed.stdout.strip()
+
     if arguments.what == "engine":
         # Deliberately after the manifest/lock agreement check above, not
         # before it: the revision worth building is the one BOTH files name.
@@ -243,8 +258,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if arguments.engine is None:
         print(
-            "pinned-spec-commit: --print spec resolves the `tests/spec` gitlink at the pinned "
-            "revision, which needs --engine pointing at a carve-rs checkout with full history.",
+            "pinned-spec-commit: --print spec needs --engine pointing at a carve-rs "
+            "checkout with full history.",
             file=sys.stderr,
         )
         raise SystemExit(2)
