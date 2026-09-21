@@ -183,7 +183,7 @@ class PackagedGemTest < Minitest::Test
                  "#{mismatches.length} of #{all.length} corpus documents render differently " \
                  "from the spec through the gem this release would publish: " \
                  "#{mismatches.first(20).join(', ')}#{mismatches.length > 20 ? ' ...' : ''}. " \
-                 "The carve-rs rev in ext/carve/Cargo.toml is the usual cause; bump it, commit " \
+                 "The carve-lang version in ext/carve/Cargo.toml is the usual cause; bump it, commit " \
                  "the regenerated ext/carve/Cargo.lock, and tag again. Publishing is not " \
                  "reversible, so this refuses rather than warns."
 

@@ -282,6 +282,8 @@ jobs:
         with:
           repository: markup-carve/carve-rs
           path: carve-rs
+          # The pin is a published version; its release tag names the revision.
+          fetch-tags: true
 
       # main, deliberately: a document the spec gained after the pinned engine's
       # `tests/spec` gitlink is precisely the one the gated corpus cannot hold,
