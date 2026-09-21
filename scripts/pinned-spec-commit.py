@@ -99,8 +99,8 @@ def load_toml(path: Path) -> dict:
     raise AssertionError("unreachable")
 
 
-def manifest_revision(manifest: Path) -> str:
-    """The revision the MANIFEST names, found by URL rather than by key.
+def manifest_pin(manifest: Path) -> tuple[str, str]:
+    """The kind and value of the engine pin the manifest names.
 
     The dependency key is spelled differently in every binding (`carve_rs` here
     and in carve-rb, `carve` in carve-wasm) and the crate publishes as
@@ -108,7 +108,7 @@ def manifest_revision(manifest: Path) -> str:
     the binding's own package and concludes there is no pin. Match the git URL.
     """
     document = load_toml(manifest)
-    found: list[str] = []
+    found: list[tuple[str, str]] = []
     for table in ("dependencies", "dev-dependencies", "build-dependencies"):
         for name, entry in (document.get(table) or {}).items():
             if not isinstance(entry, dict):
@@ -118,14 +118,14 @@ def manifest_revision(manifest: Path) -> str:
                 rev = entry.get("rev")
                 if not isinstance(rev, str):
                     fail(f"{manifest} declares `{name}` against {url} without a `rev`.")
-                found.append(rev)
+                found.append(("revision", rev))
             elif entry.get("package", name) == ENGINE_PACKAGE:
                 version = entry.get("version")
                 if not isinstance(version, str):
                     fail(f"{manifest} declares `{name}` without an engine version.")
                 if not version.startswith("="):
                     fail(f"{manifest} requires {version!r}, a range; use an exact requirement.")
-                found.append(version[1:])
+                found.append(("version", version[1:]))
     if not found:
         # A reader that quietly finds nothing is the defect this replaces: it
         # would resolve to "no divergence" and certify anything.
@@ -134,12 +134,12 @@ def manifest_revision(manifest: Path) -> str:
             "names the spec this artifact is held to; without it there is nothing to gate on."
         )
     if len(set(found)) != 1:
-        fail(f"{manifest} names more than one carve-rs revision: {', '.join(sorted(set(found)))}.")
+        fail(f"{manifest} names more than one engine pin: {found}.")
     return found[0]
 
 
-def lock_revision(lock: Path) -> str:
-    """The revision the LOCKFILE resolved, which is what cargo actually built."""
+def lock_pin(lock: Path) -> tuple[str, str]:
+    """The kind and value of the engine pin Cargo actually resolved."""
     document = load_toml(lock)
     found: list[str] = []
     for package in document.get("package") or []:
@@ -153,16 +153,50 @@ def lock_revision(lock: Path) -> str:
             resolved = match.group("resolved") or match.group("rev")
             if not resolved:
                 fail(f"{lock} has a git source for {ENGINE_PACKAGE} that names no commit: {source}")
-            found.append(resolved)
+            found.append(("revision", resolved))
         elif source == "registry+https://github.com/rust-lang/crates.io-index":
-            found.append(str(package.get("version", "")))
+            found.append(("version", str(package.get("version", ""))))
     if not found:
         fail(
             f"{lock} carries no sourced `{ENGINE_PACKAGE}` package."
         )
     if len(set(found)) != 1:
-        fail(f"{lock} resolves more than one carve-rs revision: {', '.join(sorted(set(found)))}.")
+        fail(f"{lock} resolves more than one engine pin: {found}.")
     return found[0]
+
+
+def resolve_pin(engine: Path | None, pin: tuple[str, str]) -> str:
+    kind, value = pin
+    if kind == "revision":
+        if not FULL_REV_RE.match(value):
+            fail(f"the engine revision {value!r} is not 40 lowercase hex characters.")
+        return value
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?", value):
+        fail(f"the engine version {value!r} is not exact.")
+    if engine is None:
+        fail("a published engine version needs --engine to resolve its release tag.")
+    completed = subprocess.run(
+        [
+            "git", "-C", str(engine), "rev-parse", "--verify", "--quiet",
+            f"refs/tags/{value}^{{commit}}",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        fail(f"carve-rs has no `{value}` tag, so the published crate cannot be tied to source.")
+    revision = completed.stdout.strip()
+    tagged = subprocess.run(
+        ["git", "-C", str(engine), "show", f"{revision}:Cargo.toml"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    package = tomllib.loads(tagged.stdout).get("package", {}) if tagged.returncode == 0 else {}
+    if (package.get("name"), package.get("version")) != (ENGINE_PACKAGE, value):
+        fail(f"carve-rs tag `{value}` does not declare {ENGINE_PACKAGE} {value}; the tag is misplaced.")
+    return revision
 
 
 def spec_gitlink(engine: Path, revision: str) -> str:
@@ -215,39 +249,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     arguments = parser.parse_args(argv)
 
-    manifest_rev = manifest_revision(arguments.manifest)
-    locked_rev = lock_revision(arguments.lock)
+    manifest_pin_value = manifest_pin(arguments.manifest)
+    locked_pin_value = lock_pin(arguments.lock)
 
     # Read from the lock's OWN source line rather than from the manifest twice:
     # reading one file twice is what makes two files "agree" without either
     # checking the other.
-    if manifest_rev != locked_rev:
+    if manifest_pin_value != locked_pin_value:
         fail(
-            f"{arguments.manifest} pins carve-rs {manifest_rev} but {arguments.lock} resolved "
-            f"{locked_rev}. The build follows the lock, so it is not the revision the manifest "
+            f"{arguments.manifest} pins carve-rs {manifest_pin_value} but {arguments.lock} resolved "
+            f"{locked_pin_value}. The build follows the lock, so it is not the engine the manifest "
             "advertises; regenerate the lock and commit it."
         )
 
-    if not FULL_REV_RE.match(locked_rev):
-        if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?", locked_rev):
-            fail(f"the engine version {locked_rev!r} is not exact.")
-        if arguments.engine is None:
-            fail("a published engine version needs --engine to resolve its release tag.")
-        completed = subprocess.run(
-            [
-                "git", "-C", str(arguments.engine), "rev-parse", "--verify", "--quiet",
-                f"refs/tags/{locked_rev}^{{commit}}",
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if completed.returncode != 0:
-            fail(
-                f"carve-rs has no `{locked_rev}` tag, so the published crate cannot be tied "
-                "to source."
-            )
-        locked_rev = completed.stdout.strip()
+    locked_rev = resolve_pin(arguments.engine, locked_pin_value)
 
     if arguments.what == "engine":
         # Deliberately after the manifest/lock agreement check above, not
