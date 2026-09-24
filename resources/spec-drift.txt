@@ -39,6 +39,8 @@
 # in spec main exactly as the spec does, and it is the only state that may be
 # tagged.
 
+116-fence-opener-with-a-nested-list-body-inside-a-list-item-6 # fixed in carve-lang 0.1.7, which is not published yet
+271-the-flush-left-line-after-a-container-a-quoted-line-opened-4 # fixed in carve-lang 0.1.7, which is not published yet
 276-a-fence-opened-on-a-list-marker-line-body-below-the-content-column-7 # fixed in carve-lang 0.1.7, which is not published yet
 476-an-item-s-fence-is-read-once-whatever-block-it-follows # fixed in carve-lang 0.1.7, which is not published yet
 476-an-item-s-fence-is-read-once-whatever-block-it-follows-2 # fixed in carve-lang 0.1.7, which is not published yet
@@ -50,9 +52,26 @@
 479-a-closer-below-the-container-s-column-does-not-count-4 # fixed in carve-lang 0.1.7, which is not published yet
 479-a-closer-below-the-container-s-column-does-not-count-5 # fixed in carve-lang 0.1.7, which is not published yet
 479-a-closer-below-the-container-s-column-does-not-count-6 # fixed in carve-lang 0.1.7, which is not published yet
+480-a-bare-colon-opener-in-a-description-body-is-an-opener # fixed in carve-lang 0.1.7, which is not published yet
+480-a-bare-colon-opener-in-a-description-body-is-an-opener-2 # fixed in carve-lang 0.1.7, which is not published yet
+480-a-bare-colon-opener-in-a-description-body-is-an-opener-3 # fixed in carve-lang 0.1.7, which is not published yet
+480-a-bare-colon-opener-in-a-description-body-is-an-opener-4 # fixed in carve-lang 0.1.7, which is not published yet
+480-a-bare-colon-opener-in-a-description-body-is-an-opener-5 # fixed in carve-lang 0.1.7, which is not published yet
 480-a-bare-colon-opener-in-a-description-body-is-an-opener-7 # fixed in carve-lang 0.1.7, which is not published yet
+481-a-bare-colon-run-interrupts-a-paragraph-whether-or-not-a-line-follows-it # fixed in carve-lang 0.1.7, which is not published yet
+481-a-bare-colon-run-interrupts-a-paragraph-whether-or-not-a-line-follows-it-2 # fixed in carve-lang 0.1.7, which is not published yet
+481-a-bare-colon-run-interrupts-a-paragraph-whether-or-not-a-line-follows-it-3 # fixed in carve-lang 0.1.7, which is not published yet
+481-a-bare-colon-run-interrupts-a-paragraph-whether-or-not-a-line-follows-it-4 # fixed in carve-lang 0.1.7, which is not published yet
+481-a-bare-colon-run-interrupts-a-paragraph-whether-or-not-a-line-follows-it-5 # fixed in carve-lang 0.1.7, which is not published yet
+481-a-bare-colon-run-interrupts-a-paragraph-whether-or-not-a-line-follows-it-6 # fixed in carve-lang 0.1.7, which is not published yet
+482-a-closer-does-not-rescue-a-marker-line-colon-opener-whose-body-folded-in # fixed in carve-lang 0.1.7, which is not published yet
+482-a-closer-does-not-rescue-a-marker-line-colon-opener-whose-body-folded-in-2 # fixed in carve-lang 0.1.7, which is not published yet
+482-a-closer-does-not-rescue-a-marker-line-colon-opener-whose-body-folded-in-3 # fixed in carve-lang 0.1.7, which is not published yet
+482-a-closer-does-not-rescue-a-marker-line-colon-opener-whose-body-folded-in-4 # fixed in carve-lang 0.1.7, which is not published yet
+482-a-closer-does-not-rescue-a-marker-line-colon-opener-whose-body-folded-in-5 # fixed in carve-lang 0.1.7, which is not published yet
 482-a-closer-does-not-rescue-a-marker-line-colon-opener-whose-body-folded-in-6 # fixed in carve-lang 0.1.7, which is not published yet
 482-a-closer-does-not-rescue-a-marker-line-colon-opener-whose-body-folded-in-9 # fixed in carve-lang 0.1.7, which is not published yet
+482-a-closer-does-not-rescue-a-marker-line-colon-opener-whose-body-folded-in-10 # fixed in carve-lang 0.1.7, which is not published yet
 483-an-empty-term-marker-in-a-description-body-is-text # fixed in carve-lang 0.1.7, which is not published yet
 483-an-empty-term-marker-in-a-description-body-is-text-2 # fixed in carve-lang 0.1.7, which is not published yet
 483-an-empty-term-marker-in-a-description-body-is-text-3 # fixed in carve-lang 0.1.7, which is not published yet
@@ -65,3 +84,4 @@
 489-a-caption-s-placeholder-is-any-that-does-not-begin-a-tag-5 # fixed in carve-lang 0.1.7, which is not published yet
 489-a-caption-s-placeholder-is-any-that-does-not-begin-a-tag-6 # fixed in carve-lang 0.1.7, which is not published yet
 491-an-unresolved-reference-s-literal-source-is-html-escaped-like-any-other-text # fixed in carve-lang 0.1.7, which is not published yet
+493-empty-containers-share-one-html-body-shape-2 # fixed in carve-lang 0.1.7, which is not published yet

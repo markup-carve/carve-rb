@@ -282,8 +282,15 @@ jobs:
         with:
           repository: markup-carve/carve-rs
           path: carve-rs
-          # The pin is a published version; its release tag names the revision.
-          fetch-tags: true
+          # fetch-depth: 0, not `fetch-tags: true`. The pin is a published
+          # version and its release tag names an older commit, but fetch-tags
+          # only drops checkout's `--no-tags`: at the default depth of 1 git
+          # auto-follows tags into a history holding one commit and brings
+          # none. So `--print engine` could not resolve the tag, and the
+          # 2026-09-24 failure printed `ext/carve/Cargo.toml pins (could not be
+          # resolved)` where the pin belongs. The other two carve-rs checkouts
+          # here already spell it this way.
+          fetch-depth: 0
 
       # main, deliberately: a document the spec gained after the pinned engine's
       # `tests/spec` gitlink is precisely the one the gated corpus cannot hold,
@@ -322,22 +329,53 @@ jobs:
         id: engine
         run: |
           cargo build --release --bin carve --manifest-path carve-rs/Cargo.toml
+          mkdir -p "$RUNNER_TEMP/engines"
+          cp carve-rs/target/release/carve "$RUNNER_TEMP/engines/carve-main"
           echo "rev=$(git -C carve-rs rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # THE ENGINE THIS GEM EMBEDS, built from the revision the pin resolves
+      # to. Its comparison is the one with no window, so it has to be a real
+      # build of that revision rather than the binary above under another name;
+      # copied aside for the same reason, since both builds write
+      # target/release/carve.
+      - name: Build the carve-rs CLI at the pinned revision
+        run: |
+          rev="$(python3 scripts/pinned-spec-commit.py --print engine \
+            --engine carve-rs \
+            --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock)"
+          git -C carve-rs worktree add --detach ../carve-rs-pinned "$rev"
+          cargo build --release --bin carve --manifest-path carve-rs-pinned/Cargo.toml
+          cp carve-rs-pinned/target/release/carve "$RUNNER_TEMP/engines/carve-pinned"
 
       - name: Compile the extension from the pinned engine
         run: |
           bundle install
           bundle exec rake compile
 
-      # The gem's tree against that binary's, over spec main. CARVE_REQUIRE_PARITY
-      # sits next to the two variables it guards so that dropping the wiring
-      # cannot quietly drop the guard with it: without it a renamed variable
-      # makes the comparison SKIP and exit 0.
-      - name: The gem's tree matches carve-rs at main
+      # WHICH OF THE TWO REDS IS THIS? Since #136 the pin is a published crate,
+      # so a difference below is this gem's to fix only while a newer
+      # carve-lang exists to move to. Between a carve-rs merge and its release
+      # there is none, and the old verdict asked for an edit nobody could
+      # write. This resolves the fact that tells them apart; the test refuses
+      # to guess when it is missing.
+      - name: Resolve the newest released carve-lang
+        id: published
+        run: |
+          version="$(timeout 120 python3 scripts/newest-published-engine.py)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "the newest released engine is carve-lang $version"
+
+      # The gem's tree against both binaries, over spec main. CARVE_REQUIRE_PARITY
+      # sits next to the variables it guards so that dropping the wiring cannot
+      # quietly drop the guard with it: without it a renamed variable makes a
+      # comparison SKIP and exit 0.
+      - name: The gem's tree matches the engine it embeds, and carve-rs at main
         env:
-          CARVE_ENGINE_BIN: ${{ github.workspace }}/carve-rs/target/release/carve
+          CARVE_ENGINE_BIN: ${{ runner.temp }}/engines/carve-main
           CARVE_ENGINE_REV: ${{ steps.engine.outputs.rev }}
+          CARVE_PINNED_ENGINE_BIN: ${{ runner.temp }}/engines/carve-pinned
           CARVE_PARITY_CORPUS: ${{ github.workspace }}/spec/tests/corpus
+          CARVE_PUBLISHED_ENGINE: ${{ steps.published.outputs.version }}
           CARVE_REQUIRE_PARITY: "1"
         run: bundle exec ruby -Ilib -Itest test/binding_parity_test.rb
 
