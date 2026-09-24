@@ -242,10 +242,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--print",
         dest="what",
-        choices=("spec", "engine"),
+        choices=("spec", "engine", "version"),
         default="spec",
         help="`spec` (default) prints the spec commit the pinned engine pins; "
-        "`engine` prints the pinned carve-rs revision itself",
+        "`engine` prints the pinned carve-rs revision itself; "
+        "`version` prints the pinned carve-lang version",
     )
     arguments = parser.parse_args(argv)
 
@@ -261,6 +262,20 @@ def main(argv: list[str] | None = None) -> int:
             f"{locked_pin_value}. The build follows the lock, so it is not the engine the manifest "
             "advertises; regenerate the lock and commit it."
         )
+
+    if arguments.what == "version":
+        # Deliberately before resolve_pin: the version is written in the two
+        # files this already read, so answering it must not depend on a
+        # carve-rs checkout being present or on its release tag being fetched.
+        kind, value = locked_pin_value
+        if kind != "version":
+            fail(
+                "the engine pin is a git revision, so there is no published version to print. "
+                "Use `--print engine` for the revision."
+            )
+        print(f"carve-rs is pinned at carve-lang {value}", file=sys.stderr)
+        print(value)
+        return 0
 
     locked_rev = resolve_pin(arguments.engine, locked_pin_value)
 

@@ -65,6 +65,21 @@
 # to it makes these two trees equal by construction. One line in
 # ext/carve/Cargo.toml plus the lock.
 #
+# THAT SENTENCE ASSUMED THE PIN WAS A REVISION, and #136 made it a published
+# crate. The clearing action now exists only while a newer carve-lang is
+# published; see publication_window? below for what the verdict does in the
+# window where it is not.
+#
+# SO THE BUILT-FROM COMPARISON COMES BACK, for the half of the question it can
+# answer. #85's version was rejected above as the only reference, because one
+# revision compared with itself agrees with itself and the drift goes unseen.
+# What the same paragraph concedes is that it still catches a binding wired to
+# the wrong options - and that is precisely what the window would otherwise
+# swallow, since publishing an engine does not fix a gem that asks it the wrong
+# question. So there are two comparisons with two different verdicts: against
+# the PINNED engine, always fatal, no window; against MAIN, fatal unless the
+# pin is already the newest release.
+#
 # IT IS NOT THE DISTANCE CHECK the `engine-pin` job deliberately refuses, and
 # the two are complements rather than rivals. That job prints the lag and fails
 # only on AGE, because "behind main" is red for every merge upstream and says
@@ -75,6 +90,7 @@
 require "minitest/autorun"
 require "json"
 require "open3"
+require "tmpdir"
 require "carve"
 require "corpus_population"
 
@@ -88,6 +104,17 @@ class BindingParityTest < Minitest::Test
   # The revision that binary was built from, for the failure message. Provenance
   # only - nothing branches on it.
   ENGINE_REV = ENV.fetch("CARVE_ENGINE_REV", nil)
+
+  # A `carve` binary built from the revision ext/carve/Cargo.toml pins - the
+  # engine this gem actually embeds. Compared against separately and without
+  # any window: see the header.
+  PINNED_ENGINE = ENV.fetch("CARVE_PINNED_ENGINE_BIN", nil)
+
+  # The newest carve-lang RELEASED on crates.io, resolved by the job from the
+  # sparse index. It is what says whether a difference below is this gem's to
+  # fix; see the note on publication_window? Unset or empty means the question
+  # was not asked, and the verdict is then the strict one.
+  PUBLISHED = ENV.fetch("CARVE_PUBLISHED_ENGINE", "").strip
 
   # A corpus directory, deliberately NOT CARVE_SPEC_CORPUS. That one is the
   # corpus the pinned engine's spec gitlink names, and reading it here would
@@ -113,9 +140,51 @@ class BindingParityTest < Minitest::Test
     nil
   end
 
-  # The engine's own answer for one document.
-  def engine_tree(path)
-    stdout, stderr, status = Open3.capture3(ENGINE, "--json", path)
+  # The pinned carve-lang version, read from the manifest and the lock through
+  # the same script. Needs no checkout and no release tag, which is why the
+  # verdict branches on this rather than on the revision above.
+  def pinned_version
+    out, _err, status = Open3.capture3(
+      "python3", "scripts/pinned-spec-commit.py", "--print", "version",
+      "--manifest", "ext/carve/Cargo.toml", "--lock", "ext/carve/Cargo.lock"
+    )
+    status.success? ? out.strip : nil
+  rescue StandardError
+    nil
+  end
+
+  # IS A DIFFERENCE HERE SOMETHING A COMMIT IN THIS REPOSITORY CAN CLOSE?
+  #
+  # The header above answers yes, and gives the reason: bumping the pin to
+  # carve-rs main makes the two trees equal by construction, one line in
+  # ext/carve/Cargo.toml plus the lock. That held while the pin WAS a carve-rs
+  # revision. #136 replaced it with the published crate, so `gem install` needs
+  # only rubygems and crates.io - and took the property with it. Between a
+  # carve-rs merge and its release there is no version for the pin to move to,
+  # and the gate then asks for an edit nobody can write.
+  #
+  # Measured on 2026-09-24: carve-rs main was 41 commits past the `0.1.6` tag,
+  # 0.1.7 was a DRAFT release with no tag, crates.io served 0.1.6, and this
+  # gate reported 35 of 1858 documents. Every one of them was this window.
+  #
+  # So the window is a verdict rather than a pass. It needs a POSITIVE fact -
+  # the pin equals the newest RELEASED carve-lang, resolved from the sparse
+  # index by the job - and anything short of that is strict: a pin behind a
+  # published version fails and names the bump, which is the only state a
+  # commit here can change, and an unresolved pin or an unset variable fails
+  # too. The release gate is unaffected either way; release.yml refuses to tag
+  # while resources/spec-drift.txt declares an open window.
+  def self.publication_window?(pinned, published)
+    return false if pinned.nil? || pinned.empty?
+    return false if published.nil? || published.empty?
+
+    pinned == published
+  end
+
+  # The engine's own answer for one document, from whichever `carve` binary
+  # the caller is holding the gem to.
+  def engine_tree(binary, path)
+    stdout, stderr, status = Open3.capture3(binary, "--json", path)
     # A refusal is an answer, and it has to be comparable to the gem's. Reported
     # rather than swallowed: an engine that refuses every document would
     # otherwise make this run vacuous.
@@ -168,10 +237,10 @@ class BindingParityTest < Minitest::Test
     nil
   end
 
-  def divergences(files)
+  def divergences(binary, files)
     files.filter_map do |path|
       mine = gem_tree(File.read(path))
-      theirs = engine_tree(path)
+      theirs = engine_tree(binary, path)
       next if mine == theirs
 
       detail =
@@ -207,6 +276,68 @@ class BindingParityTest < Minitest::Test
     refute_nil CORPUS,
                "CARVE_REQUIRE_PARITY=1 but CARVE_PARITY_CORPUS is unset, so the parity " \
                "comparison below skips and this run reports success having compared nothing."
+    refute_empty PUBLISHED,
+                 "CARVE_REQUIRE_PARITY=1 but CARVE_PUBLISHED_ENGINE is unset, so the verdict " \
+                 "below cannot tell a stale pin from the window between a carve-rs merge and " \
+                 "its release, and reports every difference as a stale pin. The resolver step " \
+                 "is `Resolve the newest released carve-lang` in .github/workflows/ci.yml."
+    refute_nil PINNED_ENGINE,
+               "CARVE_REQUIRE_PARITY=1 but CARVE_PINNED_ENGINE_BIN is unset, so the comparison " \
+               "against the engine this gem embeds skips. That is the one with no window, and " \
+               "without it a binding defect passes as unreleased upstream drift."
+  end
+
+  # AGAINST THE ENGINE THIS GEM EMBEDS, with no window and nothing to declare.
+  # Both sides are the same revision, so a difference cannot be upstream being
+  # ahead: it is the gem asking its own engine a different question from the
+  # one `carve --json` asks. Publishing a new carve-lang would not fix it,
+  # which is why this one never softens.
+  def test_the_gem_reports_the_same_tree_as_the_engine_it_embeds
+    skip "CARVE_PINNED_ENGINE_BIN / CARVE_PARITY_CORPUS not set (see .github/workflows/ci.yml)" \
+      unless PINNED_ENGINE && CORPUS
+
+    assert File.executable?(PINNED_ENGINE),
+           "CARVE_PINNED_ENGINE_BIN=#{PINNED_ENGINE} is not an executable."
+
+    files = corpus_files
+    assert_whole_corpus(CORPUS, files.length, "corpus documents compared against the pinned engine")
+
+    assert_empty divergences(PINNED_ENGINE, files),
+                 "this gem and the carve-rs revision it embeds disagree on the tree. Both sides " \
+                 "are the same engine, so this is the binding: ext/carve/src/lib.rs builds its " \
+                 "own Options for `_to_ast_json` and `carve --json` builds its own, and those " \
+                 "two have to ask for the same thing. No pin bump and no engine release closes " \
+                 "this one."
+  end
+
+  # The window is an EXACT match against the newest released version, and the
+  # cases below are the three ways a looser reading would be wrong: a pin one
+  # release behind is the stale pin this gate exists to catch, and an answer
+  # nobody resolved is not evidence of anything.
+  def test_the_publication_window_needs_the_pin_to_be_the_newest_release
+    assert BindingParityTest.publication_window?("0.1.6", "0.1.6")
+    refute BindingParityTest.publication_window?("0.1.6", "0.1.7")
+    refute BindingParityTest.publication_window?(nil, "0.1.6")
+    refute BindingParityTest.publication_window?("0.1.6", "")
+  end
+
+  # The ordering the sparse index is read with. `sort` puts 0.1.10 before
+  # 0.1.9, and a wrong newest here turns a stale pin into a declared window.
+  def test_the_newest_release_is_ordered_numerically_and_skips_yanks
+    Dir.mktmpdir do |dir|
+      index = File.join(dir, "carve-lang")
+      File.write(index, <<~INDEX)
+        {"name":"carve-lang","vers":"0.1.9","yanked":false}
+        {"name":"carve-lang","vers":"0.1.10","yanked":false}
+        {"name":"carve-lang","vers":"0.2.0","yanked":true}
+      INDEX
+      out, _err, status = Open3.capture3(
+        "python3", "scripts/newest-published-engine.py", "--index", index
+      )
+
+      assert_predicate status, :success?
+      assert_equal "0.1.10", out.strip
+    end
   end
 
   def test_the_gem_reports_the_same_tree_as_carve_rs
@@ -224,21 +355,61 @@ class BindingParityTest < Minitest::Test
     # already shipped three spellings of.
     assert_whole_corpus(CORPUS, files.length, "corpus documents compared against carve-rs")
 
-    diverging = divergences(files)
-    pinned = pinned_revision
+    diverging = divergences(ENGINE, files)
+    version = pinned_version
+    window = diverging.any? && self.class.publication_window?(version, PUBLISHED)
+    report_publication_window(diverging, files.length, version) if window
 
-    assert_empty diverging,
+    assert_empty(window ? [] : diverging,
                  "#{diverging.length} of #{files.length} corpus documents parse to a different " \
                  "tree in this gem than in carve-rs#{ENGINE_REV ? " #{ENGINE_REV}" : ""}:\n" \
                  "#{diverging.join("\n")}\n" \
                  "A binding has no vote of its own: carve-rs is right by definition here, so " \
                  "every one of these is this gem's.\n" \
-                 "USUALLY THE PIN IS STALE. ext/carve/Cargo.toml pins " \
-                 "#{pinned || "(could not be resolved)"}; bump it and the lock together, then " \
-                 "`rake compile` so lib/carve/ is rebuilt from the new revision - an unrebuilt " \
-                 "extension keeps the old tree and this stays red.\n" \
-                 "If the pin is already at that revision the difference is in the binding " \
-                 "itself: ext/carve/src/lib.rs builds its own Options for `_to_ast_json`, and " \
-                 "`carve --json` builds its own. Those two have to ask for the same thing."
+                 "#{bump_advice(version)}\n" \
+                 "A binding defect would show up in the comparison against the pinned " \
+                 "engine above, which has no window; this one is about the distance to main.")
+  end
+
+  # What to do about it, in the terms of the pin this gem actually carries.
+  # Said as three different sentences because they ask for three different
+  # actions, and the one that used to cover all of them - "usually the pin is
+  # stale, bump it" - was wrong for the state this gate spent 2026-09-23 and
+  # 2026-09-24 in.
+  def bump_advice(version)
+    if version.nil?
+      return "The pin could not be read from ext/carve/Cargo.toml and ext/carve/Cargo.lock, " \
+             "so this run cannot say whether a bump would close this. Run " \
+             "`python3 scripts/pinned-spec-commit.py --print version --manifest " \
+             "ext/carve/Cargo.toml --lock ext/carve/Cargo.lock` and fix what it reports."
+    end
+
+    if PUBLISHED.empty?
+      return "CARVE_PUBLISHED_ENGINE is unset, so this run cannot tell a stale pin from the " \
+             "window between a carve-rs merge and its release. See the binding-parity job in " \
+             ".github/workflows/ci.yml; the pin is carve-lang #{version}."
+    end
+
+    if PUBLISHED == version
+      return "The pin is already carve-lang #{version}, which is the newest released engine, " \
+             "so no bump can close this and the difference is the binding's own."
+    end
+
+    "THE PIN IS STALE. carve-lang #{PUBLISHED} is the newest released engine and " \
+      "ext/carve/Cargo.toml pins #{version}#{pinned_revision ? " (carve-rs #{pinned_revision})" : ""}. " \
+      "Bump it and the lock together, then `rake compile` so lib/carve/ is rebuilt from the new " \
+      "version - an unrebuilt extension keeps the old tree and this stays red."
+  end
+
+  # The window still prints everything a failure would, because its size is the
+  # thing worth watching: it is how long the published gem has been rendering
+  # documents by a superseded rule, and resources/spec-drift.txt is where that
+  # gets written down per document.
+  def report_publication_window(diverging, total, version)
+    puts "::warning::carve-rs main parses #{diverging.length} of #{total} corpus documents " \
+         "differently from carve-lang #{version}, which is the newest released engine. No " \
+         "commit here can close that - publishing the next carve-lang can. See " \
+         "markup-carve/carve-rb#142."
+    puts diverging
   end
 end
