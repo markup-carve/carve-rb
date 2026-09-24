@@ -39,6 +39,7 @@
 # in spec main exactly as the spec does, and it is the only state that may be
 # tagged.
 
+101-table-header-cell-rowspan # fixed in carve-lang 0.1.7, which is not published yet
 116-fence-opener-with-a-nested-list-body-inside-a-list-item-6 # fixed in carve-lang 0.1.7, which is not published yet
 271-the-flush-left-line-after-a-container-a-quoted-line-opened-4 # fixed in carve-lang 0.1.7, which is not published yet
 276-a-fence-opened-on-a-list-marker-line-body-below-the-content-column-7 # fixed in carve-lang 0.1.7, which is not published yet
@@ -85,3 +86,5 @@
 489-a-caption-s-placeholder-is-any-that-does-not-begin-a-tag-6 # fixed in carve-lang 0.1.7, which is not published yet
 491-an-unresolved-reference-s-literal-source-is-html-escaped-like-any-other-text # fixed in carve-lang 0.1.7, which is not published yet
 493-empty-containers-share-one-html-body-shape-2 # fixed in carve-lang 0.1.7, which is not published yet
+494-an-explicit-table-head-span-keeps-one-row-group # fixed in carve-lang 0.1.7, which is not published yet
+495-a-table-foot-span-keeps-one-row-group # fixed in carve-lang 0.1.7, which is not published yet
