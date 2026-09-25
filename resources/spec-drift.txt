@@ -88,3 +88,5 @@
 493-empty-containers-share-one-html-body-shape-2 # fixed in carve-lang 0.1.7, which is not published yet
 494-an-explicit-table-head-span-keeps-one-row-group # fixed in carve-lang 0.1.7, which is not published yet
 495-a-table-foot-span-keeps-one-row-group # fixed in carve-lang 0.1.7, which is not published yet
+496-a-title-or-label-fills-the-container-body-slot-4 # fixed in carve-lang 0.1.7, which is not published yet
+497-a-footnotes-placement-marker-inside-a-container-does-not-place # fixed in carve-lang 0.1.7, which is not published yet
