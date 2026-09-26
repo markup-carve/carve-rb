@@ -23,6 +23,7 @@ CARVE_SPEC_CORPUS=/path/to/carve/tests/corpus bundle exec rake compile test
 CARVE_ENGINE_BIN=/path/to/carve-rs/target/release/carve \
 CARVE_PINNED_ENGINE_BIN=/path/to/carve-rs-0.1.7/target/release/carve \
 CARVE_PARITY_CORPUS=/path/to/carve/tests/corpus \
+CARVE_PUBLISHED_ENGINE="$(python3 scripts/newest-published-engine.py)" \
 CARVE_REQUIRE_PARITY=1 bundle exec ruby -Ilib -Itest test/binding_parity_test.rb
 ```
 
