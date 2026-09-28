@@ -129,3 +129,8 @@
 509-a-fence-closer-below-a-nested-item-s-column-ends-containers-down-to-its-owner-8 # spec main added it in markup-carve/carve#2509 (2026-09-28); carve-lang 0.1.6 predates the rule
 509-a-fence-closer-below-a-nested-item-s-column-ends-containers-down-to-its-owner-10 # spec main added it in markup-carve/carve#2509 (2026-09-28); carve-lang 0.1.6 predates the rule
 509-a-fence-closer-below-a-nested-item-s-column-ends-containers-down-to-its-owner-11 # spec main added it in markup-carve/carve#2509 (2026-09-28); carve-lang 0.1.6 predates the rule
+511-a-fence-in-a-quote-stores-no-continuation-claim-2 # spec main added it in markup-carve/carve#2514 (2026-09-28); carve-lang 0.1.6 predates the rule
+511-a-fence-in-a-quote-stores-no-continuation-claim-3 # spec main added it in markup-carve/carve#2514 (2026-09-28); carve-lang 0.1.6 predates the rule
+511-a-fence-in-a-quote-stores-no-continuation-claim-4 # spec main added it in markup-carve/carve#2514 (2026-09-28); carve-lang 0.1.6 predates the rule
+511-a-fence-in-a-quote-stores-no-continuation-claim-5 # spec main added it in markup-carve/carve#2514 (2026-09-28); carve-lang 0.1.6 predates the rule
+511-a-fence-in-a-quote-stores-no-continuation-claim-8 # spec main added it in markup-carve/carve#2524 (2026-09-28); carve-lang 0.1.6 predates the rule
