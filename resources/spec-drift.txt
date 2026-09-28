@@ -43,6 +43,9 @@
 116-fence-opener-with-a-nested-list-body-inside-a-list-item-6 # fixed in carve-lang 0.1.7, which is not published yet
 271-the-flush-left-line-after-a-container-a-quoted-line-opened-4 # fixed in carve-lang 0.1.7, which is not published yet
 276-a-fence-opened-on-a-list-marker-line-body-below-the-content-column-7 # fixed in carve-lang 0.1.7, which is not published yet
+384-a-continuation-marker-attaches-only-a-flush-left-block-7 # spec main added it in markup-carve/carve#2334 (2026-09-26); carve-lang 0.1.6 predates the rule
+384-a-continuation-marker-attaches-only-a-flush-left-block-8 # spec main added it in markup-carve/carve#2334 (2026-09-26); carve-lang 0.1.6 predates the rule
+435-the-continuation-marker-s-column-gate-reaches-every-container-14 # spec main added it in markup-carve/carve#2343 (2026-09-26); carve-lang 0.1.6 predates the rule
 476-an-item-s-fence-is-read-once-whatever-block-it-follows # fixed in carve-lang 0.1.7, which is not published yet
 476-an-item-s-fence-is-read-once-whatever-block-it-follows-2 # fixed in carve-lang 0.1.7, which is not published yet
 478-a-definition-body-s-open-code-fence-ends-at-a-line-below-its-column-3 # fixed in carve-lang 0.1.7, which is not published yet
@@ -90,3 +93,39 @@
 495-a-table-foot-span-keeps-one-row-group # fixed in carve-lang 0.1.7, which is not published yet
 496-a-title-or-label-fills-the-container-body-slot-4 # fixed in carve-lang 0.1.7, which is not published yet
 497-a-footnotes-placement-marker-inside-a-container-does-not-place # fixed in carve-lang 0.1.7, which is not published yet
+500-an-unplaced-footnotes-marker-keeps-its-authored-blocks-inside-the-div # spec main added it in markup-carve/carve#2346 (2026-09-26); carve-lang 0.1.6 predates the rule
+500-an-unplaced-footnotes-marker-keeps-its-authored-blocks-inside-the-div-2 # spec main added it in markup-carve/carve#2346 (2026-09-26); carve-lang 0.1.6 predates the rule
+503-a-block-opener-indented-under-a-definition-term-is-term-text-at-every-depth-4 # spec main added it in markup-carve/carve#2426 (2026-09-27); carve-lang 0.1.6 predates the rule
+503-a-block-opener-indented-under-a-definition-term-is-term-text-at-every-depth-5 # spec main added it in markup-carve/carve#2426 (2026-09-27); carve-lang 0.1.6 predates the rule
+503-a-block-opener-indented-under-a-definition-term-is-term-text-at-every-depth-6 # spec main added it in markup-carve/carve#2426 (2026-09-27); carve-lang 0.1.6 predates the rule
+504-a-comment-or-a-definition-under-a-definition-term-folds-at-every-depth # spec main added it in markup-carve/carve#2458 (2026-09-27); carve-lang 0.1.6 predates the rule
+504-a-comment-or-a-definition-under-a-definition-term-folds-at-every-depth-2 # spec main added it in markup-carve/carve#2458 (2026-09-27); carve-lang 0.1.6 predates the rule
+504-a-comment-or-a-definition-under-a-definition-term-folds-at-every-depth-3 # spec main added it in markup-carve/carve#2458 (2026-09-27); carve-lang 0.1.6 predates the rule
+504-a-comment-or-a-definition-under-a-definition-term-folds-at-every-depth-4 # spec main added it in markup-carve/carve#2458 (2026-09-27); carve-lang 0.1.6 predates the rule
+504-a-comment-or-a-definition-under-a-definition-term-folds-at-every-depth-5 # spec main added it in markup-carve/carve#2458 (2026-09-27); carve-lang 0.1.6 predates the rule
+504-a-comment-or-a-definition-under-a-definition-term-folds-at-every-depth-6 # spec main added it in markup-carve/carve#2458 (2026-09-27); carve-lang 0.1.6 predates the rule
+504-a-comment-or-a-definition-under-a-definition-term-folds-at-every-depth-7 # spec main added it in markup-carve/carve#2458 (2026-09-27); carve-lang 0.1.6 predates the rule
+504-a-comment-or-a-definition-under-a-definition-term-folds-at-every-depth-8 # spec main added it in markup-carve/carve#2458 (2026-09-27); carve-lang 0.1.6 predates the rule
+504-a-comment-or-a-definition-under-a-definition-term-folds-at-every-depth-11 # spec main added it in markup-carve/carve#2458 (2026-09-27); carve-lang 0.1.6 predates the rule
+504-a-comment-or-a-definition-under-a-definition-term-folds-at-every-depth-12 # spec main added it in markup-carve/carve#2458 (2026-09-27); carve-lang 0.1.6 predates the rule
+504-a-comment-or-a-definition-under-a-definition-term-folds-at-every-depth-15 # spec main added it in markup-carve/carve#2458 (2026-09-27); carve-lang 0.1.6 predates the rule
+504-a-comment-or-a-definition-under-a-definition-term-folds-at-every-depth-16 # spec main added it in markup-carve/carve#2458 (2026-09-27); carve-lang 0.1.6 predates the rule
+504-a-comment-or-a-definition-under-a-definition-term-folds-at-every-depth-22 # spec main added it in markup-carve/carve#2458 (2026-09-27); carve-lang 0.1.6 predates the rule
+504-a-comment-or-a-definition-under-a-definition-term-folds-at-every-depth-23 # spec main added it in markup-carve/carve#2458 (2026-09-27); carve-lang 0.1.6 predates the rule
+504-a-comment-or-a-definition-under-a-definition-term-folds-at-every-depth-24 # spec main added it in markup-carve/carve#2458 (2026-09-27); carve-lang 0.1.6 predates the rule
+504-a-comment-or-a-definition-under-a-definition-term-folds-at-every-depth-25 # spec main added it in markup-carve/carve#2458 (2026-09-27); carve-lang 0.1.6 predates the rule
+505-a-verbatim-line-keeps-what-sits-past-its-fence-opener-not-past-its-container # spec main added it in markup-carve/carve#2464 (2026-09-27); carve-lang 0.1.6 predates the rule
+505-a-verbatim-line-keeps-what-sits-past-its-fence-opener-not-past-its-container-3 # spec main added it in markup-carve/carve#2464 (2026-09-27); carve-lang 0.1.6 predates the rule
+506-comment-columns-and-surviving-list-items-6 # spec main added it in markup-carve/carve d20ebd94 (2026-09-28); carve-lang 0.1.6 predates the rule
+506-comment-columns-and-surviving-list-items-7 # spec main added it in markup-carve/carve#2507 (2026-09-28); carve-lang 0.1.6 predates the rule
+507-a-list-marker-in-a-raised-colon-container-folds-into-its-open-paragraph-15 # spec main added it in markup-carve/carve#2494 (2026-09-28); carve-lang 0.1.6 predates the rule
+508-a-comment-span-s-closer-below-its-host-s-column-stays-a-delimiter # spec main added it in markup-carve/carve#2503 (2026-09-28); carve-lang 0.1.6 predates the rule
+508-a-comment-span-s-closer-below-its-host-s-column-stays-a-delimiter-2 # spec main added it in markup-carve/carve#2503 (2026-09-28); carve-lang 0.1.6 predates the rule
+508-a-comment-span-s-closer-below-its-host-s-column-stays-a-delimiter-3 # spec main added it in markup-carve/carve#2503 (2026-09-28); carve-lang 0.1.6 predates the rule
+508-a-comment-span-s-closer-below-its-host-s-column-stays-a-delimiter-4 # spec main added it in markup-carve/carve#2503 (2026-09-28); carve-lang 0.1.6 predates the rule
+509-a-fence-closer-below-a-nested-item-s-column-ends-containers-down-to-its-owner-2 # spec main added it in markup-carve/carve#2509 (2026-09-28); carve-lang 0.1.6 predates the rule
+509-a-fence-closer-below-a-nested-item-s-column-ends-containers-down-to-its-owner-4 # spec main added it in markup-carve/carve#2509 (2026-09-28); carve-lang 0.1.6 predates the rule
+509-a-fence-closer-below-a-nested-item-s-column-ends-containers-down-to-its-owner-5 # spec main added it in markup-carve/carve#2509 (2026-09-28); carve-lang 0.1.6 predates the rule
+509-a-fence-closer-below-a-nested-item-s-column-ends-containers-down-to-its-owner-8 # spec main added it in markup-carve/carve#2509 (2026-09-28); carve-lang 0.1.6 predates the rule
+509-a-fence-closer-below-a-nested-item-s-column-ends-containers-down-to-its-owner-10 # spec main added it in markup-carve/carve#2509 (2026-09-28); carve-lang 0.1.6 predates the rule
+509-a-fence-closer-below-a-nested-item-s-column-ends-containers-down-to-its-owner-11 # spec main added it in markup-carve/carve#2509 (2026-09-28); carve-lang 0.1.6 predates the rule
