@@ -50,38 +50,38 @@ class CorpusAstFieldsTest < Minitest::Test
   # that some number of them went away.
   EXPECTED = %w[
     abbreviation.abbr abbreviation.expansion abbreviation_def.abbr
-    abbreviation_def.expansion admonition.attrs admonition.children
-    admonition.kind admonition.label admonition.title autolink.attrs
-    autolink.href autolink.text block_quote.attrs block_quote.children
-    caption_number.n code.attrs code.value code_block.attrs code_block.content
-    code_block.header code_block.label code_block.lang comment.block
-    comment.content comment.delimited critic_comment.text
-    definition_description.children definition_list.items
-    definition_term.children delete.children div.attrs div.children div.label
-    document.children document.srcByteLength emphasis.children escaped_text.value
-    figure.attrs figure.caption figure.target figure_group.attrs
+    abbreviation_def.expansion admonition.attrs admonition.children admonition.kind
+    admonition.label admonition.title autolink.attrs autolink.href autolink.text
+    block_quote.attrs block_quote.children block_quote.fenced caption_number.n code.attrs
+    code.value code_block.attrs code_block.content code_block.header code_block.label
+    code_block.lang comment.block comment.content comment.delimited critic_comment.text
+    definition_description.children definition_list.items definition_list.loose
+    definition_term.children delete.children directive.children directive.kind div.attrs
+    div.children div.label document.children document.srcByteLength emphasis.children
+    escaped_text.value figure.attrs figure.caption figure.target figure_group.attrs
     figure_group.caption figure_group.children footnote.children footnote.label
-    footnote_ref.attrs footnote_ref.id footnote_ref.number frontmatter.content
-    frontmatter.format heading.attrs heading.children heading.level
-    heading_ref.href heading_ref.target highlight.children image.alt image.attrs
-    image.rawRef image.ref image.src image.title inline_extension.attrs
-    inline_extension.content inline_extension.name inline_footnote.attrs
-    inline_footnote.inline inline_footnote.number insert.attrs insert.children
-    line_block.children link.attrs link.children link.href link.rawRef link.ref
-    link.title link_reference_definition.attrs link_reference_definition.href
+    footnote_ref.attrs footnote_ref.label footnote_ref.number frontmatter.content
+    frontmatter.format heading.attrs heading.children heading.level heading_ref.href
+    heading_ref.target highlight.children image.alt image.attrs image.rawRef image.ref
+    image.src image.title inline_extension.attrs inline_extension.content
+    inline_extension.name inline_footnote.attrs inline_footnote.inline
+    inline_footnote.number insert.attrs insert.children line_block.attrs
+    line_block.children link.attrs link.children link.href link.rawRef link.ref link.title
+    link_reference_definition.attrs link_reference_definition.href
     link_reference_definition.label link_reference_definition.title list.attrs
-    list.bareMarker list.bulletChar list.delim list.items list.olType
-    list.ordered list.start list.tight list_item.attrs list_item.checked
-    list_item.children literal_inline.attrs literal_inline.content math.attrs
-    math.content math.display mention.user paragraph.attrs paragraph.children
-    raw_block.content raw_block.format raw_inline.content raw_inline.format
-    smart_punctuation.glyph smart_punctuation.kind smart_punctuation.value
-    span.attrs span.children strike.children strong.attrs strong.boldItalic
-    strong.children subscript.children substitution.new substitution.old
-    superscript.children symbol.attrs symbol.name table.attrs table.caption
-    table.rows table_cell.align table_cell.attrs table_cell.children
-    table_cell.header table_cell.span table_row.attrs table_row.cells tag.name
-    text.value thematic_break.marker underline.children
+    list.bareMarker list.bulletChar list.delim list.items list.olType list.ordered
+    list.start list.tight list_item.attrs list_item.checked list_item.children
+    list_item.taskState literal_inline.attrs literal_inline.content math.attrs
+    math.content math.display mention.user paragraph.attrs paragraph.blockImage
+    paragraph.children raw_block.content raw_block.format raw_inline.content
+    raw_inline.format smart_punctuation.glyph smart_punctuation.kind
+    smart_punctuation.value span.attrs span.children strike.children strong.attrs
+    strong.boldItalic strong.children subscript.children substitution.new substitution.old
+    superscript.children symbol.attrs symbol.name table.attrs table.caption table.columns
+    table.rowGroups table.rows table_cell.align table_cell.attrs table_cell.children
+    table_cell.colspan table_cell.header table_cell.rowspan table_cell.span
+    table_cell.valign table_row.attrs table_row.cells tag.name text.value
+    thematic_break.marker underline.children
   ].freeze
 
   # On every node, and asserted by `positions_test.rb` already.
