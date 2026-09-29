@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every row `resources/spec-drift.txt` declared: the gem renders all 2134 corpus
   documents spec main declares byte-identically, where 0.1.6 rendered 158 of them
   by a superseded rule. The ledger is empty again, which is the only state a tag
-  may ship.
+  may ship (#151).
 - **Breaking for a `Carve.parse` consumer:** a footnote reference node spells its
   target as `label`, where it spelled it `id`. PART 12 section 25 settles that
   name on the definition, and every node also carries `attrs[:id]` for an
