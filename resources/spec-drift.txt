@@ -39,15 +39,25 @@
 # in spec main exactly as the spec does, and it is the only state that may be
 # tagged.
 
+69-opaque-spans-inside-a-container-6 # spec main changed it in markup-carve/carve#2616 (2026-09-29); carve-lang 0.1.6 predates the rule
+85-blockquote-lazy-continuation-stops-at-a-fenced-block-3 # spec main changed it in markup-carve/carve#2616 (2026-09-29); carve-lang 0.1.6 predates the rule
 101-table-header-cell-rowspan # fixed in carve-lang 0.1.7, which is not published yet
 116-fence-opener-with-a-nested-list-body-inside-a-list-item-6 # fixed in carve-lang 0.1.7, which is not published yet
 271-the-flush-left-line-after-a-container-a-quoted-line-opened-4 # fixed in carve-lang 0.1.7, which is not published yet
+276-a-fence-opened-on-a-list-marker-line-body-below-the-content-column # spec main changed it in markup-carve/carve#2616 (2026-09-29); carve-lang 0.1.6 predates the rule
+276-a-fence-opened-on-a-list-marker-line-body-below-the-content-column-2 # spec main changed it in markup-carve/carve#2616 (2026-09-29); carve-lang 0.1.6 predates the rule
+276-a-fence-opened-on-a-list-marker-line-body-below-the-content-column-4 # spec main changed it in markup-carve/carve#2616 (2026-09-29); carve-lang 0.1.6 predates the rule
+276-a-fence-opened-on-a-list-marker-line-body-below-the-content-column-5 # spec main changed it in markup-carve/carve#2616 (2026-09-29); carve-lang 0.1.6 predates the rule
 276-a-fence-opened-on-a-list-marker-line-body-below-the-content-column-7 # fixed in carve-lang 0.1.7, which is not published yet
+277-a-below-column-marker-after-a-comment-where-no-paragraph-is-open # spec main changed it in markup-carve/carve#2619 (2026-09-29); carve-lang 0.1.6 predates the rule
+277-a-below-column-marker-after-a-comment-where-no-paragraph-is-open-2 # spec main changed it in markup-carve/carve#2619 (2026-09-29); carve-lang 0.1.6 predates the rule
+372-an-all-blank-raw-payload-still-emits-its-line # spec main changed it in markup-carve/carve#2574 (2026-09-29); carve-lang 0.1.6 predates the rule
 384-a-continuation-marker-attaches-only-a-flush-left-block-7 # spec main added it in markup-carve/carve#2334 (2026-09-26); carve-lang 0.1.6 predates the rule
 384-a-continuation-marker-attaches-only-a-flush-left-block-8 # spec main added it in markup-carve/carve#2334 (2026-09-26); carve-lang 0.1.6 predates the rule
 435-the-continuation-marker-s-column-gate-reaches-every-container-14 # spec main added it in markup-carve/carve#2343 (2026-09-26); carve-lang 0.1.6 predates the rule
 476-an-item-s-fence-is-read-once-whatever-block-it-follows # fixed in carve-lang 0.1.7, which is not published yet
 476-an-item-s-fence-is-read-once-whatever-block-it-follows-2 # fixed in carve-lang 0.1.7, which is not published yet
+478-a-definition-body-s-open-code-fence-ends-at-a-line-below-its-column # spec main changed it in markup-carve/carve#2616 (2026-09-29); carve-lang 0.1.6 predates the rule
 478-a-definition-body-s-open-code-fence-ends-at-a-line-below-its-column-3 # fixed in carve-lang 0.1.7, which is not published yet
 478-a-definition-body-s-open-code-fence-ends-at-a-line-below-its-column-5 # fixed in carve-lang 0.1.7, which is not published yet
 479-a-closer-below-the-container-s-column-does-not-count # fixed in carve-lang 0.1.7, which is not published yet
@@ -126,6 +136,7 @@
 509-a-fence-closer-below-a-nested-item-s-column-ends-containers-down-to-its-owner-2 # spec main added it in markup-carve/carve#2509 (2026-09-28); carve-lang 0.1.6 predates the rule
 509-a-fence-closer-below-a-nested-item-s-column-ends-containers-down-to-its-owner-4 # spec main added it in markup-carve/carve#2509 (2026-09-28); carve-lang 0.1.6 predates the rule
 509-a-fence-closer-below-a-nested-item-s-column-ends-containers-down-to-its-owner-5 # spec main added it in markup-carve/carve#2509 (2026-09-28); carve-lang 0.1.6 predates the rule
+509-a-fence-closer-below-a-nested-item-s-column-ends-containers-down-to-its-owner-6 # spec main changed it in markup-carve/carve#2616 (2026-09-29); carve-lang 0.1.6 predates the rule
 509-a-fence-closer-below-a-nested-item-s-column-ends-containers-down-to-its-owner-8 # spec main added it in markup-carve/carve#2509 (2026-09-28); carve-lang 0.1.6 predates the rule
 509-a-fence-closer-below-a-nested-item-s-column-ends-containers-down-to-its-owner-10 # spec main added it in markup-carve/carve#2509 (2026-09-28); carve-lang 0.1.6 predates the rule
 509-a-fence-closer-below-a-nested-item-s-column-ends-containers-down-to-its-owner-11 # spec main added it in markup-carve/carve#2509 (2026-09-28); carve-lang 0.1.6 predates the rule
@@ -134,3 +145,55 @@
 511-a-fence-in-a-quote-stores-no-continuation-claim-4 # spec main added it in markup-carve/carve#2514 (2026-09-28); carve-lang 0.1.6 predates the rule
 511-a-fence-in-a-quote-stores-no-continuation-claim-5 # spec main added it in markup-carve/carve#2514 (2026-09-28); carve-lang 0.1.6 predates the rule
 511-a-fence-in-a-quote-stores-no-continuation-claim-8 # spec main added it in markup-carve/carve#2524 (2026-09-28); carve-lang 0.1.6 predates the rule
+512-a-comment-span-s-closer-column-does-not-move-the-item-s-ownership # spec main added it in markup-carve/carve#2527 (2026-09-28); carve-lang 0.1.6 predates the rule
+512-a-comment-span-s-closer-column-does-not-move-the-item-s-ownership-4 # spec main added it in markup-carve/carve#2527 (2026-09-28); carve-lang 0.1.6 predates the rule
+512-a-comment-span-s-closer-column-does-not-move-the-item-s-ownership-6 # spec main added it in markup-carve/carve#2527 (2026-09-28); carve-lang 0.1.6 predates the rule
+512-a-comment-span-s-closer-column-does-not-move-the-item-s-ownership-8 # spec main added it in markup-carve/carve#2527 (2026-09-28); carve-lang 0.1.6 predates the rule
+512-a-comment-span-s-closer-column-does-not-move-the-item-s-ownership-9 # spec main added it in markup-carve/carve#2527 (2026-09-28); carve-lang 0.1.6 predates the rule
+512-a-comment-span-s-closer-column-does-not-move-the-item-s-ownership-11 # spec main added it in markup-carve/carve#2527 (2026-09-28); carve-lang 0.1.6 predates the rule
+512-a-comment-span-s-closer-column-does-not-move-the-item-s-ownership-12 # spec main added it in markup-carve/carve#2527 (2026-09-28); carve-lang 0.1.6 predates the rule
+513-a-comment-span-opened-below-every-content-column-is-located-there-2 # spec main added it in markup-carve/carve#2540 (2026-09-28); carve-lang 0.1.6 predates the rule
+513-a-comment-span-opened-below-every-content-column-is-located-there-3 # spec main added it in markup-carve/carve#2540 (2026-09-28); carve-lang 0.1.6 predates the rule
+513-a-comment-span-opened-below-every-content-column-is-located-there-4 # spec main added it in markup-carve/carve#2540 (2026-09-28); carve-lang 0.1.6 predates the rule
+513-a-comment-span-opened-below-every-content-column-is-located-there-5 # spec main added it in markup-carve/carve#2540 (2026-09-28); carve-lang 0.1.6 predates the rule
+513-a-comment-span-opened-below-every-content-column-is-located-there-6 # spec main added it in markup-carve/carve#2540 (2026-09-28); carve-lang 0.1.6 predates the rule
+513-a-comment-span-opened-below-every-content-column-is-located-there-8 # spec main added it in markup-carve/carve#2540 (2026-09-28); carve-lang 0.1.6 predates the rule
+514-a-fence-a-container-inside-a-quote-holds-open-stores-no-claim # spec main added it in markup-carve/carve#2544 (2026-09-29); carve-lang 0.1.6 predates the rule
+514-a-fence-a-container-inside-a-quote-holds-open-stores-no-claim-2 # spec main added it in markup-carve/carve#2544 (2026-09-29); carve-lang 0.1.6 predates the rule
+514-a-fence-a-container-inside-a-quote-holds-open-stores-no-claim-3 # spec main added it in markup-carve/carve#2544 (2026-09-29); carve-lang 0.1.6 predates the rule
+514-a-fence-a-container-inside-a-quote-holds-open-stores-no-claim-4 # spec main added it in markup-carve/carve#2544 (2026-09-29); carve-lang 0.1.6 predates the rule
+514-a-fence-a-container-inside-a-quote-holds-open-stores-no-claim-5 # spec main added it in markup-carve/carve#2544 (2026-09-29); carve-lang 0.1.6 predates the rule
+514-a-fence-a-container-inside-a-quote-holds-open-stores-no-claim-6 # spec main added it in markup-carve/carve#2544 (2026-09-29); carve-lang 0.1.6 predates the rule
+514-a-fence-a-container-inside-a-quote-holds-open-stores-no-claim-8 # spec main added it in markup-carve/carve#2544 (2026-09-29); carve-lang 0.1.6 predates the rule
+514-a-fence-a-container-inside-a-quote-holds-open-stores-no-claim-9 # spec main added it in markup-carve/carve#2544 (2026-09-29); carve-lang 0.1.6 predates the rule
+514-a-fence-a-container-inside-a-quote-holds-open-stores-no-claim-12 # spec main added it in markup-carve/carve#2544 (2026-09-29); carve-lang 0.1.6 predates the rule
+515-a-nested-marker-comment-keeps-its-own-ownership # spec main added it in markup-carve/carve#2549 (2026-09-29); carve-lang 0.1.6 predates the rule
+515-a-nested-marker-comment-keeps-its-own-ownership-4 # spec main added it in markup-carve/carve#2549 (2026-09-29); carve-lang 0.1.6 predates the rule
+517-a-band-paragraph-after-an-invisible-line-leaves-the-item-loose-5 # spec main changed it in markup-carve/carve#2619 (2026-09-29); carve-lang 0.1.6 predates the rule
+518-a-trailing-comment-takes-a-tab-a-run-start-and-its-whole-separator-9 # spec main added it in markup-carve/carve#2562 (2026-09-29); carve-lang 0.1.6 predates the rule
+518-a-trailing-comment-takes-a-tab-a-run-start-and-its-whole-separator-10 # spec main added it in markup-carve/carve#2562 (2026-09-29); carve-lang 0.1.6 predates the rule
+519-a-shifted-fence-in-a-quoted-item-stores-no-continuation-claim # spec main added it in markup-carve/carve#2563 (2026-09-29); carve-lang 0.1.6 predates the rule
+519-a-shifted-fence-in-a-quoted-item-stores-no-continuation-claim-2 # spec main added it in markup-carve/carve#2563 (2026-09-29); carve-lang 0.1.6 predates the rule
+519-a-shifted-fence-in-a-quoted-item-stores-no-continuation-claim-3 # spec main added it in markup-carve/carve#2563 (2026-09-29); carve-lang 0.1.6 predates the rule
+521-a-zero-line-and-a-one-blank-raw-payload-are-not-the-same-block # spec main added it in markup-carve/carve#2574 (2026-09-29); carve-lang 0.1.6 predates the rule
+521-a-zero-line-and-a-one-blank-raw-payload-are-not-the-same-block-2 # spec main added it in markup-carve/carve#2574 (2026-09-29); carve-lang 0.1.6 predates the rule
+521-a-zero-line-and-a-one-blank-raw-payload-are-not-the-same-block-9 # spec main added it in markup-carve/carve#2574 (2026-09-29); carve-lang 0.1.6 predates the rule
+522-an-emphasis-marker-does-not-pair-across-a-link-bracket # spec main added it in markup-carve/carve#2577 (2026-09-29); carve-lang 0.1.6 predates the rule
+524-an-empty-code-payload-renders-no-characters # spec main added it in markup-carve/carve#2579 (2026-09-29); carve-lang 0.1.6 predates the rule
+529-a-container-label-publishes-its-inline-run # spec main added it in markup-carve/carve#2600 (2026-09-29); carve-lang 0.1.6 predates the rule
+529-a-container-label-publishes-its-inline-run-2 # spec main added it in markup-carve/carve#2600 (2026-09-29); carve-lang 0.1.6 predates the rule
+529-a-container-label-publishes-its-inline-run-3 # spec main added it in markup-carve/carve#2600 (2026-09-29); carve-lang 0.1.6 predates the rule
+529-a-container-label-publishes-its-inline-run-5 # spec main added it in markup-carve/carve#2600 (2026-09-29); carve-lang 0.1.6 predates the rule
+529-a-container-label-publishes-its-inline-run-6 # spec main added it in markup-carve/carve#2600 (2026-09-29); carve-lang 0.1.6 predates the rule
+529-a-container-label-publishes-its-inline-run-8 # spec main added it in markup-carve/carve#2600 (2026-09-29); carve-lang 0.1.6 predates the rule
+531-an-opener-under-a-quote-in-a-nested-host-opens-at-one-column-only-3 # spec main added it in markup-carve/carve#2612 (2026-09-29); carve-lang 0.1.6 predates the rule
+531-an-opener-under-a-quote-in-a-nested-host-opens-at-one-column-only-4 # spec main added it in markup-carve/carve#2612 (2026-09-29); carve-lang 0.1.6 predates the rule
+531-an-opener-under-a-quote-in-a-nested-host-opens-at-one-column-only-5 # spec main added it in markup-carve/carve#2612 (2026-09-29); carve-lang 0.1.6 predates the rule
+531-an-opener-under-a-quote-in-a-nested-host-opens-at-one-column-only-6 # spec main added it in markup-carve/carve#2612 (2026-09-29); carve-lang 0.1.6 predates the rule
+531-an-opener-under-a-quote-in-a-nested-host-opens-at-one-column-only-7 # spec main added it in markup-carve/carve#2612 (2026-09-29); carve-lang 0.1.6 predates the rule
+531-an-opener-under-a-quote-in-a-nested-host-opens-at-one-column-only-8 # spec main added it in markup-carve/carve#2612 (2026-09-29); carve-lang 0.1.6 predates the rule
+531-an-opener-under-a-quote-in-a-nested-host-opens-at-one-column-only-9 # spec main added it in markup-carve/carve#2612 (2026-09-29); carve-lang 0.1.6 predates the rule
+531-an-opener-under-a-quote-in-a-nested-host-opens-at-one-column-only-10 # spec main added it in markup-carve/carve#2612 (2026-09-29); carve-lang 0.1.6 predates the rule
+531-an-opener-under-a-quote-in-a-nested-host-opens-at-one-column-only-11 # spec main added it in markup-carve/carve#2612 (2026-09-29); carve-lang 0.1.6 predates the rule
+531-an-opener-under-a-quote-in-a-nested-host-opens-at-one-column-only-12 # spec main added it in markup-carve/carve#2612 (2026-09-29); carve-lang 0.1.6 predates the rule
+531-an-opener-under-a-quote-in-a-nested-host-opens-at-one-column-only-13 # spec main added it in markup-carve/carve#2612 (2026-09-29); carve-lang 0.1.6 predates the rule
