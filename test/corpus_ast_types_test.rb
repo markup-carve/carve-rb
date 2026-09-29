@@ -41,15 +41,15 @@ class CorpusAstTypesTest < Minitest::Test
   # explicit list rather than a count: a count says "something went missing"
   # and this says which.
   EXPECTED = %w[
-    abbreviation abbreviation_def admonition autolink block_quote caption_number
-    code code_block comment critic_comment definition_description definition_list
-    definition_term delete div document emphasis escaped_text figure figure_group
-    footnote footnote_ref frontmatter hard_break heading heading_ref highlight image
-    inline_extension inline_footnote insert line_block link
+    abbreviation abbreviation_def admonition autolink block_quote caption_number code
+    code_block comment critic_comment definition_description definition_list
+    definition_term delete directive div document emphasis escaped_text figure
+    figure_group footnote footnote_ref frontmatter hard_break heading heading_ref
+    highlight image inline_extension inline_footnote insert line_block link
     link_reference_definition list list_item literal_inline math mention
-    paragraph raw_block raw_inline smart_punctuation soft_break span strike
-    strong subscript substitution superscript symbol table table_cell table_row
-    tag text thematic_break underline
+    non_breaking_space paragraph raw_block raw_inline smart_punctuation soft_break span
+    strike strong subscript substitution superscript symbol table table_cell table_row tag
+    text thematic_break underline
   ].freeze
 
   def corpus_files

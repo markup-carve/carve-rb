@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The engine is the published `carve-lang` 0.1.7 crate, up from 0.1.6. It closes
+  every row `resources/spec-drift.txt` declared: the gem renders all 2134 corpus
+  documents spec main declares byte-identically, where 0.1.6 rendered 158 of them
+  by a superseded rule. The ledger is empty again, which is the only state a tag
+  may ship (#151).
+- **Breaking for a `Carve.parse` consumer:** a footnote reference node spells its
+  target as `label`, where it spelled it `id`. PART 12 section 25 settles that
+  name on the definition, and every node also carries `attrs[:id]` for an
+  authored `{#x}`, so the old name stood for two unrelated values on one object.
+  `attrs[:id]` is untouched (markup-carve/carve-rs#1853).
+- **Breaking for a `Carve.parse` consumer:** a code block's `content` is the literal
+  payload text, so `a`, `a\n` and `a\n\n` stay distinct in the tree where they
+  collapsed to one shape, and an empty fence holds no newline. Rendered HTML is
+  unchanged (markup-carve/carve-rs#2191, markup-carve/carve-rs#2195).
+- `Carve.parse` publishes twelve further fields the tree gained: a fenced
+  blockquote, a loose definition list, a directive's kind and children, a line
+  block's attributes, an authored task state, a lone-image paragraph, a table's
+  columns and row groups, and a cell's colspan, rowspan and vertical alignment.
+- **Breaking for a `Carve.to_markdown` consumer:** the Markdown target follows
+  PART 11 section 11 for a GFM reader. A heading takes no `{#id}` suffix, and a
+  resolved cross-reference is written with the heading's GFM slug, so
+  `lowercase_heading_ids` no longer changes that anchor - the slug is the one a
+  GFM reader computes for itself. `Carve.to_html` still answers to the option
+  (markup-carve/carve-rs#2014).
+
 ## [0.1.5] - 2026-09-21
 
 ### Changed
@@ -287,7 +314,7 @@ are not listed, because no release ever shipped them.
   Frontmatter and footnote definitions are block nodes in `children` rather
   than root fields, which PART 12 §7 requires: a root field cannot carry the
   position §4 requires of every node, and both are source an editor navigates
-  to (carve#411, carve#418). Frontmatter is the first child, carrying `format`
+  to (markup-carve/carve#411, markup-carve/carve#418). Frontmatter is the first child, carrying `format`
   and **raw** `content` - not parsed key/values, which could not represent a
   `---toml` block at all. Anything reading `ast[:frontmatter]` or
   `ast[:footnoteDefs]` breaks.
@@ -296,9 +323,9 @@ are not listed, because no release ever shipped them.
   backslash escape is `{"type":"escaped_text","value":"-"}` instead of being
   folded into surrounding text - the backslash carries intent the character does
   not, since an author writes `\-\-` precisely so a consumer will not render an
-  en dash (carve#350). A `::: |` fence is `line_block` instead of a `div` with a
+  en dash (markup-carve/carve#350). A `::: |` fence is `line_block` instead of a `div` with a
   `.line-block` class, because inside it every newline is a hard break and a
-  class alone could not say which one a node was (carve#359). A block
+  class alone could not say which one a node was (markup-carve/carve#359). A block
   extension's `summary` is a list of inline nodes rather than a plain string,
   matching the admonition `title` shape. Definition lists publish
   `definition_term` and `definition_description` nodes
