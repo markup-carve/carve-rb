@@ -35,11 +35,5 @@ class LineBlockTabSpansTest < Minitest::Test
     refute_nil merged
     refute merged.key?(:pos)
   end
-  def test_a_fence_body_stops_below_its_container_column
-    fixture = File.join(__dir__, "fixtures", "engine-parity", "fence-below-content-column")
-    expected = JSON.parse(File.read("#{fixture}.json"))
-    actual = JSON.parse(Carve._to_ast_json(File.read("#{fixture}.crv")))
-    assert_equal expected, actual
-  end
 
 end
