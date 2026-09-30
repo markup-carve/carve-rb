@@ -38,3 +38,13 @@
 # EMPTY IS THE GOAL STATE. An empty file means this gem renders every document
 # in spec main exactly as the spec does, and it is the only state that may be
 # tagged.
+
+535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-2 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
+535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-6 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
+535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-10 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
+535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-14 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
+535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-18 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
+535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-22 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
+535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-31 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
+535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-32 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
+535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-35 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
