@@ -16,6 +16,9 @@ on:
     - cron: "15 6 * * *"
   workflow_dispatch:
 
+# Jobs carry an explicit timeout-minutes: without one GitHub applies a
+# 360-minute default, long enough for a stalled job to go unnoticed.
+
 jobs:
   # Which carve-rs is this gem running, and is that a revision that really
   # exists on `main`? The corpus job below answers whether a drifted pin
@@ -45,6 +48,7 @@ jobs:
   # reach a tag; it must not hold a pull request hostage.
   engine-pin:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -66,6 +70,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -273,6 +278,7 @@ jobs:
     name: The gem's tree is carve-rs's tree
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -430,6 +436,7 @@ jobs:
   corpus-drift:
     name: The gem's drift from spec main is declared
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: build
     steps:
       - uses: actions/checkout@v4
@@ -545,6 +552,7 @@ jobs:
       group: ci-verdict-${{ github.ref }}
       cancel-in-progress: false
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       # A job-level block REPLACES the default set rather than adding to it, so
       # every scope omitted here is `none`, and each of these three is load
