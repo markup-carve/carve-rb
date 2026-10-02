@@ -12,10 +12,22 @@ This script is the failure condition that was missing. It reads the drift log,
 takes the set of documents that actually diverge, and compares it against
 resources/spec-drift.txt:
 
-    UNDECLARED  diverging and not in the ledger  -> FAILS
-    declared    diverging and in the ledger      -> passes, reported
-    stale       in the ledger and not diverging  -> reported, does not fail
-                (it fails under --require-empty-ledger)
+    UNDECLARED  diverging and not in the ledger
+    declared    diverging and in the ledger
+    stale       in the ledger and not diverging
+
+WHICH OF THOSE IS A FAILURE IS THE CALLER'S TO CHOOSE, and that is
+markup-carve/carve#2706. An UNDECLARED row is created by the spec moving, which
+no commit here causes and no run here can clear by passing; reddening a branch
+for it is the channel the ruling rejects, so ci.yml asks for
+`--on-undeclared notice` and the scheduled job turns the same rows into a pull
+request. A STALE row is this repository contradicting itself - the ledger claims
+a divergence the gem does not produce - so ci.yml asks for `--on-stale error`
+and that half stays a gate.
+
+The defaults here are the strict pair (undeclared fails, stale reports), because
+the release gate and anyone running this by hand wants the strictest reading and
+a flag that has to be passed to make a check weaker is the right way round.
 
 That split is markup-carve/carve#1811's ruling, applied here: a declared window
 is the normal consequence of the spec leading the engine and exists to be
@@ -35,6 +47,8 @@ cannot fail (markup-carve/carve#755). That is still a failure.
 Usage:
   scripts/check-spec-drift.py --log drift.log [--ledger resources/spec-drift.txt]
                               [--spec <short-sha>] [--github]
+                              [--on-undeclared error|notice] [--on-stale notice|error]
+                              [--write-undeclared undeclared.txt]
   scripts/check-spec-drift.py --require-empty-ledger [--ledger ...] [--github]
 
 Exit codes: 0 clear, 1 refused, 2 misuse.
@@ -98,6 +112,25 @@ def main(argv: list[str] | None = None) -> int:
         "--require-empty-ledger",
         action="store_true",
         help="release mode: refuse a non-empty ledger, with or without a log",
+    )
+    p.add_argument(
+        "--on-undeclared",
+        choices=("error", "notice"),
+        default="error",
+        help="how an undeclared divergence is reported; `error` (default) exits non-zero",
+    )
+    p.add_argument(
+        "--on-stale",
+        choices=("notice", "error"),
+        default="notice",
+        help="how a declared row that no longer diverges is reported; `error` exits non-zero",
+    )
+    p.add_argument(
+        "--write-undeclared",
+        type=Path,
+        help="write the undeclared basenames here, one per line, for a caller that acts on "
+        "them. Written on every measured run, EMPTY when there are none, so a reader can "
+        "tell 'measured, nothing undeclared' from 'never ran'.",
     )
     p.add_argument("--github", action="store_true", help="emit GitHub Actions annotations")
     args = p.parse_args(argv)
@@ -180,17 +213,30 @@ def main(argv: list[str] | None = None) -> int:
     for name in diverging:
         print(f"  {'UNDECLARED' if name in undeclared else 'declared  '} {name}")
 
+    if args.write_undeclared is not None:
+        args.write_undeclared.write_text(
+            "".join(f"{name}\n" for name in undeclared), encoding="utf-8"
+        )
+
+    status = 0
+
     if stale:
         annotate(
-            "notice",
-            f"{len(stale)} declared drift row(s) no longer diverge and can be dropped from "
-            f"{args.ledger}: {', '.join(stale[:20])}{' ...' if len(stale) > 20 else ''}",
+            args.on_stale,
+            f"{len(stale)} declared drift row(s) in {args.ledger} no longer diverge: "
+            f"{', '.join(stale[:20])}{' ...' if len(stale) > 20 else ''}. The ledger describes "
+            "this gem, so a row the measurement contradicts is this repository disagreeing with "
+            "itself rather than upstream having moved - either the pin already closed the window "
+            "and the row was not dropped, or the row names a document that is not in the corpus "
+            "at all and has therefore never been compared. Delete it.",
             args.github,
         )
+        if args.on_stale == "error":
+            status = 1
 
     if undeclared:
         annotate(
-            "error",
+            args.on_undeclared,
             f"{len(undeclared)} of {len(diverging)} diverging document(s){at_spec} are "
             f"UNDECLARED: {', '.join(undeclared[:20])}"
             f"{' ...' if len(undeclared) > 20 else ''}. This gem renders them differently from "
@@ -199,9 +245,18 @@ def main(argv: list[str] | None = None) -> int:
             f"diverging, or declare them in {args.ledger} with the reason.",
             args.github,
         )
-        return 1
+        if args.on_undeclared == "error":
+            return 1
 
-    if diverging:
+    if status:
+        return status
+
+    if undeclared:
+        print(
+            f"check-spec-drift: {len(undeclared)} undeclared divergence(s) reported, not gated. "
+            "scripts/declare-spec-drift.sh turns them into a pull request."
+        )
+    elif diverging:
         print(
             f"check-spec-drift: all {len(diverging)} diverging document(s) are declared. "
             "The window is known; it must be closed before a tag."

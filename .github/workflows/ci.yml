@@ -10,8 +10,11 @@ on:
   # the state of the day someone last touched this repo. A scheduled run is
   # what turns that into a red build instead of silence.
   #
-  # This one GATES rather than reports. A corpus divergence is not upstream
-  # being ahead, it is this artifact rendering documents wrongly today.
+  # What the scheduled run does with the answer changed on 2026-10-02
+  # (markup-carve/carve#2706). Drift the spec caused opens a pull request from
+  # the declare-drift job; what still gates on the schedule is what this
+  # repository can clear - a declaration its own measurement contradicts, a pin
+  # naming a revision that was never merged, a run that measured nothing.
   schedule:
     - cron: "15 6 * * *"
   workflow_dispatch:
@@ -427,10 +430,54 @@ jobs:
   # never happened", not "nothing is wrong". scripts/check-spec-drift.py fails on
   # that, and on the same hole one layer in - a headline that counts divergence
   # while no per-document line was printed.
+  #
+  # WHAT IT GATES CHANGED ON 2026-10-02, markup-carve/carve#2706. The two
+  # readings above were decided by one exit code, and only one of them is this
+  # repository's to answer:
+  #
+  #   an UNDECLARED divergence is created by the SPEC MOVING. Nothing committed
+  #     here causes it and no run here clears it by passing - row 537 landed
+  #     upstream in markup-carve/carve#2695 hours before the 06:15 run that
+  #     reddened `main` and blocked #158, a pull request about timeouts. The
+  #     corpus gains documents faster than this pin moves, so the job returned
+  #     to red by design, which is not a check anybody can clear. It now
+  #     REPORTS, and the declare-drift job below turns it into a pull request
+  #     carrying the diff.
+  #   a STALE declaration is this repository contradicting ITSELF: the ledger
+  #     claims a divergence the measurement does not produce. The clearing
+  #     action is deleting the row, here, and it stays red until somebody does.
+  #     So this half is still a gate, and it is now a FAILURE rather than the
+  #     notice it used to be.
+  #
+  # The measurement itself is untouched, and so are the guards that make it a
+  # measurement at all: a log with no headline, or a headline whose per-document
+  # lines do not account for it, still fails. Those are not "upstream moved",
+  # they are "nothing was measured", and reporting drift from a run that
+  # measured nothing is the check that cannot fail (markup-carve/carve#755).
+  #
+  # The residual, stated rather than hidden: upstream CAN make a declared row
+  # stale by changing the spec to agree with the pinned engine, and that would
+  # redden `main` for an upstream cause. It is bounded in a way the undeclared
+  # direction was not - it needs a spec change that happens to make this gem
+  # correct again, where undeclared drift arrives with every corpus addition -
+  # and the scheduled job below proposes the row deletions in the same pull
+  # request, so the red arrives with its own fix attached.
+  #
+  # THE DISPLAY NAME IS DELIBERATELY UNCHANGED although what it gates narrowed.
+  # `main`'s protection lists required status checks by CONTEXT, which for an
+  # Actions job is this `name:` string, so renaming it retires the context that
+  # every open pull request is waiting on and replaces it with one protection
+  # has never heard of. The pull request does not go green, it waits forever on
+  # a check that will not report again - and #158 is already blocked, so the
+  # rename would have swapped one indefinite block for another. Renaming it
+  # needs a protection update in the same step, which is a settings change and
+  # not this pull request's to make.
   corpus-drift:
     name: The gem's drift from spec main is declared
     runs-on: ubuntu-latest
     needs: build
+    outputs:
+      spec: ${{ steps.verdict.outputs.spec }}
     steps:
       - uses: actions/checkout@v4
 
@@ -492,10 +539,12 @@ jobs:
       # DECIDE. Exits non-zero on an undeclared divergence, and on a log that
       # measured nothing. Nothing downstream reads its output to work out what
       # happened; the exit code is the verdict.
-      - name: Every divergence is declared
+      - name: Every declaration is real, and undeclared drift is reported
+        id: verdict
         run: |
           set -uo pipefail
           spec="$(git -C spec rev-parse --short HEAD)"
+          echo "spec=$spec" >> "$GITHUB_OUTPUT"
           # errexit off around the pipeline only, so the summary below is
           # written on a refusal too - that is the run whose summary matters.
           # The status is then re-raised verbatim; it is never recomputed from
@@ -503,7 +552,9 @@ jobs:
           set +e
           python3 scripts/check-spec-drift.py \
             --log drift.log --ledger resources/spec-drift.txt \
-            --spec "$spec" --github 2>&1 | tee drift-verdict.txt
+            --spec "$spec" --github \
+            --on-undeclared notice --on-stale error \
+            --write-undeclared undeclared.txt 2>&1 | tee drift-verdict.txt
           status=${PIPESTATUS[0]}
           set -e
           {
@@ -514,6 +565,90 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
+
+      # For declare-drift below, which runs on the schedule only. Uploaded even
+      # on a refusal: a stale row fails the step above, and the undeclared rows
+      # measured in the same run are still worth a pull request. `if: always()`
+      # rather than a success condition, because tying the artifact to the gate
+      # would let the gate's failure silence the channel this ruling created.
+      #
+      # if-no-files-found: error. The file is written on every run whose
+      # comparison happened and is EMPTY when nothing is undeclared, so its
+      # absence means the measurement did not get that far - and an automation
+      # that reads a missing file as "all clear" is reporting about a run that
+      # did not happen.
+      - name: Keep the undeclared rows
+        if: always() && hashFiles('undeclared.txt') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: undeclared-drift
+          path: undeclared.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  # THE CHANNEL markup-carve/carve#2706 RULED. Undeclared drift arrives as a
+  # pull request rather than as a red default branch.
+  #
+  # SCHEDULE AND MANUAL DISPATCH ONLY, and that is the point rather than a
+  # saving. A contributor's pull request is not the place to learn that the spec
+  # moved, and a bot opening a pull request per topic branch is how a filer gets
+  # muted and takes the real ones with it.
+  #
+  # WHY IT IS A JOB HERE AND NOT ITS OWN WORKFLOW FILE, since a separate file
+  # reads tidier: the drift number has to be about the gem something else looked
+  # at. corpus-drift deliberately downloads the artifact `build` produced
+  # instead of compiling a second one, because two builds are two artifacts and
+  # the drift would describe the one no other job gated. A standalone workflow
+  # cannot reach that artifact without rebuilding, so it would measure a gem
+  # nothing else has seen. The copyable unit for the other repositories is
+  # scripts/declare-spec-drift.sh plus this job, not the file boundary.
+  declare-drift:
+    name: Undeclared drift opens a pull request
+    if: always() && github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    needs: corpus-drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # One at a time per ref, none cancelled. The script's read-compare-push over
+    # one branch is not atomic, and a cancelled run is a run that reported
+    # nothing.
+    concurrency:
+      group: declare-spec-drift-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The script merges `main` into the branch on the preserve path, so it
+          # needs more than the tip.
+          fetch-depth: 0
+
+      # continue-on-error, because the artifact is absent exactly when
+      # corpus-drift's comparison never happened - and the script's own refusal
+      # for a missing file says that in words, where a failed download says
+      # "Artifact not found". Both fail the job; only one of them tells the
+      # reader which of the two states they are in.
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: undeclared-drift
+
+      # BUMP_TOKEN when the repository has it, GITHUB_TOKEN otherwise. Not
+      # interchangeable, and the difference is worth knowing before reading the
+      # pull request: a GITHUB_TOKEN-authored pull request does not trigger this
+      # repository's own workflows, so it arrives with no checks, and creating
+      # it at all needs "Allow GitHub Actions to create and approve pull
+      # requests" enabled. With a fine-grained token the pull request is a
+      # normal one that CI validates.
+      - name: Open or update the declaration pull request
+        env:
+          GH_TOKEN: ${{ secrets.BUMP_TOKEN || github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          bash scripts/declare-spec-drift.sh \
+            --undeclared undeclared.txt \
+            --spec "${{ needs.corpus-drift.outputs.spec }}"
 
   # The run knows before anyone does. Everything above already refuses correctly
   # and says why - on 2026-08-29 the 06:15 scheduled run named a stale pin and
@@ -533,7 +668,13 @@ jobs:
     # always(), because it is skipped by default exactly when a job ahead of it
     # fails - the only run it has anything to say about.
     if: always()
-    needs: [engine-pin, build, binding-parity, corpus-drift]
+    # declare-drift is in here although opening a pull request is not a CI
+    # failure to report: the invariant test/ci_verdict_test.rb pins is that the
+    # filer waits for EVERY job, so that it cannot read the run before they
+    # finish. declare-drift can also genuinely fail - a refused lease, a
+    # conflicting merge - and that is a verdict worth carrying. It is skipped on
+    # every push and pull request, which `always()` above already tolerates.
+    needs: [engine-pin, build, binding-parity, corpus-drift, declare-drift]
     # Runs on this branch overlap - a push and the 06:15 schedule - and the
     # filer's read-check-write over the ticket is not atomic. Two of them
     # interleaved can file the ticket twice, or close one the other just wrote.
