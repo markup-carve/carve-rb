@@ -11,15 +11,22 @@
 # So the window is DECLARED rather than tolerated. Every document listed below
 # is a divergence somebody looked at and wrote down. A divergence that is NOT
 # listed is the state nobody knows they are in - a pinned build rendering
-# documents wrongly with nothing saying so - and that is what the per-PR gate
-# refuses (markup-carve/carve-rb#100, following the split ruled in
-# markup-carve/carve#1811).
+# documents wrongly with nothing saying so (markup-carve/carve-rb#100,
+# following the split ruled in markup-carve/carve#1811). It arrives as a pull
+# request adding the row, not as a red build.
 #
 # HOW IT IS ENFORCED
 #
-#   per-PR CI     an UNDECLARED diverging document FAILS. A declared one passes.
-#                 A declared document that no longer diverges is reported, so
-#                 the line can be dropped, and does not fail.
+#   per-PR CI     a declared document that NO LONGER DIVERGES fails. The ledger
+#                 describes this gem, so a row its own measurement contradicts
+#                 is this repository disagreeing with itself, and deleting the
+#                 row is an action taken here.
+#   the schedule  an UNDECLARED diverging document opens a pull request that
+#                 adds it here, rather than reddening `main`. The spec gains
+#                 documents faster than this pin moves, so that reading used to
+#                 return to red by design and blocked unrelated pull requests
+#                 (markup-carve/carve#2706, markup-carve/carve-rb#157).
+#                 scripts/declare-spec-drift.sh writes those rows.
 #   release gate  this file must be EMPTY. A declared window is a window that is
 #                 still open, and a tag must not ship one.
 #

@@ -22,6 +22,7 @@
 
 require "minitest/autorun"
 require "tmpdir"
+require "yaml"
 
 class SpecDriftGateTest < Minitest::Test
   ROOT = File.expand_path("..", __dir__)
@@ -124,6 +125,67 @@ class SpecDriftGateTest < Minitest::Test
                  "a row to delete is a notice per-PR; the release gate is what refuses it"
   end
 
+  # ---- markup-carve/carve#2706: which reading is a gate ------------------
+  #
+  # The two readings used to share one exit code. ci.yml now asks for the pair
+  # that this repository can act on, and these pin both halves - a flag that is
+  # only exercised by a workflow file is a flag nothing tests.
+
+  def test_undeclared_drift_can_be_reported_without_failing
+    assert_equal 0, run_gate(diverging_log("367-002", "412-001"), "# nothing declared\n",
+                             ["--on-undeclared", "notice"]),
+                 "the spec moving is not this repository's failure; #2706 moved it to a pull request"
+  end
+
+  def test_the_strict_reading_is_still_the_default
+    assert_equal 1, run_gate(diverging_log("367-002"), "# nothing declared\n"),
+                 "release.yml and a hand run get the strictest reading without passing a flag"
+  end
+
+  def test_a_stale_declaration_fails_under_the_flag_ci_passes
+    assert_equal 1, run_gate(clean_log, "367-002  # closed by a bump, row not yet dropped\n",
+                             ["--on-stale", "error"]),
+                 "a row the measurement contradicts is this repository disagreeing with itself"
+  end
+
+  def test_a_stale_row_fails_even_while_undeclared_drift_only_reports
+    # The exact pair ci.yml passes, and the combination a single exit code could
+    # not express: report what upstream caused, refuse what this repository did.
+    assert_equal 1, run_gate(diverging_log("412-001"), "367-002  # no longer diverges\n",
+                             ["--on-undeclared", "notice", "--on-stale", "error"]),
+                 "the stale row must still fail with undeclared drift demoted to a notice"
+  end
+
+  def test_the_measurement_guards_survive_both_flags
+    # Not "upstream moved" but "nothing was measured", so no flag may weaken it.
+    flags = ["--on-undeclared", "notice", "--on-stale", "error"]
+    assert_equal 1, run_gate("nothing was measured here\n", "", flags),
+                 "a log with no headline measured nothing, whatever the flags say"
+    partial = "corpus mismatch: 367-002\n" \
+              "50 of 1475 corpus documents render differently from the spec\n"
+    assert_equal 1, run_gate(partial, "367-002\n", flags),
+                 "a headline its per-document lines do not account for is not a measurement"
+  end
+
+  # The handoff to scripts/declare-spec-drift.sh. The file is the only thing
+  # that reaches the automation, so an empty one and a missing one must mean
+  # different things: measured and clear, versus never got there.
+  def test_the_undeclared_rows_are_written_for_the_automation
+    rows = undeclared_file(diverging_log("367-002", "412-001"), "412-001\n")
+    assert_equal ["367-002"], rows,
+                 "the automation declares exactly the rows the ledger lacks"
+  end
+
+  def test_an_empty_undeclared_file_is_written_when_nothing_is_undeclared
+    assert_equal [], undeclared_file(clean_log, ""),
+                 "empty means measured and clear; absence must not be able to mean that too"
+  end
+
+  def test_no_undeclared_file_is_written_when_nothing_was_measured
+    assert_nil undeclared_file("nothing was measured here\n", ""),
+               "a run that measured nothing must leave the automation nothing to read"
+  end
+
   # The release half of the split.
   def test_release_mode_refuses_a_non_empty_ledger
     assert_equal 1, run_gate(nil, "367-002\n", ["--require-empty-ledger"]),
@@ -132,6 +194,74 @@ class SpecDriftGateTest < Minitest::Test
 
   def test_release_mode_accepts_an_empty_ledger
     assert_equal 0, run_gate(nil, "# only comments\n", ["--require-empty-ledger"])
+  end
+
+  # Returns the written rows, or nil when the script wrote no file at all.
+  def undeclared_file(log_body, ledger_body)
+    Dir.mktmpdir("drift-gate") do |dir|
+      log = File.join(dir, "drift.log")
+      ledger = File.join(dir, "ledger.txt")
+      out = File.join(dir, "undeclared.txt")
+      File.write(log, log_body)
+      File.write(ledger, ledger_body)
+      system("python3", SCRIPT, "--ledger", ledger, "--log", log,
+             "--on-undeclared", "notice", "--write-undeclared", out,
+             out: File::NULL, err: File::NULL)
+      next nil unless File.exist?(out)
+
+      File.read(out).split("\n").reject(&:empty?)
+    end
+  end
+
+  # ---- the wiring, not only the script -----------------------------------
+  #
+  # Every assertion above is about flags, and a flag no workflow passes changes
+  # nothing. These read ci.yml, because the whole ruling lives in which pair of
+  # flags that file chooses and on which events the pull request opens.
+
+  def ci
+    @ci ||= YAML.safe_load_file(File.join(ROOT, ".github/workflows/ci.yml"), aliases: true)
+  end
+
+  def drift_step
+    ci.dig("jobs", "corpus-drift", "steps")
+      .find { |step| step["run"].to_s.include?("check-spec-drift.py") }
+  end
+
+  def test_ci_demotes_undeclared_drift_and_gates_on_a_false_declaration
+    run = drift_step.fetch("run")
+
+    assert_includes run, "--on-undeclared notice",
+                    "ci.yml gating on undeclared drift is what reddened main for a spec change " \
+                    "nobody here made (markup-carve/carve#2706, #157)"
+    assert_includes run, "--on-stale error",
+                    "the half this repository can clear must stay a gate"
+  end
+
+  def test_ci_hands_the_undeclared_rows_to_the_automation
+    assert_includes drift_step.fetch("run"), "--write-undeclared",
+                    "without the file the scheduled job has nothing to open a pull request about"
+  end
+
+  def test_the_pull_request_opens_on_the_schedule_only
+    condition = ci.dig("jobs", "declare-drift", "if").to_s
+
+    assert_includes condition, "schedule"
+    assert_includes condition, "workflow_dispatch"
+    assert_includes condition, "refs/heads/main"
+    refute_includes condition, "pull_request",
+                    "a contributor's pull request is not the place to learn the spec moved, and " \
+                    "a bot opening one per topic branch is how a filer gets muted"
+  end
+
+  def test_only_that_job_runs_the_automation
+    runners = ci.fetch("jobs").select do |_id, job|
+      Array(job["steps"]).any? { |step| step["run"].to_s.include?("declare-spec-drift.sh") }
+    end
+
+    assert_equal ["declare-drift"], runners.keys,
+                 "the pull request channel must have exactly one caller, or two of them race " \
+                 "over one branch"
   end
 
   # The ledger this repository actually ships has to parse under the same reader,
