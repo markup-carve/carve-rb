@@ -1,0 +1,205 @@
+name: Binding parity
+
+# Split out of ci.yml so it has no pull_request trigger: there it was a job-level
+# `if:` that showed up as a skipped check on every pull request.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "15 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  # DOES THE GEM STILL REPORT WHAT CARVE-RS PARSES? Nothing here asked.
+  #
+  # Every check in ci.yml compares this gem to its own PINNED WORLD - the corpus the
+  # pinned engine's spec gitlink names, walked by ledgers built from that same
+  # corpus - and a stale pin is self-consistent inside it. So the drift was
+  # found twice inside a week by markup-carve/carve's nightly
+  # `scripts/ast-conformance.mjs`, in another repository: once on a pin 28
+  # commits behind (#82), once on a pin ONE DAY old (#84). The long comment at
+  # the top of test/binding_parity_test.rb goes through why each check here was
+  # blind to it, and shows the measurement that rules out comparing the gem
+  # against the engine it was BUILT FROM: one revision compared with itself
+  # agrees with itself, on the stale pin and the current one alike.
+  #
+  # So the reference is carve-rs at MAIN, and the corpus is spec main. Both are
+  # outside the pinned world, which is the whole point; either alone leaves half
+  # the drift invisible.
+  #
+  # WHY IT IS NOT ON pull_request, said plainly, because that is a real
+  # limitation and not an oversight. carve-rs merges AST-affecting changes
+  # daily: measured on 2026-08-23, the pin merged the DAY BEFORE already
+  # produced a different tree from carve-rs main on 105 of 1356 documents, all
+  # of them span changes nobody here caused. A pull-request gate in that state
+  # is red for a reason that has nothing to do with its diff, with the fix in
+  # another repository - the trap #78 had to re-aim the corpus gate out of, and
+  # the reason `engine-pin` is an age bound rather than a distance check.
+  #
+  # On the schedule, that same redness is exactly the signal wanted, and its
+  # clearing action is taken HERE: bump ext/carve/Cargo.toml and the lock. This
+  # does not widen what CI blocks; it moves a detector this repository was
+  # borrowing from another repository into this repository.
+  #
+  # THE PULL-REQUEST BLOCK LIVES IN corpus-drift IN ci.yml, and that is the answer
+  # to markup-carve/carve-rb#100 rather than dropping this `if:`. Two reasons,
+  # in order of weight:
+  #
+  #   - UNIT. This job compares AST TREES, which carry byte offsets, so a span
+  #     change nobody here caused moves a hundred documents with the rendered
+  #     HTML byte-identical: 105 of 1356 on a pin merged the day before. There
+  #     is no honest way to declare that window document by document, because
+  #     the rows would turn over daily and describe nothing a reader of this
+  #     repository can act on. corpus-drift asks the question a consumer of the
+  #     gem can feel - does the published artifact still render the spec - and
+  #     that answer is stable enough to be written down.
+  #   - COST, secondary but real. This job does TWO Rust builds: `cargo build
+  #     --release` of carve-rs main's CLI plus `rake compile` of the extension,
+  #     each behind an apt install of libclang. corpus-drift reuses the .gem the
+  #     build job already produced and compiles once, inside `gem install`. So
+  #     the cheaper detector is also the one with the right unit; if it were only
+  #     cost, the answer would have been to run this on pull requests anyway.
+  #
+  # What that costs, stated rather than hidden: a carve-rs change that alters no
+  # rendered HTML still reaches main here unblocked, and is caught the next
+  # morning by this job. That is a narrower hole than the one #100 measured,
+  # where NOTHING blocked and 50 documents rendered wrongly through a green PR.
+  binding-parity:
+    name: The gem's tree is carve-rs's tree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # main, deliberately unpinned: the reference is what carve-rs does TODAY.
+      - name: Check out carve-rs at main
+        uses: actions/checkout@v4
+        with:
+          repository: markup-carve/carve-rs
+          path: carve-rs
+          # fetch-depth: 0, not `fetch-tags: true`. The pin is a published
+          # version and its release tag names an older commit, but fetch-tags
+          # only drops checkout's `--no-tags`: at the default depth of 1 git
+          # auto-follows tags into a history holding one commit and brings
+          # none. So `--print engine` could not resolve the tag, and the
+          # 2026-09-24 failure printed `ext/carve/Cargo.toml pins (could not be
+          # resolved)` where the pin belongs. The other two carve-rs checkouts
+          # here already spell it this way.
+          fetch-depth: 0
+
+      # main, deliberately: a document the spec gained after the pinned engine's
+      # `tests/spec` gitlink is precisely the one the gated corpus cannot hold,
+      # and one of the three documents the 2026-08-22 drift showed up on was
+      # exactly that.
+      - name: Check out the spec corpus at main
+        uses: actions/checkout@v4
+        with:
+          repository: markup-carve/carve
+          path: spec
+
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install libclang (rb-sys bindgen)
+        # BOUNDED AND RETRIED, for the reason spelled out in the build job: bare
+        # `apt-get` has no timeout, and a wedged mirror is indistinguishable
+        # from a slow compile until the 6h runner limit.
+        run: |
+          for attempt in 1 2 3; do
+            if timeout 240 sudo apt-get update && timeout 240 sudo apt-get install -y libclang-dev; then
+              exit 0
+            fi
+            echo "::warning::apt attempt ${attempt} failed or timed out; retrying"
+            sleep 10
+          done
+          echo "::error::apt-get could not install libclang-dev after 3 attempts"
+          exit 1
+
+      - name: Build the carve-rs CLI at main
+        id: engine
+        run: |
+          cargo build --release --bin carve --manifest-path carve-rs/Cargo.toml
+          mkdir -p "$RUNNER_TEMP/engines"
+          cp carve-rs/target/release/carve "$RUNNER_TEMP/engines/carve-main"
+          echo "rev=$(git -C carve-rs rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # THE ENGINE THIS GEM EMBEDS, built from the revision the pin resolves
+      # to. Its comparison is the one with no window, so it has to be a real
+      # build of that revision rather than the binary above under another name;
+      # copied aside for the same reason, since both builds write
+      # target/release/carve.
+      - name: Build the carve-rs CLI at the pinned revision
+        run: |
+          rev="$(python3 scripts/pinned-spec-commit.py --print engine \
+            --engine carve-rs \
+            --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock)"
+          git -C carve-rs worktree add --detach ../carve-rs-pinned "$rev"
+          cargo build --release --bin carve --manifest-path carve-rs-pinned/Cargo.toml
+          cp carve-rs-pinned/target/release/carve "$RUNNER_TEMP/engines/carve-pinned"
+
+      - name: Compile the extension from the pinned engine
+        run: |
+          bundle install
+          bundle exec rake compile
+
+      # WHICH OF THE TWO REDS IS THIS? Since #136 the pin is a published crate,
+      # so a difference below is this gem's to fix only while a newer
+      # carve-lang exists to move to. Between a carve-rs merge and its release
+      # there is none, and the old verdict asked for an edit nobody could
+      # write. This resolves the fact that tells them apart; the test refuses
+      # to guess when it is missing.
+      - name: Resolve the newest released carve-lang
+        id: published
+        run: |
+          version="$(timeout 120 python3 scripts/newest-published-engine.py)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "the newest released engine is carve-lang $version"
+
+      # The gem's tree against both binaries, over spec main. CARVE_REQUIRE_PARITY
+      # sits next to the variables it guards so that dropping the wiring cannot
+      # quietly drop the guard with it: without it a renamed variable makes a
+      # comparison SKIP and exit 0.
+      - name: The gem's tree matches the engine it embeds, and carve-rs at main
+        env:
+          CARVE_ENGINE_BIN: ${{ runner.temp }}/engines/carve-main
+          CARVE_ENGINE_REV: ${{ steps.engine.outputs.rev }}
+          CARVE_PINNED_ENGINE_BIN: ${{ runner.temp }}/engines/carve-pinned
+          CARVE_PARITY_CORPUS: ${{ github.workspace }}/spec/tests/corpus
+          CARVE_PUBLISHED_ENGINE: ${{ steps.published.outputs.version }}
+          CARVE_REQUIRE_PARITY: "1"
+        run: bundle exec ruby -Ilib -Itest test/binding_parity_test.rb
+
+  # The same filer ci.yml runs, scoped so this workflow's ticket and ci.yml's do
+  # not find, edit or close each other.
+  verdict:
+    name: The verdict reaches a person
+    if: always()
+    needs: [binding-parity]
+    concurrency:
+      group: binding-parity-verdict-${{ github.ref }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: File the verdict where someone reads it
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          HEAD_SHA: ${{ github.sha }}
+          REF_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          VERDICT_JOB_NAME: The verdict reaches a person
+          VERDICT_SCOPE: Binding parity
+        run: bash scripts/file-ci-verdict.sh

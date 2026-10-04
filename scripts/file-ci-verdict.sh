@@ -12,9 +12,16 @@ set -euo pipefail
 : "${REPO:?}" "${RUN_ID:?}" "${RUN_URL:?}" "${HEAD_SHA:?}"
 : "${REF_NAME:?}" "${DEFAULT_BRANCH:?}" "${EVENT_NAME:?}" "${VERDICT_JOB_NAME:?}"
 
-MARKER="<!-- ci-verdict ref=$REF_NAME -->"
+# VERDICT_SCOPE gives a second workflow its own ticket. Unset keeps ci.yml's
+# marker byte-identical, so its open ticket is still found.
+if [ -n "${VERDICT_SCOPE:-}" ]; then
+  MARKER="<!-- ci-verdict ref=$REF_NAME scope=$VERDICT_SCOPE -->"
+  TITLE="$VERDICT_SCOPE is failing on $REF_NAME"
+else
+  MARKER="<!-- ci-verdict ref=$REF_NAME -->"
+  TITLE="CI is failing on $REF_NAME"
+fi
 JOBS_OPEN="<!-- ci-verdict-jobs"
-TITLE="CI is failing on $REF_NAME"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 

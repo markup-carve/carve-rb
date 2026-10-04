@@ -32,7 +32,7 @@ class CiVerdictTest < Minitest::Test
     { "name" => name, "conclusion" => conclusion, "status" => "completed" }
   end
 
-  def run_script(jobs:, issues: [], ref: "main", event: "schedule")
+  def run_script(jobs:, issues: [], ref: "main", event: "schedule", scope: nil)
     Dir.mktmpdir do |dir|
       File.write(File.join(dir, "jobs.json"), JSON.generate({ "jobs" => jobs }))
       File.write(File.join(dir, "issues.json"), JSON.generate(issues))
@@ -54,6 +54,7 @@ class CiVerdictTest < Minitest::Test
         "VERDICT_JOB_NAME" => SELF_NAME,
         "GITHUB_STEP_SUMMARY" => "",
       }
+      env["VERDICT_SCOPE"] = scope if scope
       out = IO.popen(env, ["bash", SCRIPT], err: %i[child out], &:read)
       calls = File.exist?(File.join(dir, "calls.log")) ? File.read(File.join(dir, "calls.log")) : ""
       body = File.exist?(File.join(dir, "sent-body.md")) ? File.read(File.join(dir, "sent-body.md")) : ""
@@ -105,6 +106,31 @@ class CiVerdictTest < Minitest::Test
     assert_includes body, MARKER, "the ticket carries no marker, so the next red run cannot find it"
     assert_includes body, "The gem's tree is carve-rs's tree",
                     "the ticket does not name the job that failed"
+  end
+
+  # binding-parity.yml files through the same script. Sharing ci.yml's marker
+  # would let a green run of one workflow close the other's ticket.
+  def test_a_scoped_verdict_keeps_its_own_ticket
+    calls, body, = run_script(jobs: RED, issues: [open_issue(42, ["build"])], scope: "Binding parity")
+
+    refute_includes calls, "issue edit 42", "the scoped verdict edited ci.yml's ticket. calls:\n#{calls}"
+    assert_includes calls, "issue create"
+    assert_includes body, "<!-- ci-verdict ref=main scope=Binding parity -->"
+    refute_includes body, MARKER
+  end
+
+  def test_the_binding_parity_workflow_runs_a_scoped_filer
+    wf = YAML.safe_load_file(File.join(ROOT, ".github/workflows/binding-parity.yml"), aliases: true)
+    triggers = wf["on"] || wf[true]
+    refute_includes triggers.keys, "pull_request",
+                    "binding-parity compares against carve-rs main, which moves without a commit here"
+    id, job_def = wf.fetch("jobs").find { |_id, j| Array(j["steps"]).any? { |st| st["run"].to_s.include?("file-ci-verdict.sh") } }
+    refute_nil id, "binding-parity.yml lost its filer, so a red scheduled run is silent again"
+    assert_equal "always()", job_def["if"].to_s.strip
+    assert_empty wf.fetch("jobs").keys - [id] - Array(job_def["needs"])
+    step = job_def["steps"].find { |st| st["run"].to_s.include?("file-ci-verdict.sh") }
+    refute_empty step.dig("env", "VERDICT_SCOPE").to_s
+    assert_equal SELF_NAME, step.dig("env", "VERDICT_JOB_NAME")
   end
 
   def test_a_second_red_run_edits_the_ticket_it_already_filed
