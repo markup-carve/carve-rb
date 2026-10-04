@@ -269,18 +269,9 @@ jobs:
       # nothing and still exit 0.
       - name: The release notes match this tag's changelog
         shell: bash
-        if: github.event_name != 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          release="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate \
-            | jq -cs --arg tag "$GITHUB_REF_NAME" '[.[][] | select(.tag_name == $tag)] | first // empty')"
-          if [ -z "$release" ]; then
-            echo "::error::No release for $GITHUB_REF_NAME. Write its notes first."
-            exit 1
-          fi
-          printf '%s' "$release" | python tools/check-release-notes.py \
-            --tag "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY"
+        run: bash tools/run-release-notes-gate.sh "$GITHUB_REF_NAME"
 
       - name: Download the verified gem
         uses: actions/download-artifact@v4
