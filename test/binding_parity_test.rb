@@ -272,7 +272,7 @@ class BindingParityTest < Minitest::Test
     refute_nil ENGINE,
                "CARVE_REQUIRE_PARITY=1 but CARVE_ENGINE_BIN is unset, so the parity comparison " \
                "below skips and this run reports success having compared nothing. See the " \
-               "binding-parity job in .github/workflows/ci.yml."
+               "binding-parity job in .github/workflows/binding-parity.yml."
     refute_nil CORPUS,
                "CARVE_REQUIRE_PARITY=1 but CARVE_PARITY_CORPUS is unset, so the parity " \
                "comparison below skips and this run reports success having compared nothing."
@@ -280,7 +280,7 @@ class BindingParityTest < Minitest::Test
                  "CARVE_REQUIRE_PARITY=1 but CARVE_PUBLISHED_ENGINE is unset, so the verdict " \
                  "below cannot tell a stale pin from the window between a carve-rs merge and " \
                  "its release, and reports every difference as a stale pin. The resolver step " \
-                 "is `Resolve the newest released carve-lang` in .github/workflows/ci.yml."
+                 "is `Resolve the newest released carve-lang` in .github/workflows/binding-parity.yml."
     refute_nil PINNED_ENGINE,
                "CARVE_REQUIRE_PARITY=1 but CARVE_PINNED_ENGINE_BIN is unset, so the comparison " \
                "against the engine this gem embeds skips. That is the one with no window, and " \
@@ -293,7 +293,7 @@ class BindingParityTest < Minitest::Test
   # one `carve --json` asks. Publishing a new carve-lang would not fix it,
   # which is why this one never softens.
   def test_the_gem_reports_the_same_tree_as_the_engine_it_embeds
-    skip "CARVE_PINNED_ENGINE_BIN / CARVE_PARITY_CORPUS not set (see .github/workflows/ci.yml)" \
+    skip "CARVE_PINNED_ENGINE_BIN / CARVE_PARITY_CORPUS not set (see .github/workflows/binding-parity.yml)" \
       unless PINNED_ENGINE && CORPUS
 
     assert File.executable?(PINNED_ENGINE),
@@ -341,7 +341,7 @@ class BindingParityTest < Minitest::Test
   end
 
   def test_the_gem_reports_the_same_tree_as_carve_rs
-    skip "CARVE_ENGINE_BIN / CARVE_PARITY_CORPUS not set (see .github/workflows/ci.yml)" unless ENGINE && CORPUS
+    skip "CARVE_ENGINE_BIN / CARVE_PARITY_CORPUS not set (see .github/workflows/binding-parity.yml)" unless ENGINE && CORPUS
 
     assert File.executable?(ENGINE),
            "CARVE_ENGINE_BIN=#{ENGINE} is not an executable. Build it from a carve-rs checkout " \
@@ -387,7 +387,7 @@ class BindingParityTest < Minitest::Test
     if PUBLISHED.empty?
       return "CARVE_PUBLISHED_ENGINE is unset, so this run cannot tell a stale pin from the " \
              "window between a carve-rs merge and its release. See the binding-parity job in " \
-             ".github/workflows/ci.yml; the pin is carve-lang #{version}."
+             ".github/workflows/binding-parity.yml; the pin is carve-lang #{version}."
     end
 
     if PUBLISHED == version

@@ -1,12 +1,9 @@
 name: Release notes check
 
 on:
+  # Every pull request, no paths filter: the suite takes under a second, and a
+  # check that reports on every PR is one branch protection can require.
   pull_request:
-    paths:
-      - 'tools/check-release-notes.py'
-      - 'tools/test-release-notes.py'
-      - '.github/workflows/release.yml'
-      - '.github/workflows/release-notes.yml'
   push:
     branches: [main]
     paths:
