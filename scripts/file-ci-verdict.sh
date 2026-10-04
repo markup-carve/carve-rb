@@ -79,6 +79,17 @@ failed="$(jq_jobs '
   | select(.conclusion as $c | ["success", "skipped", "neutral"] | index($c) | not)
   | "- `" + .name + "` (" + .conclusion + ")"')"
 
+# DRIFT_JOBS names green jobs whose measurement found upstream drift. They are
+# filed like a failure, but the run stays green: the ticket is the signal.
+drifted=""
+while IFS= read -r name; do
+  [ -n "$name" ] || continue
+  drifted+="- \`$name\` (drift: the run stays green, this ticket is the signal)"$'\n'
+done <<< "${DRIFT_JOBS:-}"
+if [ -n "$drifted" ]; then
+  failed="$(printf '%s\n%s' "$failed" "${drifted%$'\n'}" | sed '/^$/d')"
+fi
+
 # The jobs that actually reached a verdict, discovered from the run rather than
 # listed here: a hand-kept list goes stale the first time a job is added, and a
 # job it forgot to name is a job whose failure is invisible again.
@@ -153,10 +164,10 @@ fi
   cat "$WORK/required.txt"
   echo "-->"
   echo
-  echo "CI is failing on \`$REF_NAME\`. The corpus and binding jobs here can go red"
-  echo "without a commit in this repository - the spec and the engine both move on"
-  echo "their own - so a scheduled run is what finds it, and no pull request gate"
-  echo "will show it to you."
+  echo "CI is failing or found drift on \`$REF_NAME\`. The corpus and binding jobs here"
+  echo "can find drift without a commit in this repository - the spec and the"
+  echo "engine both move on their own - so a scheduled run is what finds it, and no"
+  echo "pull request gate will show it to you."
   echo
   echo "| | |"
   echo "| --- | --- |"
@@ -165,13 +176,13 @@ fi
   echo "| ref | \`$REF_NAME\` |"
   echo "| trigger | \`$EVENT_NAME\` |"
   echo
-  echo "### Failing jobs"
+  echo "### Failing or drifting jobs"
   echo
   printf '%s\n' "$failed"
   echo
   echo "### Before acting on this"
   echo
-  echo "Read the run's own error before anything else. Both drift jobs name the"
+  echo "Read the run's own log before anything else. Both drift jobs name the"
   echo "remedy in full, including which file to edit, and that message is more"
   echo "specific than this ticket can be."
   echo
@@ -180,8 +191,8 @@ fi
   echo "\`ext/carve/Cargo.lock\`, and let this run again."
   echo
   echo "This ticket is filed and maintained by the workflow. It is EDITED by each"
-  echo "later red run and CLOSED by the first green one. Closing it by hand does"
-  echo "not silence it: the next red run files a new one."
+  echo "later red or drifting run and CLOSED by the first clean one. Closing it by"
+  echo "hand does not silence it: the next such run files a new one."
 } > "$WORK/verdict.md"
 
 # One ordering is knowingly left unhandled: a newer GREEN run closing the ticket
@@ -203,4 +214,4 @@ else
     --body-file "$WORK/verdict.md" --label bug --label area:tooling
 fi
 
-printf 'CI is red on `%s`. Failing jobs:\n\n%s\n' "$HEAD_SHA" "$failed" | summary
+printf 'Ticket filed for `%s`. Failing or drifting jobs:\n\n%s\n' "$HEAD_SHA" "$failed" | summary

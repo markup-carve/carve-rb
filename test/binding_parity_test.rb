@@ -121,6 +121,11 @@ class BindingParityTest < Minitest::Test
   # rebuild the self-consistency this file exists to break.
   CORPUS = ENV.fetch("CARVE_PARITY_CORPUS", nil)
 
+  # Set by the scheduled job. A stale pin against a newer release is upstream
+  # drift, so the verdict is written here for the filer and the test passes;
+  # unset (local, any other caller) it fails as before.
+  DRIFT_VERDICT_FILE = ENV.fetch("CARVE_DRIFT_VERDICT_FILE", nil)
+
   def corpus_files
     Dir.glob(File.join(CORPUS, "*.crv")).sort
   end
@@ -179,6 +184,15 @@ class BindingParityTest < Minitest::Test
     return false if published.nil? || published.empty?
 
     pinned == published
+  end
+
+  # A newer release exists to move to, so the difference is drift with a bump as
+  # its remedy. An unresolved pin or release is a broken check, not drift.
+  def self.stale_pin?(pinned, published)
+    return false if pinned.nil? || pinned.empty?
+    return false if published.nil? || published.empty?
+
+    pinned != published
   end
 
   # The engine's own answer for one document, from whichever `carve` binary
@@ -321,6 +335,13 @@ class BindingParityTest < Minitest::Test
     refute BindingParityTest.publication_window?("0.1.6", "")
   end
 
+  def test_only_a_resolved_pin_behind_a_release_is_drift
+    assert BindingParityTest.stale_pin?("0.1.6", "0.1.7")
+    refute BindingParityTest.stale_pin?("0.1.6", "0.1.6")
+    refute BindingParityTest.stale_pin?(nil, "0.1.7")
+    refute BindingParityTest.stale_pin?("0.1.6", "")
+  end
+
   # The ordering the sparse index is read with. `sort` puts 0.1.10 before
   # 0.1.9, and a wrong newest here turns a stale pin into a declared window.
   def test_the_newest_release_is_ordered_numerically_and_skips_yanks
@@ -360,15 +381,24 @@ class BindingParityTest < Minitest::Test
     window = diverging.any? && self.class.publication_window?(version, PUBLISHED)
     report_publication_window(diverging, files.length, version) if window
 
-    assert_empty(window ? [] : diverging,
-                 "#{diverging.length} of #{files.length} corpus documents parse to a different " \
-                 "tree in this gem than in carve-rs#{ENGINE_REV ? " #{ENGINE_REV}" : ""}:\n" \
-                 "#{diverging.join("\n")}\n" \
-                 "A binding has no vote of its own: carve-rs is right by definition here, so " \
-                 "every one of these is this gem's.\n" \
-                 "#{bump_advice(version)}\n" \
-                 "A binding defect would show up in the comparison against the pinned " \
-                 "engine above, which has no window; this one is about the distance to main.")
+    message = "#{diverging.length} of #{files.length} corpus documents parse to a different " \
+              "tree in this gem than in carve-rs#{ENGINE_REV ? " #{ENGINE_REV}" : ""}:\n" \
+              "#{diverging.join("\n")}\n" \
+              "A binding has no vote of its own: carve-rs is right by definition here, so " \
+              "every one of these is this gem's.\n" \
+              "#{bump_advice(version)}\n" \
+              "A binding defect would show up in the comparison against the pinned " \
+              "engine above, which has no window; this one is about the distance to main."
+
+    if DRIFT_VERDICT_FILE && diverging.any? && self.class.stale_pin?(version, PUBLISHED)
+      File.write(DRIFT_VERDICT_FILE, "#{message}\n")
+      puts "::warning::drift verdict: #{diverging.length} of #{files.length} corpus documents, " \
+           "pin carve-lang #{version}, newest release #{PUBLISHED}. Filed as a ticket, not a failure."
+      puts message
+      return
+    end
+
+    assert_empty(window ? [] : diverging, message)
   end
 
   # What to do about it, in the terms of the pin this gem actually carries.
