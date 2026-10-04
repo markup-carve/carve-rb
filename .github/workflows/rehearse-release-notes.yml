@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   rehearse:
-    name: Release notes match the changelog
+    name: Release notes agree with the changelog
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
