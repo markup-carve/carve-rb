@@ -32,7 +32,7 @@ class CiVerdictTest < Minitest::Test
     { "name" => name, "conclusion" => conclusion, "status" => "completed" }
   end
 
-  def run_script(jobs:, issues: [], ref: "main", event: "schedule", scope: nil)
+  def run_script(jobs:, issues: [], ref: "main", event: "schedule", scope: nil, drift_jobs: nil)
     Dir.mktmpdir do |dir|
       File.write(File.join(dir, "jobs.json"), JSON.generate({ "jobs" => jobs }))
       File.write(File.join(dir, "issues.json"), JSON.generate(issues))
@@ -55,6 +55,7 @@ class CiVerdictTest < Minitest::Test
         "GITHUB_STEP_SUMMARY" => "",
       }
       env["VERDICT_SCOPE"] = scope if scope
+      env["DRIFT_JOBS"] = drift_jobs if drift_jobs
       out = IO.popen(env, ["bash", SCRIPT], err: %i[child out], &:read)
       calls = File.exist?(File.join(dir, "calls.log")) ? File.read(File.join(dir, "calls.log")) : ""
       body = File.exist?(File.join(dir, "sent-body.md")) ? File.read(File.join(dir, "sent-body.md")) : ""
@@ -117,6 +118,39 @@ class CiVerdictTest < Minitest::Test
     assert_includes calls, "issue create"
     assert_includes body, "<!-- ci-verdict ref=main scope=Binding parity -->"
     refute_includes body, MARKER
+  end
+
+  # markup-carve/carve#2706: a drift verdict files the ticket and the run stays
+  # green, so the job that found it is green and only DRIFT_JOBS carries it.
+  def test_a_green_run_with_drift_files_a_ticket
+    jobs = [job("build", "success"), job("The gem's tree is carve-rs's tree", "success")]
+    calls, body, _out, status = run_script(jobs: jobs, scope: "Binding parity",
+                                           drift_jobs: "The gem's tree is carve-rs's tree")
+
+    assert_predicate status, :success?
+    assert_includes calls, "issue create", "a drift verdict filed nothing. calls:\n#{calls}"
+    assert_includes body, "`The gem's tree is carve-rs's tree` (drift"
+  end
+
+  def test_a_green_run_with_drift_does_not_close_the_ticket
+    jobs = [job("The gem's tree is carve-rs's tree", "success")]
+    calls, = run_script(jobs: jobs, issues: [open_issue(7, ["The gem's tree is carve-rs's tree"])],
+                        drift_jobs: "The gem's tree is carve-rs's tree")
+
+    refute_includes calls, "issue close", "drift closed its own ticket. calls:\n#{calls}"
+    assert_includes calls, "issue edit 7"
+  end
+
+  def test_binding_parity_reports_drift_under_its_own_job_name
+    wf = YAML.safe_load_file(File.join(ROOT, ".github/workflows/binding-parity.yml"), aliases: true)
+    job_def = wf.fetch("jobs").fetch("binding-parity")
+    step = job_def["steps"].find { |st| st["id"] == "parity" }
+    refute_nil step, "the parity step lost its id, so its drift output reaches nobody"
+    assert_includes step["run"], "drift=#{job_def["name"]}",
+                    "the drift output names a job the filer cannot match to this one"
+    assert_equal "${{ steps.parity.outputs.drift }}", job_def.dig("outputs", "drift")
+    filer = wf.fetch("jobs").fetch("verdict")["steps"].find { |st| st["run"].to_s.include?("file-ci-verdict.sh") }
+    assert_equal "${{ needs.binding-parity.outputs.drift }}", filer.dig("env", "DRIFT_JOBS")
   end
 
   def test_the_binding_parity_workflow_runs_a_scoped_filer

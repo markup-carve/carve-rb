@@ -2,6 +2,8 @@ name: Binding parity
 
 # Split out of ci.yml so it has no pull_request trigger: there it was a job-level
 # `if:` that showed up as a skipped check on every pull request.
+# A stale-pin drift verdict files a ticket and the run stays green; a binding
+# defect, a check that could not measure, or a failed filing stays red.
 on:
   push:
     branches: [main]
@@ -36,10 +38,9 @@ jobs:
   # another repository - the trap #78 had to re-aim the corpus gate out of, and
   # the reason `engine-pin` is an age bound rather than a distance check.
   #
-  # On the schedule, that same redness is exactly the signal wanted, and its
-  # clearing action is taken HERE: bump ext/carve/Cargo.toml and the lock. This
-  # does not widen what CI blocks; it moves a detector this repository was
-  # borrowing from another repository into this repository.
+  # On the schedule, that same finding is exactly the signal wanted, and its
+  # clearing action is taken HERE: bump ext/carve/Cargo.toml and the lock. It
+  # arrives as the verdict ticket, not as a red run (markup-carve/carve#2706).
   #
   # THE PULL-REQUEST BLOCK LIVES IN corpus-drift IN ci.yml, and that is the answer
   # to markup-carve/carve-rb#100 rather than dropping this `if:`. Two reasons,
@@ -67,6 +68,8 @@ jobs:
   binding-parity:
     name: The gem's tree is carve-rs's tree
     runs-on: ubuntu-latest
+    outputs:
+      drift: ${{ steps.parity.outputs.drift }}
     steps:
       - uses: actions/checkout@v4
 
@@ -164,6 +167,7 @@ jobs:
       # quietly drop the guard with it: without it a renamed variable makes a
       # comparison SKIP and exit 0.
       - name: The gem's tree matches the engine it embeds, and carve-rs at main
+        id: parity
         env:
           CARVE_ENGINE_BIN: ${{ runner.temp }}/engines/carve-main
           CARVE_ENGINE_REV: ${{ steps.engine.outputs.rev }}
@@ -171,7 +175,14 @@ jobs:
           CARVE_PARITY_CORPUS: ${{ github.workspace }}/spec/tests/corpus
           CARVE_PUBLISHED_ENGINE: ${{ steps.published.outputs.version }}
           CARVE_REQUIRE_PARITY: "1"
-        run: bundle exec ruby -Ilib -Itest test/binding_parity_test.rb
+          CARVE_DRIFT_VERDICT_FILE: ${{ runner.temp }}/binding-drift.txt
+        run: |
+          set -euo pipefail
+          bundle exec ruby -Ilib -Itest test/binding_parity_test.rb
+          if [ -s "$CARVE_DRIFT_VERDICT_FILE" ]; then
+            # Must equal this job's `name:`; test/ci_verdict_test.rb asserts it.
+            echo "drift=The gem's tree is carve-rs's tree" >> "$GITHUB_OUTPUT"
+          fi
 
   # The same filer ci.yml runs, scoped so this workflow's ticket and ci.yml's do
   # not find, edit or close each other.
@@ -202,4 +213,5 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           VERDICT_JOB_NAME: The verdict reaches a person
           VERDICT_SCOPE: Binding parity
+          DRIFT_JOBS: ${{ needs.binding-parity.outputs.drift }}
         run: bash scripts/file-ci-verdict.sh
