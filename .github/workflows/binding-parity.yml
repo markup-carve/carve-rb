@@ -11,6 +11,9 @@ on:
     - cron: "15 6 * * *"
   workflow_dispatch:
 
+# Jobs carry an explicit timeout-minutes: without one GitHub applies a
+# 360-minute default, long enough for a stalled job to go unnoticed.
+
 jobs:
   # DOES THE GEM STILL REPORT WHAT CARVE-RS PARSES? Nothing here asked.
   #
@@ -68,6 +71,7 @@ jobs:
   binding-parity:
     name: The gem's tree is carve-rs's tree
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     outputs:
       drift: ${{ steps.parity.outputs.drift }}
     steps:
@@ -194,6 +198,7 @@ jobs:
       group: binding-parity-verdict-${{ github.ref }}
       cancel-in-progress: false
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       actions: read
       contents: read
