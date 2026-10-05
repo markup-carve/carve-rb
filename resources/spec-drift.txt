@@ -69,3 +69,7 @@
 542-a-span-across-bodies-keeps-their-header-semantics # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
 543-a-head-and-foot-consuming-all-rows-leave-no-implicit-body # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
 544-explicit-body-counts-include-native-header-cells # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
+15-heading-ids-2 # undeclared at spec main 9db4723 on 2026-10-05; the pinned engine predates it
+173-implicit-heading-references-with-no-definition # undeclared at spec main 9db4723 on 2026-10-05; the pinned engine predates it
+546-every-name-lookup-compares-case-exactly # undeclared at spec main 9db4723 on 2026-10-05; the pinned engine predates it
+546-every-name-lookup-compares-case-exactly-3 # undeclared at spec main 9db4723 on 2026-10-05; the pinned engine predates it
