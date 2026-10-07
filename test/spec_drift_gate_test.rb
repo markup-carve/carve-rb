@@ -47,6 +47,16 @@ class SpecDriftGateTest < Minitest::Test
     log.sub("corpus mismatch:", "..F.corpus mismatch:")
   end
 
+  # A ledger carrying REASONED rows. Every row needs one since
+  # markup-carve/carve-rb#174: the reason used to be discarded by the parser, so
+  # a fixture could declare a document with no justification at all and the gate
+  # could not tell. Four fixtures here did exactly that, and three of them began
+  # passing for the wrong reason rather than failing, which is why they are all
+  # routed through this.
+  def declared(*names)
+    names.map { |name| "#{name}  # carve-rs has not shipped the rule yet\n" }.join
+  end
+
   def clean_log
     "packaged gem carve-lang-0.1.2.gem: 1475 of 1475 declared corpus documents byte-identical\n"
   end
@@ -66,31 +76,72 @@ class SpecDriftGateTest < Minitest::Test
     end
   end
 
+  # THE REASON HAS TO BE READ, OR IT CANNOT EXPIRE.
+  #
+  # read_ledger used to be `line.split("#", 1)[0].strip()`, so everything after
+  # the `#` was discarded and three ledgers differing only in their reason all
+  # exited 0 (markup-carve/carve-rb#174). That is how 21 rows reading "the
+  # pinned engine predates it" survived the bump that made every one of them
+  # false (markup-carve/carve-rb#167).
+  #
+  # The pin these fixtures name is the one ext/carve/Cargo.toml carries, read
+  # from the manifest rather than written here, so a bump does not silently turn
+  # the passing case into a vacuous one.
+  def pinned_engine
+    manifest = File.read(File.join(ROOT, "ext/carve/Cargo.toml"))
+    manifest[/package = "carve-lang", version = "=([^"]+)"/, 1].then do |version|
+      version ? "carve-lang #{version}" : flunk("no engine version in ext/carve/Cargo.toml")
+    end
+  end
+
+  def test_a_row_with_no_reason_is_refused
+    assert_equal 1, run_gate(diverging_log("367-002"), "367-002\n"),
+                 "the format puts a reason after `#` and the header calls it the point of the row"
+  end
+
+  def test_a_predates_reason_that_names_no_pin_is_refused
+    ledger = "367-002  # the pinned engine predates it\n"
+    assert_equal 1, run_gate(diverging_log("367-002"), ledger),
+                 "that wording is true for one pin only and cannot expire without naming it"
+  end
+
+  def test_a_predates_reason_naming_a_superseded_pin_has_expired
+    ledger = "367-002  # the pinned engine carve-lang 0.0.1 predates it\n"
+    assert_equal 1, run_gate(diverging_log("367-002"), ledger),
+                 "a reason about an engine the manifest no longer pins is a waiver nobody re-checked"
+  end
+
+  def test_a_predates_reason_naming_the_current_pin_stands
+    ledger = "367-002  # the pinned engine #{pinned_engine} predates it\n"
+    assert_equal 0, run_gate(diverging_log("367-002"), ledger),
+                 "the reason is true while the pin it names is the pin in the manifest"
+  end
+
   def test_an_undeclared_divergence_fails
     assert_equal 1, run_gate(diverging_log("367-002", "412-001"), "# nothing declared\n"),
                  "a diverging document nobody wrote down is the state #100 found; it must fail"
   end
 
   def test_a_declared_divergence_passes
-    ledger = "# reasoned elsewhere\n367-002  # carve-rs has not shipped the rule yet\n412-001\n"
+    ledger = "# reasoned elsewhere\n" + declared("367-002", "412-001")
     assert_equal 0, run_gate(diverging_log("367-002", "412-001"), ledger),
                  "a declared window is the normal spec-ahead state and must not fail per-PR"
   end
 
   def test_one_undeclared_among_declared_still_fails
-    ledger = "367-002\n"
+    ledger = declared("367-002")
     assert_equal 1, run_gate(diverging_log("367-002", "412-001"), ledger),
                  "the verdict is per document, not a count against a threshold"
   end
 
   def test_the_first_line_is_found_when_minitest_glues_its_progress_dots_to_it
-    ledger = "367-002\n412-001\n"
+    ledger = declared("367-002", "412-001")
     assert_equal 0, run_gate(dot_glued_log("367-002", "412-001"), ledger),
                  "a progress dot in front of the first line must not hide that document"
   end
 
   def test_a_dot_glued_line_that_is_undeclared_still_fails
-    assert_equal 1, run_gate(dot_glued_log("367-002", "412-001"), "412-001\n"),
+    assert_equal 1, run_gate(dot_glued_log("367-002", "412-001"), declared("412-001")),
                  "the glued line is the one that would go missing, so it must be the one that fails"
   end
 
@@ -116,7 +167,7 @@ class SpecDriftGateTest < Minitest::Test
   def test_a_partial_mismatch_list_fails_even_when_every_printed_row_is_declared
     log = "corpus mismatch: 367-002\n" \
           "50 of 1475 corpus documents render differently from the spec\n"
-    assert_equal 1, run_gate(log, "367-002\n"),
+    assert_equal 1, run_gate(log, declared("367-002")),
                  "one printed line out of fifty counted is not a measurement of the fifty"
   end
 
@@ -163,7 +214,7 @@ class SpecDriftGateTest < Minitest::Test
                  "a log with no headline measured nothing, whatever the flags say"
     partial = "corpus mismatch: 367-002\n" \
               "50 of 1475 corpus documents render differently from the spec\n"
-    assert_equal 1, run_gate(partial, "367-002\n", flags),
+    assert_equal 1, run_gate(partial, declared("367-002"), flags),
                  "a headline its per-document lines do not account for is not a measurement"
   end
 
@@ -171,7 +222,7 @@ class SpecDriftGateTest < Minitest::Test
   # that reaches the automation, so an empty one and a missing one must mean
   # different things: measured and clear, versus never got there.
   def test_the_undeclared_rows_are_written_for_the_automation
-    rows = undeclared_file(diverging_log("367-002", "412-001"), "412-001\n")
+    rows = undeclared_file(diverging_log("367-002", "412-001"), declared("412-001"))
     assert_equal ["367-002"], rows,
                  "the automation declares exactly the rows the ledger lacks"
   end
@@ -188,7 +239,7 @@ class SpecDriftGateTest < Minitest::Test
 
   # The release half of the split.
   def test_release_mode_refuses_a_non_empty_ledger
-    assert_equal 1, run_gate(nil, "367-002\n", ["--require-empty-ledger"]),
+    assert_equal 1, run_gate(nil, declared("367-002"), ["--require-empty-ledger"]),
                  "a declared window is still open, and a tag must not ship one"
   end
 

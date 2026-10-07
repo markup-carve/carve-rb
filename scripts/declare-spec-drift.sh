@@ -163,11 +163,23 @@ fi
 
 # Append only the rows the ledger does not already carry, so a re-push over a
 # preserved branch does not duplicate a line somebody already wrote.
+# The reason NAMES the engine pin it was true for. "The pinned engine predates
+# it" is a claim about a moment, false the instant the pin moves, and
+# check-spec-drift.py now expires a row whose named pin is not the one the
+# manifest carries (markup-carve/carve-rb#167, #174). Without the pin in the
+# wording there is nothing for it to compare, and the gate refuses the row.
 python3 - "$LEDGER" "$SPEC" "${ROWS[@]}" <<'PY'
-import datetime, sys
+import datetime, importlib.util, sys
 from pathlib import Path
 
 ledger, spec, rows = Path(sys.argv[1]), sys.argv[2], sys.argv[3:]
+reader = Path("scripts/pinned-spec-commit.py")
+loader = importlib.util.spec_from_file_location("pinned_spec_commit", reader)
+module = importlib.util.module_from_spec(loader)
+loader.loader.exec_module(module)
+kind, value = module.manifest_pin(Path("ext/carve/Cargo.toml"))
+pin = f"carve-lang {value}" if kind == "version" else f"rev {value}"
+
 text = ledger.read_text(encoding="utf-8")
 have = {line.split("#", 1)[0].strip() for line in text.splitlines()}
 today = datetime.date.today().isoformat()
@@ -175,7 +187,7 @@ new = [row for row in rows if row not in have]
 if new:
     if not text.endswith("\n"):
         text += "\n"
-    reason = f"# undeclared at spec main {spec} on {today}; the pinned engine predates it"
+    reason = f"# undeclared at spec main {spec} on {today}; the pinned engine {pin} predates it"
     text += "".join(f"{name} {reason}\n" for name in new)
     ledger.write_text(text, encoding="utf-8")
 print(f"declare-spec-drift: {len(new)} row(s) added to {ledger}")
