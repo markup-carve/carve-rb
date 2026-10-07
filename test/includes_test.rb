@@ -199,7 +199,7 @@ class IncludesTest < Minitest::Test
   # The RULE ID is deliberately asserted as the engine spells it today,
   # `include-heading-id-rename`, even though it now fires for a paragraph. That
   # mismatch is upstream's to settle (reported as
-  # markup-carve/carve-rb#__RENAME_TICKET__); pinning the current spelling here
+  # markup-carve/carve-rb#172); pinning the current spelling here
   # means a host matching on the rule id finds out from this suite when it
   # changes, rather than from its own logs.
   def test_a_colliding_paragraph_id_is_renamed_and_reported
