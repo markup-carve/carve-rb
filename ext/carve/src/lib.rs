@@ -27,8 +27,12 @@
 use carve_rs::extensions::registry;
 use carve_rs::{CarveExtension, Mode, Options, Profile, StaticRenderers};
 use magnus::value::{InnerValue, Opaque};
-use magnus::{function, prelude::*, Error, RArray, RHash, Ruby, Value};
+use magnus::{function, prelude::*, Error, ExceptionClass, RArray, RHash, Ruby, Value};
+use std::any::Any;
+use std::cell::RefCell;
+use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
+use std::sync::Once;
 
 /// HTML-escape a string for the renderer-failure fallback path.
 ///
@@ -732,6 +736,192 @@ fn stamp_needs_review(source: String, current_version: Option<String>) -> bool {
     carve_rs::needs_review(&source, &current)
 }
 
+/// Panic deliberately inside the extension, so a test can observe the FFI
+/// panic contract rather than assuming it.
+///
+/// Nothing but a test calls this. It exists because no Carve input panics the
+/// pinned engine: the one that did (`|{.r}`) is fixed, and a test that cannot
+/// reach a panic cannot tell a working safety net from a missing one.
+fn panic_probe() -> String {
+    panic!("deliberate panic from the Carve extension panic probe");
+}
+
+// ---------------------------------------------------------------------------
+// FFI panic safety
+// ---------------------------------------------------------------------------
+//
+// magnus wraps every exposed call in catch_unwind, but `Error::from_panic`
+// raises the caught panic as Ruby's `fatal`, and Ruby does not let a host stop
+// a `fatal` -- not with `rescue Exception`, not with anything. So the unwind
+// that was supposed to protect the host still ends the process, and magnus
+// offers no way to choose a different class.
+//
+// Everything Ruby can reach therefore runs inside `guard`, which catches the
+// unwind FIRST and raises `Carve::EnginePanic` (a StandardError) instead. The
+// `panic = "unwind"` compile flag is still what makes any of this possible,
+// which is why `scripts/check-panic-unwind.sh` stays.
+
+thread_local! {
+    /// Where the most recent panic on this thread came from.
+    ///
+    /// The payload `catch_unwind` hands back carries the message but not the
+    /// location, and the location is the half that identifies the engine bug.
+    static PANIC_LOCATION: RefCell<Option<String>> = const { RefCell::new(None) };
+}
+
+/// Record panic locations without taking over panic reporting.
+///
+/// The previous hook still runs, so the `thread '<unnamed>' panicked at ...`
+/// line and any `RUST_BACKTRACE` output a developer relies on are unchanged.
+fn install_panic_hook() {
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        let previous = panic::take_hook();
+        panic::set_hook(Box::new(move |info| {
+            let location = info
+                .location()
+                .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()));
+            PANIC_LOCATION.with(|slot| *slot.borrow_mut() = location);
+            previous(info);
+        }));
+    });
+}
+
+/// `Carve::EnginePanic`, or `RuntimeError` if the class cannot be looked up.
+///
+/// The fallback is still rescuable, which is the property that matters; losing
+/// the specific class is better than losing the process.
+fn engine_panic_class(ruby: &Ruby) -> ExceptionClass {
+    ruby.define_module("Carve")
+        .ok()
+        .and_then(|module| module.const_get::<_, ExceptionClass>("EnginePanic").ok())
+        .unwrap_or_else(|| ruby.exception_runtime_error())
+}
+
+/// Turn a caught unwind payload into a rescuable Ruby exception.
+fn engine_panic_error(payload: Box<dyn Any + Send>) -> Error {
+    let message = if let Some(m) = payload.downcast_ref::<&'static str>() {
+        (*m).to_string()
+    } else if let Some(m) = payload.downcast_ref::<String>() {
+        m.clone()
+    } else {
+        "panic".to_string()
+    };
+    let message = match PANIC_LOCATION.with(|slot| slot.borrow_mut().take()) {
+        Some(at) => format!("the Carve engine panicked at {at}: {message}"),
+        None => format!("the Carve engine panicked: {message}"),
+    };
+
+    // Unchecked for the same reason magnus does it in `Error::from_panic`: this
+    // only runs while a Ruby thread is calling into the extension.
+    let ruby = unsafe { Ruby::get_unchecked() };
+    Error::new(engine_panic_class(&ruby), message)
+}
+
+/// Run an exposed call with the panic net in front of magnus's.
+fn guard<T>(f: impl FnOnce() -> Result<T, Error>) -> Result<T, Error> {
+    match panic::catch_unwind(AssertUnwindSafe(f)) {
+        Ok(result) => result,
+        Err(payload) => Err(engine_panic_error(payload)),
+    }
+}
+
+/// Declare the guarded wrapper Ruby is given for an implementation function.
+///
+/// `=>` wraps an infallible implementation, `=>?` one that already returns
+/// `Result`. Registering a bare implementation instead of its wrapper would
+/// leave that one call raising `fatal` again, so `test/panic_unwind_test.rb`
+/// reads the `function!` registrations below and fails on any name that is not
+/// a `g_` wrapper.
+macro_rules! guarded {
+    ($wrapper:ident ( $($arg:ident : $ty:ty),* ) -> $ret:ty => $inner:ident) => {
+        #[allow(clippy::too_many_arguments)]
+        fn $wrapper($($arg: $ty),*) -> Result<$ret, Error> {
+            guard(|| Ok($inner($($arg),*)))
+        }
+    };
+    ($wrapper:ident ( $($arg:ident : $ty:ty),* ) -> $ret:ty =>? $inner:ident) => {
+        #[allow(clippy::too_many_arguments)]
+        fn $wrapper($($arg: $ty),*) -> Result<$ret, Error> {
+            guard(|| $inner($($arg),*))
+        }
+    };
+}
+
+guarded!(g_to_html(source: String) -> String => to_html);
+guarded!(g_to_markdown(source: String) -> String => to_markdown);
+guarded!(g_to_plain_text(source: String) -> String => to_plain_text);
+guarded!(g_to_ansi(source: String) -> String => to_ansi);
+guarded!(g_to_carve(source: String) -> String => to_carve);
+guarded!(g_from_markdown_json(source: String) -> String => from_markdown_json);
+guarded!(g_to_ast_json(source: String) -> String => to_ast_json);
+guarded!(g_extension_names() -> Vec<String> => extension_names);
+guarded!(g_panic_probe() -> String => panic_probe);
+guarded!(
+    g_stamp_needs_review(source: String, current_version: Option<String>) -> bool
+        => stamp_needs_review
+);
+guarded!(
+    g_from_html_json(ruby: &Ruby, source: String, mode: String) -> String =>? from_html_json
+);
+guarded!(g_read_stamp(ruby: &Ruby, source: String) -> Value =>? read_stamp);
+guarded!(
+    g_to_html_with_extensions(ruby: &Ruby, source: String, names: RArray) -> String
+        =>? to_html_with_extensions
+);
+guarded!(
+    g_to_html_full(
+        ruby: &Ruby,
+        source: String,
+        names: RArray,
+        mode: String,
+        renderers: RHash
+    ) -> String =>? to_html_full
+);
+guarded!(
+    g_to_html_full_with_symbols(
+        ruby: &Ruby,
+        source: String,
+        names: RArray,
+        mode: String,
+        renderers: RHash,
+        symbols: RHash
+    ) -> String =>? to_html_full_with_symbols
+);
+guarded!(
+    g_to_html_safe(
+        ruby: &Ruby,
+        source: String,
+        names: RArray,
+        mode: String,
+        renderers: RHash,
+        symbols: RHash,
+        safe: bool,
+        profile: Option<String>,
+        sections: bool
+    ) -> String =>? to_html_safe
+);
+guarded!(
+    g_render_with_includes_json(
+        ruby: &Ruby,
+        source: String,
+        root: String,
+        source_path: String,
+        target: String,
+        names: RArray,
+        mode: String,
+        renderers: RHash,
+        symbols: RHash,
+        safe: bool,
+        profile: Option<String>,
+        sections: bool,
+        max_depth: Option<usize>,
+        max_bytes: Option<usize>,
+        max_resolver_calls: Option<usize>,
+        max_warnings: Option<usize>
+    ) -> String =>? render_with_includes_json
+);
+
 /// Entry point invoked by Ruby when the extension is loaded.
 ///
 /// `name = "carve"` makes the macro emit the `Init_carve` symbol that matches
@@ -739,35 +929,43 @@ fn stamp_needs_review(source: String, current_version: Option<String>) -> bool {
 /// package is named `carve-rb`.
 #[magnus::init(name = "carve")]
 fn init(ruby: &Ruby) -> Result<(), Error> {
+    install_panic_hook();
+
     let module = ruby.define_module("Carve")?;
+    // Raised when the engine panics. A StandardError subclass on purpose:
+    // magnus would otherwise surface the panic as `fatal`, which no host can
+    // rescue, so an embedder taking untrusted input had no defense at all
+    // (markup-carve/carve-rb#170).
+    module.define_error("EnginePanic", ruby.exception_standard_error())?;
     // Native primitives. The pure-Ruby wrapper in lib/carve.rb defines the
     // public `Carve.to_html(source, extensions:, mode:, renderers:)` on top of
     // these. `_to_html` is the no-extension fast path; the wrapper owns the
     // bare `to_html` name.
-    module.define_singleton_method("_to_html", function!(to_html, 1))?;
-    module.define_singleton_method("to_markdown", function!(to_markdown, 1))?;
-    module.define_singleton_method("to_plain_text", function!(to_plain_text, 1))?;
-    module.define_singleton_method("to_ansi", function!(to_ansi, 1))?;
-    module.define_singleton_method("to_carve", function!(to_carve, 1))?;
+    module.define_singleton_method("_to_html", function!(g_to_html, 1))?;
+    module.define_singleton_method("to_markdown", function!(g_to_markdown, 1))?;
+    module.define_singleton_method("to_plain_text", function!(g_to_plain_text, 1))?;
+    module.define_singleton_method("to_ansi", function!(g_to_ansi, 1))?;
+    module.define_singleton_method("to_carve", function!(g_to_carve, 1))?;
     module.define_singleton_method(
         "_render_with_includes_json",
-        function!(render_with_includes_json, 15),
+        function!(g_render_with_includes_json, 15),
     )?;
-    module.define_singleton_method("_from_html_json", function!(from_html_json, 2))?;
-    module.define_singleton_method("_from_markdown_json", function!(from_markdown_json, 1))?;
-    module.define_singleton_method("_to_ast_json", function!(to_ast_json, 1))?;
+    module.define_singleton_method("_from_html_json", function!(g_from_html_json, 2))?;
+    module.define_singleton_method("_from_markdown_json", function!(g_from_markdown_json, 1))?;
+    module.define_singleton_method("_to_ast_json", function!(g_to_ast_json, 1))?;
     module.define_singleton_method(
         "to_html_with_extensions",
-        function!(to_html_with_extensions, 2),
+        function!(g_to_html_with_extensions, 2),
     )?;
-    module.define_singleton_method("to_html_full", function!(to_html_full, 4))?;
+    module.define_singleton_method("to_html_full", function!(g_to_html_full, 4))?;
     module.define_singleton_method(
         "to_html_full_with_symbols",
-        function!(to_html_full_with_symbols, 5),
+        function!(g_to_html_full_with_symbols, 5),
     )?;
-    module.define_singleton_method("_to_html_safe", function!(to_html_safe, 8))?;
-    module.define_singleton_method("_extension_names", function!(extension_names, 0))?;
-    module.define_singleton_method("_read_stamp", function!(read_stamp, 1))?;
-    module.define_singleton_method("_stamp_needs_review", function!(stamp_needs_review, 2))?;
+    module.define_singleton_method("_to_html_safe", function!(g_to_html_safe, 8))?;
+    module.define_singleton_method("_extension_names", function!(g_extension_names, 0))?;
+    module.define_singleton_method("_read_stamp", function!(g_read_stamp, 1))?;
+    module.define_singleton_method("_stamp_needs_review", function!(g_stamp_needs_review, 2))?;
+    module.define_singleton_method("_panic_probe", function!(g_panic_probe, 0))?;
     Ok(())
 }
