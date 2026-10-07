@@ -187,4 +187,54 @@ class IncludesTest < Minitest::Test
       assert_equal 4, result[:suppressedWarnings]
     end
   end
+
+  # --- id collisions across two inclusions -------------------------------
+
+  # An include renames a colliding explicit id on ANY element, not just a
+  # heading, and the warning says so (markup-carve/carve-rs#2311,
+  # markup-carve/carve#2729). Under the 0.1.7 pin this gem shipped at v0.1.6 the
+  # message read `Heading id "x" was renamed`; it now reads `Id "x" was
+  # renamed`, because the rename reaches paragraphs too.
+  #
+  # The RULE ID is deliberately asserted as the engine spells it today,
+  # `include-heading-id-rename`, even though it now fires for a paragraph. That
+  # mismatch is upstream's to settle (reported as
+  # markup-carve/carve-rb#172); pinning the current spelling here
+  # means a host matching on the rule id finds out from this suite when it
+  # changes, rather than from its own logs.
+  def test_a_colliding_paragraph_id_is_renamed_and_reported
+    with_book do |root, book|
+      write(root, "chapters/one.crv", "{#para}\nJust a paragraph.\n")
+      File.write(book, "{{ chapters/one.crv }}\n\n{{ chapters/one.crv }}\n")
+
+      result = Carve.render_with_includes(File.read(book), root: root, source_path: book,
+                                                           target: "html")
+
+      assert_includes result[:value], "<p id=\"para\">"
+      assert_includes result[:value], "<p id=\"para-2\">"
+
+      rules = result[:warnings].map { |w| w[:rule] }
+
+      assert_includes rules, "include-heading-id-rename"
+      messages = result[:warnings].map { |w| w[:message] }
+
+      assert_includes messages, "Id \"para\" was renamed to \"para-2\"."
+    end
+  end
+
+  # The same rename on a heading, so the two shapes are pinned together. A guard
+  # on the paragraph alone would pass an engine that had stopped renaming
+  # headings, which is the case that already worked and is easier to break.
+  def test_a_colliding_heading_id_is_still_renamed
+    with_book do |root, book|
+      write(root, "chapters/one.crv", "{#dup}\n# Shared\n\nbody\n")
+      File.write(book, "{{ chapters/one.crv }}\n\n{{ chapters/one.crv }}\n")
+
+      result = Carve.render_with_includes(File.read(book), root: root, source_path: book,
+                                                           target: "html")
+
+      assert_includes result[:value], "id=\"dup\""
+      assert_includes result[:value], "id=\"dup-2\""
+    end
+  end
 end

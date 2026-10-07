@@ -10,5 +10,5 @@ if [ -z "$release" ]; then
   echo "::error::No release for $tag. Write its notes first."
   exit 1
 fi
-printf '%s' "$release" | python tools/check-release-notes.py \
+printf '%s' "$release" | python3 tools/check-release-notes.py \
   --tag "$tag" --repo "$GITHUB_REPOSITORY"
