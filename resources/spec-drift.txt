@@ -73,3 +73,6 @@
 173-implicit-heading-references-with-no-definition # undeclared at spec main 9db4723 on 2026-10-05; the pinned engine predates it
 546-every-name-lookup-compares-case-exactly # undeclared at spec main 9db4723 on 2026-10-05; the pinned engine predates it
 546-every-name-lookup-compares-case-exactly-3 # undeclared at spec main 9db4723 on 2026-10-05; the pinned engine predates it
+546-every-name-lookup-compares-case-exactly-5 # undeclared at spec main c61b0d5 on 2026-10-07; the pinned engine predates it
+547-an-info-string-does-not-change-how-a-flush-left-fence-folds-into-a-description-body # undeclared at spec main c61b0d5 on 2026-10-07; the pinned engine predates it
+547-an-info-string-does-not-change-how-a-flush-left-fence-folds-into-a-description-body-2 # undeclared at spec main c61b0d5 on 2026-10-07; the pinned engine predates it
