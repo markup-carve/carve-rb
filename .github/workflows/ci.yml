@@ -111,7 +111,37 @@ jobs:
         #
         # Three tries, each capped at 4 minutes. A hung mirror now costs 12
         # minutes worst case and says so, instead of an hour of silence.
+        #
+        # THE CHEAPEST APT CALL IS THE ONE NOT MADE. Three attempts against one
+        # unhealthy mirror cost 12.6 minutes and then failed, taking `main` red
+        # for an infrastructure reason that the verdict ticket it filed reads as
+        # a gem defect (markup-carve/carve-rb#175). The runner image usually
+        # already ships llvm, so look first and make no network request at all
+        # on the common path.
+        #
+        # A LIBRARY IS NOT ENOUGH, so the probe does not stop at finding one.
+        # bindgen needs clang's own resource headers too, and a split package
+        # can ship libclang.so.1 with no lib/clang/<v>/include beside it -
+        # bindgen then fails on every header it opens rather than at load time.
+        # That is the same missing-resource-headers problem that makes a local
+        # `rake compile` need BINDGEN_EXTRA_CLANG_ARGS pointed at the GCC
+        # include directory. An install without them falls through to apt, so
+        # this step either skips apt for a usable libclang or installs one; it
+        # never hands bindgen a half-install and calls it a saving.
         run: |
+          for lib in $(find /usr/lib -maxdepth 4 \
+                         \( -name 'libclang.so' -o -name 'libclang.so.*' \) \
+                         2>/dev/null | sort -V -r); do
+            dir="$(dirname "$lib")"
+            headers="$(find "$dir/clang" -maxdepth 3 -name stddef.h 2>/dev/null | sort -V | tail -1)"
+            if [ -n "$headers" ]; then
+              echo "libclang on the image: $lib (resource headers at $(dirname "$headers"))"
+              echo "LIBCLANG_PATH=$dir" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "::notice::$lib has no clang resource headers beside it"
+          done
+          echo "::notice::no usable libclang on the image; installing from apt"
           for attempt in 1 2 3; do
             if timeout 240 sudo apt-get update && timeout 240 sudo apt-get install -y libclang-dev; then
               exit 0
@@ -351,7 +381,37 @@ jobs:
         #
         # Three tries, each capped at 4 minutes. A hung mirror now costs 12
         # minutes worst case and says so, instead of an hour of silence.
+        #
+        # THE CHEAPEST APT CALL IS THE ONE NOT MADE. Three attempts against one
+        # unhealthy mirror cost 12.6 minutes and then failed, taking `main` red
+        # for an infrastructure reason that the verdict ticket it filed reads as
+        # a gem defect (markup-carve/carve-rb#175). The runner image usually
+        # already ships llvm, so look first and make no network request at all
+        # on the common path.
+        #
+        # A LIBRARY IS NOT ENOUGH, so the probe does not stop at finding one.
+        # bindgen needs clang's own resource headers too, and a split package
+        # can ship libclang.so.1 with no lib/clang/<v>/include beside it -
+        # bindgen then fails on every header it opens rather than at load time.
+        # That is the same missing-resource-headers problem that makes a local
+        # `rake compile` need BINDGEN_EXTRA_CLANG_ARGS pointed at the GCC
+        # include directory. An install without them falls through to apt, so
+        # this step either skips apt for a usable libclang or installs one; it
+        # never hands bindgen a half-install and calls it a saving.
         run: |
+          for lib in $(find /usr/lib -maxdepth 4 \
+                         \( -name 'libclang.so' -o -name 'libclang.so.*' \) \
+                         2>/dev/null | sort -V -r); do
+            dir="$(dirname "$lib")"
+            headers="$(find "$dir/clang" -maxdepth 3 -name stddef.h 2>/dev/null | sort -V | tail -1)"
+            if [ -n "$headers" ]; then
+              echo "libclang on the image: $lib (resource headers at $(dirname "$headers"))"
+              echo "LIBCLANG_PATH=$dir" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "::notice::$lib has no clang resource headers beside it"
+          done
+          echo "::notice::no usable libclang on the image; installing from apt"
           for attempt in 1 2 3; do
             if timeout 240 sudo apt-get update && timeout 240 sudo apt-get install -y libclang-dev; then
               exit 0

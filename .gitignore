@@ -13,3 +13,7 @@ Gemfile.lock
 /vendor/
 /.bundle/
 carve-lang-*.gem
+
+# scripts/check-spec-drift.py imports pinned-spec-commit.py by path, which
+# writes a cache beside it.
+__pycache__/
