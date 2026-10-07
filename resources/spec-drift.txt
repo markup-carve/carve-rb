@@ -45,34 +45,3 @@
 # EMPTY IS THE GOAL STATE. An empty file means this gem renders every document
 # in spec main exactly as the spec does, and it is the only state that may be
 # tagged.
-
-535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-2 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
-535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-6 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
-535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-10 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
-535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-14 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
-535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-18 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
-535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-22 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
-535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-31 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
-535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-32 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
-535-a-marker-line-opaque-quote-keeps-overindented-markers-literal-35 # markup-carve/carve#2658 (spec corpus row 535, 2026-09-30); fixed in markup-carve/carve-rs#2228, merged after the 0.1.7 tag and not published
-255-colon-fence-metadata-slots-must-be-a-space-too # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
-255-colon-fence-metadata-slots-must-be-a-space-too-2 # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
-255-colon-fence-metadata-slots-must-be-a-space-too-3 # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
-255-colon-fence-metadata-slots-must-be-a-space-too-4 # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
-537-invalid-named-container-metadata-keeps-the-subtree # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
-537-invalid-named-container-metadata-keeps-the-subtree-2 # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
-538-multiple-table-bodies-have-positional-source-metadata # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
-539-empty-table-bodies-keep-their-source-boundaries # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
-540-a-table-with-no-bodies-keeps-its-head-and-foot # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
-541-invalid-table-body-metadata-stays-ordinary # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
-541-invalid-table-body-metadata-stays-ordinary-4 # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
-542-a-span-across-bodies-keeps-their-header-semantics # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
-543-a-head-and-foot-consuming-all-rows-leave-no-implicit-body # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
-544-explicit-body-counts-include-native-header-cells # undeclared at spec main 0579480 on 2026-10-04; the pinned engine predates it
-15-heading-ids-2 # undeclared at spec main 9db4723 on 2026-10-05; the pinned engine predates it
-173-implicit-heading-references-with-no-definition # undeclared at spec main 9db4723 on 2026-10-05; the pinned engine predates it
-546-every-name-lookup-compares-case-exactly # undeclared at spec main 9db4723 on 2026-10-05; the pinned engine predates it
-546-every-name-lookup-compares-case-exactly-3 # undeclared at spec main 9db4723 on 2026-10-05; the pinned engine predates it
-546-every-name-lookup-compares-case-exactly-5 # undeclared at spec main c61b0d5 on 2026-10-07; the pinned engine predates it
-547-an-info-string-does-not-change-how-a-flush-left-fence-folds-into-a-description-body # undeclared at spec main c61b0d5 on 2026-10-07; the pinned engine predates it
-547-an-info-string-does-not-change-how-a-flush-left-fence-folds-into-a-description-body-2 # undeclared at spec main c61b0d5 on 2026-10-07; the pinned engine predates it

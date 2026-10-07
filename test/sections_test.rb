@@ -51,7 +51,14 @@ class SectionsTest < Minitest::Test
   def test_resolves_crossrefs_and_implicit_heading_references
     assert_equal "<h1 id=\"Target\">Target</h1>\n" \
                  "<p>See <a href=\"#Target\">Target</a> and <a href=\"#Target\">Target</a>.</p>",
-                 flat("# Target\n\nSee </#target> and [Target][].\n")
+                 flat("# Target\n\nSee </#Target> and [Target][].\n")
+  end
+
+  # A heading cross-reference compares its target case exactly, so a case-only
+  # miss stays literal text rather than resolving (markup-carve/carve#2732).
+  def test_a_case_only_crossref_target_stays_literal
+    assert_equal "<h1 id=\"Target\">Target</h1>\n<p>See &lt;/#target&gt;.</p>",
+                 flat("# Target\n\nSee </#target>.\n")
   end
 
   def test_keeps_the_dedup_namespace_intact

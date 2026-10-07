@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The engine is the published `carve-lang` 0.1.8 crate, up from 0.1.7. It closes
+  every row `resources/spec-drift.txt` declared: the gem renders all 2225 corpus
+  documents spec main declares byte-identically, where 0.1.7 rendered 30 of them
+  by a superseded rule. The ledger is empty again, which is the only state a tag
+  may ship.
+- **Breaking for a `Carve.to_html` consumer:** a heading cross-reference, a
+  numbered caption or equation reference, and a collapsed reference falling back
+  to heading text compare their target case exactly. `</#target>` against a
+  `# Target` heading no longer resolves and stays literal text; link-definition
+  labels, footnote labels and include fragment selectors already matched case
+  exactly. `carve fmt --migrate` in carve-rs repairs unambiguous case-only misses
+  (markup-carve/carve#2732, markup-carve/carve-rs#2320).
+- **Breaking for a `Carve.to_html` consumer:** a glossary reference matches its
+  term exactly and links to the matched entry, and two terms differing only in
+  case take two ids (markup-carve/carve#2739).
+- A render that blanks a denied destination scheme reports one
+  `destination-denied` loss, so a checked render of a `javascript:` destination
+  refuses where it used to pass. The emitted `href=""` does not move
+  (markup-carve/carve#2679).
+
 ## [0.1.6] - 2026-09-29
 
 ### Changed
