@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refuses where it used to pass. The emitted `href=""` does not move
   (markup-carve/carve#2679).
 
+### Fixed
+
+- A line holding a single `|` followed by an attribute block, such as `|{.r}`,
+  renders as paragraph text. Under the 0.1.7 engine it panicked inside the table
+  check, and a panic crossing the FFI boundary reaches Ruby as `fatal`, which
+  `rescue` cannot catch, so five bytes of input terminated the host process
+  (markup-carve/carve-rs#2341).
+
 ## [0.1.6] - 2026-09-29
 
 ### Changed
