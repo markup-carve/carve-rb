@@ -37,10 +37,22 @@
 # FORMAT
 #
 # One corpus document basename per line, without the .crv extension, as
-# scripts/verify-packaged-gem.rb prints it. Anything after `#` is a comment and
-# is where the reason goes. Blank lines are ignored.
+# scripts/verify-packaged-gem.rb prints it. Anything after `#` is the REASON,
+# and it is REQUIRED - a row without one is refused. Blank lines are ignored.
 #
 #   367-002  # spec gained `{=raw}` on attribute lines; carve-rs has not shipped it
+#
+# A REASON THAT IS ABOUT THE PIN MUST NAME THE PIN. The wording "the pinned
+# engine predates it" is true only while the gem pins that engine, and it was
+# false for 21 rows the moment one bump landed (markup-carve/carve-rb#167). So
+# it is written with the pin in it and the gate expires it when the manifest
+# moves:
+#
+#   367-002  # undeclared at spec main abc1234 on 2026-10-07; the pinned engine carve-lang 0.1.8 predates it
+#
+# scripts/declare-spec-drift.sh writes that form. When the gate reports a row
+# as expired, delete it if the bump closed the window, and record the real
+# reason if it still diverges - do not restore the old wording with a new pin.
 #
 # EMPTY IS THE GOAL STATE. An empty file means this gem renders every document
 # in spec main exactly as the spec does, and it is the only state that may be

@@ -57,9 +57,11 @@ Exit codes: 0 clear, 1 refused, 2 misuse.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import re
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 # `corpus mismatch: <basename>`, one line per diverging document, printed by
 # scripts/verify-packaged-gem.rb. Parsing THAT rather than the assertion message
@@ -88,15 +90,101 @@ def annotate(level: str, message: str, github: bool) -> None:
     print(f"{level}: {message}", file=stream)
 
 
-def read_ledger(path: Path) -> list[str]:
+# The dated class of reason, the one markup-carve/carve-rb#167 was written
+# about. It is a claim about a MOMENT rather than about behavior: true only
+# while the gem pins an engine released before the corpus row landed, and false
+# the instant the pin moves. The pin it was true for is what makes it
+# mechanically checkable, so the form requires it.
+PREDATES = re.compile(r"the pinned engine (carve-lang \S+|rev [0-9a-fA-F]{7,40}) predates it")
+# A row written before the pin became part of the wording. Matched separately so
+# the message can say what to add, rather than reporting "no reason".
+PREDATES_UNPINNED = re.compile(r"the pinned engine predates it")
+
+
+def read_manifest_pin(manifest: Path) -> tuple[str, str]:
+    """Borrow pinned-spec-commit.py's reader rather than re-spelling it.
+
+    It already knows the dependency key differs per binding and that the crate
+    publishes as `carve-lang`. Imported by path because the filename is
+    hyphenated and so not importable as a module name - the same route
+    check-engine-floor.py takes in the sibling bindings.
+    """
+    path = Path(__file__).resolve().parent / "pinned-spec-commit.py"
+    spec = importlib.util.spec_from_file_location("pinned_spec_commit", path)
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"check-spec-drift: cannot load {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.manifest_pin(manifest)
+
+
+class LedgerRow(NamedTuple):
+    name: str
+    reason: str
+
+
+def read_ledger(path: Path) -> list[LedgerRow]:
+    """The declared rows, WITH their reasons.
+
+    The reason used to be discarded here - `line.split("#", 1)[0]` and nothing
+    read the other half - so the file asked for a justification that no check
+    could tell from decoration, and a reason could not expire
+    (markup-carve/carve-rb#174).
+    """
     if not path.exists():
         raise SystemExit(f"check-spec-drift: no ledger at {path}")
     rows = []
     for line in path.read_text(encoding="utf-8").splitlines():
-        row = line.split("#", 1)[0].strip()
-        if row:
-            rows.append(row)
+        name, _, reason = line.partition("#")
+        name = name.strip()
+        if name:
+            rows.append(LedgerRow(name, reason.strip()))
     return rows
+
+
+def check_reasons(rows: list[LedgerRow], pin: str, ledger: Path, github: bool) -> int:
+    """Fail on a row whose reason is missing or has expired.
+
+    A waiver nobody reads never expires, which is the shape that put 21 rows
+    reading "the pinned engine predates it" in front of an engine bump that made
+    every one of them false (markup-carve/carve-rb#167). Expiry is decided by
+    the pin the reason NAMES against the pin the manifest carries: any move
+    invalidates the claim, including a downgrade, because either way the
+    sentence has to be re-justified rather than inherited.
+    """
+    problems: list[str] = []
+    for row in rows:
+        if not row.reason:
+            problems.append(
+                f"{row.name}: no reason. The file's format puts one after `#` and its header "
+                "calls it the point of the row; a row without one waives a divergence nobody "
+                "looked at."
+            )
+            continue
+        if PREDATES_UNPINNED.search(row.reason) and not PREDATES.search(row.reason):
+            problems.append(
+                f"{row.name}: \"the pinned engine predates it\" without naming which pin. "
+                "That wording is true only for one pin and cannot expire without it. Write "
+                f"`the pinned engine {pin} predates it`."
+            )
+            continue
+        named = PREDATES.search(row.reason)
+        if named and named.group(1) != pin:
+            problems.append(
+                f"{row.name}: the reason is about engine {named.group(1)} and the manifest now "
+                f"pins {pin}, so it has EXPIRED. Re-run the drift gate and delete the row if the "
+                "bump closed it; if it still diverges, record the real reason rather than "
+                "restoring this wording."
+            )
+    if not problems:
+        return 0
+    annotate(
+        "error",
+        f"{len(problems)} row(s) in {ledger} carry a reason that cannot stand:\n  "
+        + "\n  ".join(problems),
+        github,
+    )
+    return 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -132,10 +220,29 @@ def main(argv: list[str] | None = None) -> int:
         "them. Written on every measured run, EMPTY when there are none, so a reader can "
         "tell 'measured, nothing undeclared' from 'never ran'.",
     )
+    p.add_argument(
+        "--manifest",
+        type=Path,
+        default=Path(__file__).resolve().parent.parent / "ext" / "carve" / "Cargo.toml",
+        help="the manifest carrying the engine pin, read to expire a dated reason",
+    )
     p.add_argument("--github", action="store_true", help="emit GitHub Actions annotations")
     args = p.parse_args(argv)
 
-    declared = read_ledger(args.ledger)
+    rows = read_ledger(args.ledger)
+    declared = [row.name for row in rows]
+
+    # One path for every mode, so there is one spelling of the rule. It does
+    # not change the release verdict: --require-empty-ledger already refuses
+    # ANY non-empty ledger, so with rows present both answers are 1 and with
+    # none there is nothing to read. What it changes there is the message, and
+    # a test asserting the release exit code could not tell the two apart - so
+    # there is no such test, rather than one that cannot fail.
+    if rows:
+        kind, value = read_manifest_pin(args.manifest)
+        pin = f"carve-lang {value}" if kind == "version" else f"rev {value}"
+        if check_reasons(rows, pin, args.ledger, args.github):
+            return 1
 
     if args.require_empty_ledger:
         if declared:
