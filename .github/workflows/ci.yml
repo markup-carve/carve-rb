@@ -78,9 +78,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Guard against panic = "abort" (preserves FFI catch_unwind safety)
-        # magnus turns Rust panics into Ruby exceptions via catch_unwind, which
-        # only works under panic = "unwind". This step fails the build if any
-        # tracked Cargo.toml sets panic = "abort".
+        # The extension converts a Rust panic into a rescuable
+        # Carve::EnginePanic, which needs the panic to unwind first. That only
+        # holds under panic = "unwind". This step fails the build if any tracked
+        # Cargo.toml sets panic = "abort"; test/panic_unwind_test.rb covers the
+        # conversion itself.
         run: bash scripts/check-panic-unwind.sh
 
       - name: Install Ruby

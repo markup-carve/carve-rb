@@ -283,6 +283,27 @@ That matters for untrusted input: the engine's infallible entry point answers a
 rejection with an empty String, which a caller cannot tell from a document that
 legitimately rendered to nothing.
 
+An engine **panic** raises `Carve::EnginePanic`, a `StandardError` subclass.
+This is the error class untrusted input makes relevant: a panic means the engine
+reached a state it believed impossible, and before it was introduced such a
+panic arrived as Ruby `fatal`, which `rescue` cannot stop, so a single document
+ended the host process (markup-carve/carve-rb#170). A worker can now answer the
+request and keep serving:
+
+``` ruby
+begin
+  Carve.to_html(user_input, safe: true, profile: :comment)
+rescue Carve::EnginePanic => e
+  logger.error("carve engine panic: #{e.message}")
+  nil
+end
+```
+
+The message carries the panic text and its location in the engine source, and
+the usual `thread '<unnamed>' panicked at ...` report still reaches stderr, so
+`RUST_BACKTRACE=1` works as before. Treat any input that raises it as an engine
+defect worth reporting, not as a rejection: a rejection is an `ArgumentError`.
+
 Full recipe, defaults and threat model:
 [Security](https://markup-carve.github.io/carve/security).
 
@@ -333,6 +354,7 @@ a document change.
 | `Carve::EXTENSIONS` | Array of recognized extension symbols. |
 | `Carve::MODES` | Array of recognized render modes (`:interactive`, `:static`). |
 | `Carve::RENDERER_KEYS` | Array of recognized `renderers:` keys. |
+| `Carve::EnginePanic` | `StandardError` raised when the engine panics; see [Untrusted input](#untrusted-input). |
 
 ## Develop
 

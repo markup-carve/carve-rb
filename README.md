@@ -45,6 +45,29 @@ Carve.to_html(
 `Carve::EXTENSIONS` reports the names accepted by the bundled engine. Unknown
 names raise `ArgumentError`.
 
+## Errors
+
+An invalid argument raises `ArgumentError`, and a render the engine refuses -
+input past a profile's `max_length`, or a denied construct - also raises
+`ArgumentError` with the engine's reason.
+
+If the engine panics, the call raises `Carve::EnginePanic`, a `StandardError`
+subclass carrying the panic message and its location in the engine source. A
+panic means the engine reached a state it believed impossible, so the document
+is not renderable, but the process survives and a host can serve an error
+instead of losing the worker:
+
+``` ruby
+begin
+  Carve.to_html(untrusted_source)
+rescue Carve::EnginePanic => e
+  logger.error("carve engine panic: #{e.message}")
+  "<p>This document could not be rendered.</p>"
+end
+```
+
+Report any input that raises it: a panic is an engine defect, not a rejection.
+
 ## Migration and AST access
 
 `Carve.from_html` and `Carve.from_markdown` return canonical Carve with

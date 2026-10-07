@@ -31,11 +31,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refuses where it used to pass. The emitted `href=""` does not move
   (markup-carve/carve#2679).
 
+### Added
+
+- `Carve::EnginePanic`, a `StandardError` subclass raised when the engine
+  panics, so a host rendering untrusted input can rescue one and keep serving.
+  The message carries the panic text and its location in the engine source, and
+  the usual panic report still reaches stderr (#170).
+
 ### Fixed
 
+- An engine panic arrives as a rescuable Ruby exception rather than `fatal`.
+  magnus catches the unwind but raises it as `fatal`, which no host can stop,
+  not even with `rescue Exception`, so any panic ended the process. The binding
+  now converts a caught panic itself (#170).
 - A line holding a single `|` followed by an attribute block, such as `|{.r}`,
   renders as paragraph text. Under the 0.1.7 engine it panicked inside the table
-  check, and a panic crossing the FFI boundary reaches Ruby as `fatal`, which
+  check, and a panic crossing the FFI boundary reached Ruby as `fatal`, which
   `rescue` cannot catch, so five bytes of input terminated the host process
   (markup-carve/carve-rs#2341).
 
