@@ -1,14 +1,32 @@
-name: Release
+name: Release packages and assets
 
 on:
-  push:
-    tags:
-      - "v*"
-  # A tag-triggered workflow is unexercisable between releases, which is how a
-  # release job rots. This lets the whole gate run on demand against `main`; the
-  # publish job below is tag-only, so a manual run builds and verifies the gem
-  # and stops there.
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      publish:
+        required: true
+        type: boolean
+      tag:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      release_tag:
+        required: true
+        type: string
+      source_sha:
+        required: true
+        type: string
+      release_id:
+        required: true
+        type: string
+      release_body:
+        required: true
+        type: string
+      notes_digest:
+        required: true
+        type: string
 
 # Jobs carry an explicit timeout-minutes: without one GitHub applies a
 # 360-minute default, long enough for a stalled job to go unnoticed.
@@ -33,13 +51,23 @@ jobs:
       # constant named 0.1.0 for want of this step (markup-carve/carve-js#1074).
       # test/release_version_test.rb checks the same constant against the same
       # two files on every push; this is the last chance to catch it.
-      - name: Verify version and changelog match the release tag
-        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+      - name: Expose the candidate tag locally
+        if: ${{ !inputs.publish }}
+        shell: bash
+        env:
+          CANDIDATE_TAG: ${{ inputs.tag }}
         run: |
-          TAG="${GITHUB_REF_NAME#v}"
+          git tag "$CANDIDATE_TAG" "${{ inputs.source_sha }}"
+      - name: Verify version and changelog match the release tag
+        if: startsWith(format('refs/tags/{0}', inputs.tag), 'refs/tags/v')
+        run: |
+          TAG="${LANE_TAG#v}"
           VER="$(sed -n 's/.*VERSION[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' lib/carve/version.rb | head -1)"
           if [ "$TAG" != "$VER" ]; then
-            echo "::error::Release tag $GITHUB_REF_NAME does not match Carve::VERSION $VER."
+            echo "::error::Release tag $LANE_TAG does not match Carve::VERSION $VER."
             exit 1
           fi
           # Compare the extracted heading literally rather than grepping the tag
@@ -224,7 +252,7 @@ jobs:
       - name: Upload the verified gem
         uses: actions/upload-artifact@v4
         with:
-          name: verified-gem
+          name: verified-gem-${{ inputs.publish && 'publish' || 'check' }}
           path: carve-lang-*.gem
           if-no-files-found: error
           retention-days: 7
@@ -238,7 +266,7 @@ jobs:
     # while the corpus gate is failing, and it has nothing to push except the
     # artifact that job uploaded.
     needs: verify
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: true && startsWith(format('refs/tags/{0}', inputs.tag), 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: release
@@ -252,11 +280,30 @@ jobs:
       # it. See markup-carve/carve-wasm#80.
       contents: write
       id-token: write
+      actions: read
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ inputs.source_sha }}
 
+          fetch-depth: 0
+      - name: Verify approval and checked tag before publishing
+        working-directory: ${{ github.workspace }}
+        if: ${{ inputs.publish }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_SHA: ${{ inputs.source_sha }}
+          RELEASE_NOTES_DIGEST: ${{ inputs.notes_digest }}
+        run: python .github/scripts/release-lane.py permit
+      - name: Expose the candidate tag locally
+        if: ${{ !inputs.publish }}
+        shell: bash
+        env:
+          CANDIDATE_TAG: ${{ inputs.tag }}
+        run: |
+          git tag "$CANDIDATE_TAG" "${{ inputs.source_sha }}"
       - uses: actions/setup-python@v6
         with:
           python-version: '3.x'
@@ -271,12 +318,12 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash tools/run-release-notes-gate.sh "$GITHUB_REF_NAME"
+        run: bash tools/run-release-notes-gate.sh "$LANE_TAG"
 
       - name: Download the verified gem
         uses: actions/download-artifact@v4
         with:
-          name: verified-gem
+          name: verified-gem-${{ inputs.publish && 'publish' || 'check' }}
 
       - name: Install Ruby
         uses: ruby/setup-ruby@v1
@@ -298,11 +345,17 @@ jobs:
       # Skipped on a dispatch: a rehearsal must not mint a publishing
       # credential.
       - name: Exchange the OIDC token for a RubyGems credential
-        if: github.event_name != 'workflow_dispatch'
         uses: rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a # v2.1.0
 
+        if: ${{ inputs.publish }}
       - name: Push gem to RubyGems
-        run: gem push carve-lang-*.gem
+        run: |
+          if [ "$LANE_PUBLISH" = true ]; then
+            gem push carve-lang-*.gem
+          else
+            ls -l ./*.gem
+          fi
+
 
       # A registry publish is not finished until the release page exists. The
       # tag is pushed, CI publishes, the registry answers 200, and "released"
@@ -313,33 +366,13 @@ jobs:
       #
       # Last, deliberately: a draft that stays a draft is recoverable, and one
       # published beside a failed publish is not.
-      - name: Publish the release notes
-        if: github.event_name != 'workflow_dispatch'
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # The fetch and the check are the SHARED script's, not a second copy.
-          # This step used to re-spell the same `gh api | jq -cs ... select` and
-          # the same check-release-notes.py call, and the two drifted: both
-          # invoked bare `python`, so fixing the wrapper alone left this copy
-          # broken (markup-carve/carve-rb#169, #171). --release-out hands back
-          # the release object the gate already fetched, which is the only part
-          # this step needed that the gate did not already do.
-          bash tools/run-release-notes-gate.sh "$GITHUB_REF_NAME" --release-out release.json
-          release="$(cat release.json)"
-          id="$(printf '%s' "$release" | jq -r 'select(.draft) | .id // empty')"
-          if [ -z "$id" ]; then
-            echo "The release is already published."
-            exit 0
-          fi
-          # `tag_name` goes with every PATCH of a release. Omit it on a DRAFT
-          # and GitHub replaces the tag with a generated `untagged-*`
-          # placeholder, because a draft's tag is a string on the object rather
-          # than a git ref - so the field has nothing to fall back to.
-          # `-F` (not `-f`) for draft, so it is sent as a boolean.
-          gh api "repos/$GITHUB_REPOSITORY/releases/$id" -X PATCH \
-            -f tag_name="$GITHUB_REF_NAME" -F draft=false --jq '"published \(.tag_name)"'
-          # Read it back: exit status does not tell you whether the tag survived.
-          gh api "repos/$GITHUB_REPOSITORY/releases/$id" \
-            --jq '"draft=\(.draft) tag=\(.tag_name)"'
+permissions:
+  contents: write
+  actions: read
+  id-token: write
+env:
+  LANE_TAG: ${{ inputs.tag }}
+  LANE_REF: ${{ format('refs/tags/{0}', inputs.tag) }}
+  LANE_REF_TYPE: tag
+  LANE_PUBLISH: ${{ inputs.publish }}
