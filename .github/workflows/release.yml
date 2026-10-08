@@ -4,10 +4,8 @@ on:
   push:
     tags:
       - "v*"
-  # A tag-triggered workflow is unexercisable between releases, which is how a
-  # release job rots. This lets the whole gate run on demand against `main`; the
-  # publish job below is tag-only, so a manual run builds and verifies the gem
-  # and stops there.
+  # An empty dispatch builds and verifies the gem.
+  # Set version to publish after approval.
   workflow_dispatch:
     inputs:
       version:
