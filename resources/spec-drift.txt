@@ -57,3 +57,4 @@
 # EMPTY IS THE GOAL STATE. An empty file means this gem renders every document
 # in spec main exactly as the spec does, and it is the only state that may be
 # tagged.
+316-an-image-s-alt-text-closes-where-a-link-s-text-closes-4 # undeclared at spec main 563ae1a on 2026-10-08; the pinned engine carve-lang 0.1.8 predates it
