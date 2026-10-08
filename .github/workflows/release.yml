@@ -287,6 +287,16 @@ jobs:
           ref: ${{ inputs.source_sha }}
 
           fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      # The draft must describe the tagged changelog section before publishing.
+      # Relative changelog links resolve against this tag in the release body.
+      #
+      # Found by listing rather than `gh release view <tag>`: a draft's tag is
+      # not a git ref, so addressing one by tag can match nothing, change
+      # nothing and still exit 0.
       - name: Verify approval and checked tag before publishing
         working-directory: ${{ github.workspace }}
         if: ${{ inputs.publish }}
@@ -304,16 +314,6 @@ jobs:
           CANDIDATE_TAG: ${{ inputs.tag }}
         run: |
           git tag "$CANDIDATE_TAG" "${{ inputs.source_sha }}"
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.x'
-
-      # The draft must describe the tagged changelog section before publishing.
-      # Relative changelog links resolve against this tag in the release body.
-      #
-      # Found by listing rather than `gh release view <tag>`: a draft's tag is
-      # not a git ref, so addressing one by tag can match nothing, change
-      # nothing and still exit 0.
       - name: The release notes match this tag's changelog
         shell: bash
         env:
