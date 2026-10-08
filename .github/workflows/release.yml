@@ -4,11 +4,14 @@ on:
   push:
     tags:
       - "v*"
-  # A tag-triggered workflow is unexercisable between releases, which is how a
-  # release job rots. This lets the whole gate run on demand against `main`; the
-  # publish job below is tag-only, so a manual run builds and verifies the gem
-  # and stops there.
+  # An empty dispatch builds and verifies the gem.
+  # Set version to publish after approval.
   workflow_dispatch:
+    inputs:
+      version:
+        description: Version to publish, without v; leave empty for rehearsal
+        required: false
+        type: string
 
 # Jobs carry an explicit timeout-minutes: without one GitHub applies a
 # 360-minute default, long enough for a stalled job to go unnoticed.
@@ -34,12 +37,12 @@ jobs:
       # test/release_version_test.rb checks the same constant against the same
       # two files on every push; this is the last chance to catch it.
       - name: Verify version and changelog match the release tag
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: (startsWith(github.ref, 'refs/tags/v') || inputs.version != '')
         run: |
-          TAG="${GITHUB_REF_NAME#v}"
+          TAG="${RELEASE_TAG#v}"
           VER="$(sed -n 's/.*VERSION[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' lib/carve/version.rb | head -1)"
           if [ "$TAG" != "$VER" ]; then
-            echo "::error::Release tag $GITHUB_REF_NAME does not match Carve::VERSION $VER."
+            echo "::error::Release tag $RELEASE_TAG does not match Carve::VERSION $VER."
             exit 1
           fi
           # Compare the extracted heading literally rather than grepping the tag
@@ -238,7 +241,8 @@ jobs:
     # while the corpus gate is failing, and it has nothing to push except the
     # artifact that job uploaded.
     needs: verify
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: ((github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || inputs.version != '')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.version != ''))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: release
@@ -255,7 +259,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
 
       - uses: actions/setup-python@v6
         with:
@@ -271,7 +275,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash tools/run-release-notes-gate.sh "$GITHUB_REF_NAME"
+        run: bash tools/run-release-notes-gate.sh "$RELEASE_TAG"
 
       - name: Download the verified gem
         uses: actions/download-artifact@v4
@@ -298,9 +302,22 @@ jobs:
       # Skipped on a dispatch: a rehearsal must not mint a publishing
       # credential.
       - name: Exchange the OIDC token for a RubyGems credential
-        if: github.event_name != 'workflow_dispatch'
+        if: (github.event_name != 'workflow_dispatch' || inputs.version != '')
         uses: rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a # v2.1.0
 
+      - name: Create the release tag after approval
+        if: github.event_name == 'workflow_dispatch' && inputs.version != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Version must be X.Y.Z"; exit 1; }
+          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            remote="$(git ls-remote --tags origin "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}" | tail -1 | cut -f1)"
+            [ "$remote" = "$GITHUB_SHA" ] || { echo "::error::Existing tag points to another commit"; exit 1; }
+          else
+            git tag "$RELEASE_TAG" "$GITHUB_SHA"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
       - name: Push gem to RubyGems
         run: gem push carve-lang-*.gem
 
@@ -314,7 +331,7 @@ jobs:
       # Last, deliberately: a draft that stays a draft is recoverable, and one
       # published beside a failed publish is not.
       - name: Publish the release notes
-        if: github.event_name != 'workflow_dispatch'
+        if: (github.event_name != 'workflow_dispatch' || inputs.version != '')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -326,7 +343,7 @@ jobs:
           # broken (markup-carve/carve-rb#169, #171). --release-out hands back
           # the release object the gate already fetched, which is the only part
           # this step needed that the gate did not already do.
-          bash tools/run-release-notes-gate.sh "$GITHUB_REF_NAME" --release-out release.json
+          bash tools/run-release-notes-gate.sh "$RELEASE_TAG" --release-out release.json
           release="$(cat release.json)"
           id="$(printf '%s' "$release" | jq -r 'select(.draft) | .id // empty')"
           if [ -z "$id" ]; then
@@ -339,7 +356,10 @@ jobs:
           # than a git ref - so the field has nothing to fall back to.
           # `-F` (not `-f`) for draft, so it is sent as a boolean.
           gh api "repos/$GITHUB_REPOSITORY/releases/$id" -X PATCH \
-            -f tag_name="$GITHUB_REF_NAME" -F draft=false --jq '"published \(.tag_name)"'
+            -f tag_name="$RELEASE_TAG" -F draft=false --jq '"published \(.tag_name)"'
           # Read it back: exit status does not tell you whether the tag survived.
           gh api "repos/$GITHUB_REPOSITORY/releases/$id" \
             --jq '"draft=\(.draft) tag=\(.tag_name)"'
+env:
+  RELEASE_VERSION: ${{ inputs.version }}
+  RELEASE_TAG: ${{ inputs.version != '' && format('v{0}', inputs.version) || github.ref_name }}
