@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- A Markdown writer refusal returns ArgumentError instead of panicking in the engine.
+
+- **Breaking:** Engine compatibility: image alt text and quoted include paths decode ASCII punctuation escapes; escape a literal backslash twice. Include rename warnings use `include-id-rename` instead of `include-heading-id-rename`.
+
+- Pin Rust engine `ed5581b1` to include Markdown construct assessment and the image-alt boundary fix.
+
 ## [0.1.7] - 2026-10-07
 
 ### Changed

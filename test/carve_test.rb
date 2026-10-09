@@ -96,11 +96,21 @@ class CarveTest < Minitest::Test
     assert_equal "/em/ and *strong*\n", markdown[:value]
     assert_equal "markdown", markdown[:report][:source_format]
     assert_equal "markdown", markdown[:report][:sourceFormat]
-    assert_equal "fidelity-unverified", markdown[:report][:diagnostics][0][:code]
-    assert_equal "dropped", markdown[:report][:diagnostics][0][:fidelity]
-    assert_equal "fallback", markdown[:report][:diagnostics][0][:confidence]
-    assert_equal "warning", markdown[:report][:diagnostics][0][:severity]
-    assert_equal 1, markdown[:report][:diagnostics].length
+    assert_equal ["markdown-paragraph", "markdown-emphasis", "markdown-strong"],
+                 markdown[:report][:diagnostics].map { |row| row[:code] }
+    refute_empty markdown[:report][:diagnostics]
+    markdown[:report][:diagnostics].each do |diagnostic|
+      refute_equal "fidelity-unverified", diagnostic[:code]
+      assert_equal "preserved", diagnostic[:fidelity]
+      assert_equal "exact", diagnostic[:confidence]
+      assert_equal "info", diagnostic[:severity]
+    end
+  end
+
+  def test_markdown_depth_refusal_is_an_argument_error
+    error = assert_raises(ArgumentError) { Carve.from_markdown("> " * 512 + "text\n") }
+    assert_match(/Markdown import failed/, error.message)
+    assert_equal "<p>after refusal</p>", Carve.to_html("after refusal")
   end
 
   # Path to the carve-rs CLI binary, used for byte-identical checks.
