@@ -1,9 +1,6 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
   # An empty dispatch builds and verifies the gem.
   # Set version to publish after approval.
   workflow_dispatch:
