@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Pin Rust engine `675edf58` for ordered-list boundary preservation, raw-block profile fallback and the 2,230-example core corpus.
+
 - A Markdown writer refusal returns ArgumentError instead of panicking in the engine.
 
 - **Breaking:** Engine compatibility: image alt text and quoted include paths decode ASCII punctuation escapes; escape a literal backslash twice. Include rename warnings use `include-id-rename` instead of `include-heading-id-rename`.
