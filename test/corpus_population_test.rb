@@ -1,38 +1,47 @@
 # frozen_string_literal: true
 
 require "minitest/autorun"
-require "tmpdir"
-require_relative "corpus_population"
+require "corpus_population"
 
+# The counter's own test, because the corpus can no longer be its test.
+#
+# The population gates used to count one pair per `::: compare` block, while the
+# spec's generator writes one pair per `carve` fence inside the block. The gap
+# only showed on a multi-pair block, and markup-carve/carve#2825 split the one
+# block upstream that had it, so a corpus run cannot demonstrate the difference
+# any more. A synthetic page can.
 class CorpusPopulationTest < Minitest::Test
-  include CorpusPopulation
+  PAGE = [
+    "::: compare",
+    "```carve", "one", "```",
+    "```html", "<p>one</p>", "```",
+    "````carve", "```carve", "nested, not a pair", "```", "````",
+    "```html", "<pre>two</pre>", "```",
+    "```carve", "three", "```",
+    "```html", "<p>three</p>", "```",
+    ":::",
+    "```carve", "outside any block", "```",
+  ].freeze
 
-  SOURCE = "````text\n::: compare\n```carve\nfake\n```\n```html\nfake\n```\n:::\n````\n::: compare no-render\n````carve\n::: compare\n```html\nliteral\n```\n:::\n````\n```html\n<p>first</p>\n```\n```carve\nsecond\n```\n```html\n<p>second</p>\n```\n:::\n"
-
-  def with_source(source)
-    Dir.mktmpdir do |root|
-      examples = File.join(root, "resources", "examples")
-      FileUtils.mkdir_p(examples)
-      EXAMPLE_PAGES.each_with_index do |page, index|
-        File.write(File.join(examples, page), index.zero? ? source : "")
-      end
-      yield File.join(root, "tests", "corpus")
-    end
+  def census
+    CorpusPopulation.census_compare_pairs(PAGE)
   end
 
-  def test_multiple_pairs_and_literal_fences
-    with_source(SOURCE) do |corpus|
-      assert_equal 2, declared_corpus_size(corpus)
-      assert_whole_corpus(corpus, 2, "complete")
-      assert_raises(Minitest::Assertion) { assert_whole_corpus(corpus, 1, "truncated") }
-    end
+  def test_counts_every_carve_fence_in_a_block_as_a_pair
+    pairs = census.sum { |block| block["carve"] }
+    assert_equal 3, pairs, "got #{pairs} pairs, want 3"
   end
 
-  def test_unpaired_and_unclosed_sources_are_refused
-    ["::: compare\n```carve\nx\n```\n:::\n", "::: compare\n:::\n", SOURCE.sub(/:::\n\z/, "")].each do |source|
-      with_source(source) do |corpus|
-        assert_raises(Minitest::Assertion) { declared_corpus_size(corpus) }
-      end
-    end
+  def test_reports_one_block_with_matching_html_fences
+    blocks = census
+    assert_equal 1, blocks.length
+    assert_equal 3, blocks.first["html"]
+    assert_nil blocks.first[:unclosed]
+    assert_nil blocks.first[:unclosed_fence]
+  end
+
+  def test_an_unclosed_block_is_reported_rather_than_counted_silently
+    blocks = CorpusPopulation.census_compare_pairs(["::: compare", "```carve", "x", "```"])
+    assert_equal true, blocks.first[:unclosed]
   end
 end
