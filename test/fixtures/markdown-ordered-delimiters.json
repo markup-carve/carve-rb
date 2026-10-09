@@ -1,0 +1,20 @@
+[
+  {
+    "name": "CommonMark 296",
+    "markdown": "10) foo\n    - bar\n",
+    "source": "10) foo\n    - bar\n",
+    "html": "<ol start=\"10\" data-delim=\")\">\n  <li>foo\n    <ul>\n      <li>bar</li>\n    </ul>\n  </li>\n</ol>"
+  },
+  {
+    "name": "CommonMark 297",
+    "markdown": "10) foo\n   - bar\n",
+    "source": "10) foo\n\n- bar\n",
+    "html": "<ol start=\"10\" data-delim=\")\">\n  <li>foo</li>\n</ol>\n<ul>\n  <li>bar</li>\n</ul>"
+  },
+  {
+    "name": "CommonMark 302",
+    "markdown": "1. foo\n2. bar\n3) baz\n",
+    "source": "1. foo\n2. bar\n\n3) baz\n",
+    "html": "<ol>\n  <li>foo</li>\n  <li>bar</li>\n</ol>\n<ol start=\"3\" data-delim=\")\">\n  <li>baz</li>\n</ol>"
+  }
+]
