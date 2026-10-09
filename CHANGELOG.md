@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Pin Rust engine `675edf58` for ordered-list boundary preservation and current spec conformance. This retains the Markdown fidelity and image-alt fixes from the previous pin.
+- Pin Rust engine `675edf58` for current spec conformance.
+
+- Adjacent alphabetic and Roman ordered lists stay separate through HTML import and formatting. Three blank lines end dialect lookahead.
+
 - Under the article profile, denied raw blocks become code blocks that retain their escaped payload.
 
 - Ordered lists retain their authored delimiter in HTML as `data-delim`. Markdown import preserves trailing form feeds and vertical tabs. Braced closers stay inside their bracket and code scopes.
@@ -440,6 +443,7 @@ are not listed, because no release ever shipped them.
   instead of re-rendering them, so an escaped character in a heading reaches the
   label; and `attrs.keyValues` is published in the author's source order, the
   same order the sibling `attrs.order` field states.
+
 
 ## [0.1.0] - 2026-07-12
 
