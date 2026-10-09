@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Pin Rust engine `675edf58` for ordered-list boundary preservation, raw-block profile fallback and the 2,230-example core corpus. This retains the Markdown fidelity and image-alt fixes from the previous pin.
-- Ordered lists retain their authored delimiter in HTML as `data-delim`. Markdown import preserves trailing form feeds and vertical tabs. Braced closers stay inside their bracket and code scopes. Djot migration preserves delimiter boundaries.
+- Pin Rust engine `675edf58` for ordered-list boundary preservation and current spec conformance. This retains the Markdown fidelity and image-alt fixes from the previous pin.
+- Under the article profile, denied raw blocks become code blocks that retain their escaped payload.
+
+- Ordered lists retain their authored delimiter in HTML as `data-delim`. Markdown import preserves trailing form feeds and vertical tabs. Braced closers stay inside their bracket and code scopes.
 
 - A Markdown writer refusal returns ArgumentError instead of panicking in the engine.
 
