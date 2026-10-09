@@ -24,4 +24,16 @@ class OrderedDialectBoundariesTest < Minitest::Test
     assert_equal "<pre><code class=\"language-html\">&lt;b&gt;x&lt;/b&gt;\n</code></pre>",
                  Carve.to_html("``` =html\n<b>x</b>\n```", profile: "article")
   end
+
+  def test_markdown_retains_authored_ordered_delimiters
+    cases = JSON.parse(File.read(File.join(__dir__, "fixtures", "markdown-ordered-delimiters.json")))
+    assert_equal 3, cases.length
+    cases.each do |row|
+      imported = Carve.from_markdown(row.fetch("markdown"))
+      assert_equal row.fetch("source"), imported[:value], row.fetch("name")
+      assert_equal row.fetch("html"), Carve.to_html(imported[:value]).sub(/\n+\z/, ""), row.fetch("name")
+      refute_empty imported[:report][:diagnostics], row.fetch("name")
+      assert imported[:report][:diagnostics].all? { |diagnostic| diagnostic[:fidelity] == "preserved" }, row.fetch("name")
+    end
+  end
 end
