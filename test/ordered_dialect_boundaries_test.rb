@@ -12,6 +12,7 @@ class OrderedDialectBoundariesTest < Minitest::Test
       source = row.fetch("source")
       assert_equal row.fetch("html"), Carve.to_html(source).sub(/\n+\z/, ""), row.fetch("name")
       assert_equal source, Carve.to_carve(source), row.fetch("name")
+      assert_equal source, Carve.to_carve(source + "\n"), row.fetch("name")
       imported = Carve.from_html(row.fetch("inputHtml"))
       assert_equal source, imported[:value], row.fetch("name")
       assert_empty imported[:report][:diagnostics], row.fetch("name")
