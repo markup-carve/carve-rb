@@ -63,6 +63,8 @@ CRV
 Carve.to_html(src, extensions: %w[math-block list-table])
 ```
 
+`Carve.from_markdown` raises `ArgumentError` when Markdown nesting exceeds the importer limit.
+
 ### Recognized extensions
 
 `Carve::EXTENSIONS` is the list, and it comes from the engine rather than from
