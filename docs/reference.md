@@ -45,8 +45,8 @@ Carve.to_plain_text(source)
 Carve.to_ansi(source)
 Carve.to_carve(source)
 # Import reports use schema version 2, with fidelity and confidence per finding.
-# Markdown emits fidelity-unverified/dropped/fallback until its engine path
-# exposes construct-level fidelity.
+# Markdown reports construct outcomes and known losses. Incomplete assessments
+# emit fidelity-unverified/dropped/fallback.
 Carve.from_html('<p>Hello <strong>world</strong></p>')
 Carve.from_markdown('*em* and **strong**')
 

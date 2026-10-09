@@ -196,12 +196,6 @@ class IncludesTest < Minitest::Test
   # message read `Heading id "x" was renamed`; it now reads `Id "x" was
   # renamed`, because the rename reaches paragraphs too.
   #
-  # The RULE ID is deliberately asserted as the engine spells it today,
-  # `include-heading-id-rename`, even though it now fires for a paragraph. That
-  # mismatch is upstream's to settle (reported as
-  # markup-carve/carve-rb#172); pinning the current spelling here
-  # means a host matching on the rule id finds out from this suite when it
-  # changes, rather than from its own logs.
   def test_a_colliding_paragraph_id_is_renamed_and_reported
     with_book do |root, book|
       write(root, "chapters/one.crv", "{#para}\nJust a paragraph.\n")
@@ -215,7 +209,7 @@ class IncludesTest < Minitest::Test
 
       rules = result[:warnings].map { |w| w[:rule] }
 
-      assert_includes rules, "include-heading-id-rename"
+      assert_includes rules, "include-id-rename"
       messages = result[:warnings].map { |w| w[:message] }
 
       assert_includes messages, "Id \"para\" was renamed to \"para-2\"."

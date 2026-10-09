@@ -471,15 +471,20 @@ fn from_html_json(ruby: &Ruby, source: String, mode: String) -> Result<String, E
     .to_string())
 }
 
-fn from_markdown_json(source: String) -> String {
-    let result = carve_rs::migrate_markdown(&source);
+fn from_markdown_json(ruby: &Ruby, source: String) -> Result<String, Error> {
+    let result = carve_rs::try_migrate_markdown(&source).map_err(|error| {
+        Error::new(
+            ruby.exception_arg_error(),
+            format!("Markdown import failed: {error}"),
+        )
+    })?;
     let diagnostics = result
         .report
         .diagnostics
         .iter()
         .map(migration_diagnostic_json)
         .collect::<Vec<_>>();
-    serde_json::json!({"value": result.value, "report": {"schemaVersion": result.report.schema_version, "sourceFormat": result.report.source_format.as_str(), "diagnostics": diagnostics}}).to_string()
+    Ok(serde_json::json!({"value": result.value, "report": {"schemaVersion": result.report.schema_version, "sourceFormat": result.report.source_format.as_str(), "diagnostics": diagnostics}}).to_string())
 }
 
 fn migration_diagnostic_json(diagnostic: &carve_rs::MigrationDiagnostic) -> serde_json::Value {
@@ -853,7 +858,7 @@ guarded!(g_to_markdown(source: String) -> String => to_markdown);
 guarded!(g_to_plain_text(source: String) -> String => to_plain_text);
 guarded!(g_to_ansi(source: String) -> String => to_ansi);
 guarded!(g_to_carve(source: String) -> String => to_carve);
-guarded!(g_from_markdown_json(source: String) -> String => from_markdown_json);
+guarded!(g_from_markdown_json(ruby: &Ruby, source: String) -> String =>? from_markdown_json);
 guarded!(g_to_ast_json(source: String) -> String => to_ast_json);
 guarded!(g_extension_names() -> Vec<String> => extension_names);
 guarded!(g_panic_probe() -> String => panic_probe);

@@ -89,8 +89,14 @@ class SpecDriftGateTest < Minitest::Test
   # the passing case into a vacuous one.
   def pinned_engine
     manifest = File.read(File.join(ROOT, "ext/carve/Cargo.toml"))
-    manifest[/package = "carve-lang", version = "=([^"]+)"/, 1].then do |version|
-      version ? "carve-lang #{version}" : flunk("no engine version in ext/carve/Cargo.toml")
+    entry = manifest.lines.find { |line| line.start_with?("carve_rs = ") }
+    flunk("no engine dependency in ext/carve/Cargo.toml") unless entry
+    if (revision = entry[/rev = "([^"]+)"/, 1])
+      "rev #{revision}"
+    elsif (version = entry[/version = "=([^"]+)"/, 1])
+      "carve-lang #{version}"
+    else
+      flunk("no exact engine pin in ext/carve/Cargo.toml")
     end
   end
 
