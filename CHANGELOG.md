@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Adjacent alphabetic and Roman ordered lists stay separate through HTML import and formatting. Three blank lines end dialect lookahead.
 
+- Markdown import reports assess construct fidelity, including preserved constructs and conversion losses.
+
 - Under the article profile, denied raw blocks become code blocks that retain their escaped payload.
 
 - Ordered lists retain their authored delimiter in HTML as `data-delim`. Markdown import preserves trailing form feeds and vertical tabs. Braced closers stay inside their bracket and code scopes.
