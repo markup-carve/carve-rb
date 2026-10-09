@@ -43,11 +43,61 @@ module CorpusPopulation
   COMPARE_OPEN = /\A:{3,}\s+compare(\s+\S.*)?\z/
   MARKER_RUN = /\A:{3,}/
 
+  # An independent census of the pairs one example page declares, ported from
+  # the spec's scripts/lib/example-pair-census.mjs. One entry per `::: compare`
+  # block, in source order, carrying how many `carve` and `html` fences the
+  # author put in it.
+  #
+  # A block may hold SEVERAL pairs - one per `carve` fence - so counting the
+  # blocks reports N-1 pairs too few for a block of N pairs, which is a gate
+  # that cannot detect what it claims to detect.
+  #
+  # Fences are tracked by their literal opening backtick run, because inside a
+  # fence nothing is markup: a ```` example whose content is a ``` carve line
+  # declares no pair of its own.
+  #
+  # A plain function over lines, deliberately. The counting used to be inline in
+  # declared_corpus_size, where it could only be exercised by pointing the suite
+  # at a real spec checkout, and the one corpus shape that would have caught the
+  # block-counting defect no longer exists upstream.
+  def self.census_compare_pairs(lines)
+    blocks = []
+    block = nil
+    fence = nil
+    lines.each_with_index do |line, index|
+      if fence
+        fence = nil if line.start_with?(fence) && line[fence.length..].strip.empty?
+        next
+      end
+      ticks = line[/\A`*/].length
+      if ticks >= 3
+        fence = line[0, ticks]
+        language = line[ticks..].strip
+        block[language] += 1 if block && block.key?(language)
+        next
+      end
+      trimmed = line.strip
+      if block.nil?
+        if COMPARE_OPEN.match?(trimmed)
+          block = { line: index + 1, marker: MARKER_RUN.match(trimmed)[0], "carve" => 0, "html" => 0 }
+        end
+        next
+      end
+      next unless trimmed == block[:marker]
+
+      blocks << block
+      block = nil
+    end
+    blocks << block.merge(unclosed: true) if block
+    blocks << { unclosed_fence: fence } if fence
+    blocks
+  end
+
   # Counts the example pairs the spec DECLARES. corpus_dir is
   # CARVE_SPEC_CORPUS, i.e. <spec>/tests/corpus.
   #
-  # Count Carve and HTML fences independently of generated files. Each block
-  # must contain equal, nonzero counts; literal fenced content is ignored.
+  # Every `carve` fence inside a compare block is one pair. Each block must
+  # carry equal, nonzero counts; literal fenced content is ignored.
   def declared_corpus_size(corpus_dir)
     examples_dir = File.expand_path(File.join(corpus_dir, "..", "..", "resources", "examples"))
     declared = 0
@@ -59,37 +109,14 @@ module CorpusPopulation
       assert File.exist?(path),
              "no corpus source page at #{path}. tests/corpus is generated from these pages; " \
              "if the spec moved them, this helper has to move with them"
-      marker = nil
-      fence = nil
-      counts = { "carve" => 0, "html" => 0 }
-      File.read(path).split("\n").each do |line|
-        if fence
-          fence = nil if line.start_with?(fence) && line[fence.length..].strip.empty?
-          next
-        end
-        opening = /\A(`{3,})(.*)\z/.match(line)
-        if opening
-          fence = opening[1]
-          language = opening[2].strip
-          counts[language] += 1 if marker && counts.key?(language)
-          next
-        end
-        trimmed = line.strip
-        if marker
-          if trimmed == marker
-            assert counts["carve"].positive? && counts["carve"] == counts["html"],
-                   "unpaired or empty compare block in #{path}: #{counts}"
-            declared += counts["carve"]
-            marker = nil
-          end
-          next
-        end
-        next unless COMPARE_OPEN.match?(trimmed)
-
-        marker = MARKER_RUN.match(trimmed)[0]
-        counts = { "carve" => 0, "html" => 0 }
+      CorpusPopulation.census_compare_pairs(File.read(path).split("\n")).each do |block|
+        assert_nil block[:unclosed], "unclosed compare block in #{path} at line #{block[:line]}"
+        assert_nil block[:unclosed_fence], "unclosed fence in #{path}"
+        assert block["carve"].positive? && block["carve"] == block["html"],
+               "unpaired or empty compare block in #{path} at line #{block[:line]}: " \
+               "#{block['carve']} carve, #{block['html']} html"
+        declared += block["carve"]
       end
-      assert marker.nil? && fence.nil?, "unclosed compare block or fence in #{path}"
     end
     refute_equal 0, declared,
                  "the corpus source pages under #{examples_dir} declare no ::: compare blocks " \
@@ -109,7 +136,8 @@ module CorpusPopulation
     assert_equal declared, got,
                  "#{what}: #{got}, but the spec's example pages declare #{declared}. Every " \
                  "::: compare block in resources/examples/{core,extensions,edge-cases}.md " \
-                 "declares its fence pairs, so a difference means the corpus at #{corpus_dir} " \
+                 "yields one corpus pair per `carve` fence, so a difference means the corpus " \
+                 "at #{corpus_dir} " \
                  "is not the one those pages describe - a truncated or stale checkout, a wrong " \
                  "CARVE_SPEC_CORPUS, or a corpus that needs regenerating (npm run corpus:build " \
                  "in the spec repository). It does not mean this run was clean."
