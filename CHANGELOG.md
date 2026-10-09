@@ -7,13 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Pin Rust engine `675edf58` for ordered-list boundary preservation, raw-block profile fallback and the 2,230-example core corpus.
+- Pin Rust engine `675edf58` for ordered-list boundary preservation, raw-block profile fallback and the 2,230-example core corpus. This retains the Markdown fidelity and image-alt fixes from the previous pin.
+- Ordered lists retain their authored delimiter in HTML as `data-delim`. Markdown import preserves trailing form feeds and vertical tabs. Braced closers stay inside their bracket and code scopes. Djot migration preserves delimiter boundaries.
 
 - A Markdown writer refusal returns ArgumentError instead of panicking in the engine.
 
 - **Breaking:** Engine compatibility: image alt text and quoted include paths decode ASCII punctuation escapes; escape a literal backslash twice. Include rename warnings use `include-id-rename` instead of `include-heading-id-rename`.
-
-- Pin Rust engine `ed5581b1` to include Markdown construct assessment and the image-alt boundary fix.
 
 ## [0.1.7] - 2026-10-07
 
@@ -439,7 +438,6 @@ are not listed, because no release ever shipped them.
   instead of re-rendering them, so an escaped character in a heading reaches the
   label; and `attrs.keyValues` is published in the author's source order, the
   same order the sibling `attrs.order` field states.
-
 
 ## [0.1.0] - 2026-07-12
 
