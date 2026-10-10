@@ -672,9 +672,10 @@ class CarveTest < Minitest::Test
   end
 
   def test_parse_publishes_the_author_s_list_marker
-    assert_equal "-", Carve.parse("- a\n")[:children][0][:bulletChar]
+    # The defaults `-` and `.` are absent from the tree (carve#2828).
+    refute Carve.parse("- a\n")[:children][0].key?(:bulletChar)
     assert_equal "*", Carve.parse("* a\n")[:children][0][:bulletChar]
-    assert_equal ".", Carve.parse("1. a\n")[:children][0][:delim]
+    refute Carve.parse("1. a\n")[:children][0].key?(:delim)
     assert_equal ")", Carve.parse("1) a\n")[:children][0][:delim]
     refute Carve.parse("- a\n")[:children][0].key?(:ol_type)
   end
