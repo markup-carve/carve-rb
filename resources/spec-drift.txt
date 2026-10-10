@@ -57,3 +57,21 @@
 # EMPTY IS THE GOAL STATE. An empty file means this gem renders every document
 # in spec main exactly as the spec does, and it is the only state that may be
 # tagged.
+19-smart-typography-dashes-and-quotes-11 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+19-smart-typography-dashes-and-quotes-12 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+19-smart-typography-dashes-and-quotes-14 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+19-smart-typography-dashes-and-quotes-15 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+19-smart-typography-dashes-and-quotes-16 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+19-smart-typography-dashes-and-quotes-18 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+19-smart-typography-dashes-and-quotes-19 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+19-smart-typography-dashes-and-quotes-20 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+19-smart-typography-dashes-and-quotes-21 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+19-smart-typography-dashes-and-quotes-22 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+19-smart-typography-dashes-and-quotes-26 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+19-smart-typography-dashes-and-quotes-27 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+19-smart-typography-dashes-and-quotes-30 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+29-non-breaking-space-2 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+552-a-braced-comment-does-not-decide-a-quote-2 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+552-a-braced-comment-does-not-decide-a-quote-3 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+552-a-braced-comment-does-not-decide-a-quote-4 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
+552-a-braced-comment-does-not-decide-a-quote-7 # undeclared at spec main d675083 on 2026-10-10; the pinned engine rev 889e916f62dd9d51d743b544a83d04dace2d924c predates it
