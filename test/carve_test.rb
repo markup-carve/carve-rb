@@ -671,12 +671,25 @@ class CarveTest < Minitest::Test
     assert_equal "new", sub[:new].first[:children].first[:value]
   end
 
-  def test_parse_publishes_the_author_s_list_marker
-    assert_equal "-", Carve.parse("- a\n")[:children][0][:bulletChar]
+  def test_parse_omits_default_list_markers_and_preserves_author_choices
+    refute Carve.parse("- a\n")[:children][0].key?(:bulletChar)
     assert_equal "*", Carve.parse("* a\n")[:children][0][:bulletChar]
-    assert_equal ".", Carve.parse("1. a\n")[:children][0][:delim]
+    refute Carve.parse("1. a\n")[:children][0].key?(:delim)
     assert_equal ")", Carve.parse("1) a\n")[:children][0][:delim]
     refute Carve.parse("- a\n")[:children][0].key?(:ol_type)
+    assert_equal "- a\n", Carve.to_carve("- a\n")
+    assert_equal "1. a\n", Carve.to_carve("1. a\n")
+    assert_equal "* a\n", Carve.to_carve("* a\n")
+    assert_equal "1) a\n", Carve.to_carve("1) a\n")
+    assert_equal "<ul>\n  <li>a</li>\n</ul>", Carve.to_html("- a\n")
+    assert_equal "<ol>\n  <li>a</li>\n</ol>", Carve.to_html("1. a\n")
+  end
+
+  def test_parse_publishes_table_separator_widths
+    table = Carve.parse("| a | b |\n| -- | ----- |\n")[:children][0]
+
+    assert_equal "table", table[:type]
+    assert_equal [2, 5], table[:separatorWidths]
   end
 
   def test_parse_does_not_leak_engine_internals_on_a_link
