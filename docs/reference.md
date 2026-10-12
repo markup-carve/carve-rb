@@ -286,11 +286,8 @@ rejection with an empty String, which a caller cannot tell from a document that
 legitimately rendered to nothing.
 
 An engine **panic** raises `Carve::EnginePanic`, a `StandardError` subclass.
-This is the error class untrusted input makes relevant: a panic means the engine
-reached a state it believed impossible, and before it was introduced such a
-panic arrived as Ruby `fatal`, which `rescue` cannot stop, so a single document
-ended the host process (markup-carve/carve-rb#170). A worker can now answer the
-request and keep serving:
+A panic means the engine reached a state it believed impossible. Rescue it to
+handle the failed request and keep the worker serving:
 
 ``` ruby
 begin
@@ -379,23 +376,14 @@ rake test      # runs the minitest suite
 
 ## carve-rs dependency pin
 
-`ext/carve/Cargo.toml` pins a specific published carve-rs version for
-reproducible gem builds:
+`ext/carve/Cargo.toml` pins the engine to an exact Git revision for
+reproducible gem builds. Read its `rev` field for the current pin.
 
-```toml
-carve_rs = { package = "carve-lang", version = "=0.1.6" }
-```
+The dependency uses the package name `carve-lang` and the Rust import alias
+`carve_rs`.
 
-Read the current version from `ext/carve/Cargo.toml`; the example above only
-shows the shape of the exact pin.
-
-The crate is imported under the alias `carve_rs`. It is published as `carve-lang`
-(carve-rs renamed it from `carve`), so the dependency keeps
-`package = "carve-lang"`.
-
-When bumping the version, run `rake compile` and commit the resulting
-`ext/carve/Cargo.lock` in the same change. The lock records the resolved crate,
-so leaving it behind can test a different engine from a fresh build.
+When updating the revision, run `rake compile` and commit the resulting
+`ext/carve/Cargo.lock` in the same change. The lock records the resolved engine.
 
 Whether the pin is current is not a judgment call: CI runs the mandatory spec
 corpus through the compiled extension and requires byte-identical HTML, so a pin
