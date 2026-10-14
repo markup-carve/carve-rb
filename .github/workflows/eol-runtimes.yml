@@ -1,0 +1,108 @@
+name: EOL runtimes
+
+# Ruby versions past end of life that carve.gemspec still declares
+# (required_ruby_version). They stay tested here, daily, instead of on every
+# PR: the gem is built, gated and tested the same way as ci.yml's build job.
+on:
+  schedule:
+    - cron: "41 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build (Ruby ${{ matrix.ruby }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ["3.2"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache the Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ext/carve
+          cache-targets: "false"
+          save-if: false
+
+      # Same probe as ci.yml: use the image's libclang when it is complete,
+      # otherwise install it from apt with bounded retries.
+      - name: Install libclang (rb-sys bindgen)
+        run: |
+          for lib in $(find /usr/lib -maxdepth 4 \
+                         \( -name 'libclang.so' -o -name 'libclang.so.*' \) \
+                         2>/dev/null | sort -V -r); do
+            dir="$(dirname "$lib")"
+            headers="$(find "$dir/clang" -maxdepth 3 -name stddef.h 2>/dev/null | sort -V | tail -1)"
+            if [ -n "$headers" ]; then
+              echo "libclang on the image: $lib (resource headers at $(dirname "$headers"))"
+              echo "LIBCLANG_PATH=$dir" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "::notice::$lib has no clang resource headers beside it"
+          done
+          echo "::notice::no usable libclang on the image; installing from apt"
+          for attempt in 1 2 3; do
+            if timeout 240 sudo apt-get update && timeout 240 sudo apt-get install -y libclang-dev; then
+              exit 0
+            fi
+            echo "::warning::apt attempt ${attempt} failed or timed out; retrying"
+            sleep 10
+          done
+          echo "::error::apt-get could not install libclang-dev after 3 attempts"
+          exit 1
+
+      - name: Check out carve-rs
+        uses: actions/checkout@v4
+        with:
+          repository: markup-carve/carve-rs
+          path: carve-rs
+          fetch-depth: 0
+
+      - name: Resolve the spec commit the pinned engine pins
+        id: pin
+        run: |
+          spec="$(python3 scripts/pinned-spec-commit.py \
+            --engine carve-rs \
+            --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock)"
+          echo "spec=$spec" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the spec corpus that engine was written against
+        uses: actions/checkout@v4
+        with:
+          repository: markup-carve/carve
+          ref: ${{ steps.pin.outputs.spec }}
+          path: spec
+
+      - name: Build the gem and run the release gate over it
+        env:
+          CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
+          CARVE_GATE_GEM_HOME: ${{ runner.temp }}/gate-gems
+        run: |
+          gem build carve.gemspec
+          bash scripts/verify-release-artifact.sh "$(ls carve-lang-*.gem)"
+
+      # The Ruby suite against the extension that install compiled, so no
+      # second compile. Not `rake test`: its `compile` prerequisite would
+      # rebuild the extension from the working tree.
+      - name: Run the test suite against the packaged extension
+        env:
+          CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
+          GATE_GEMS: ${{ runner.temp }}/gate-gems
+        run: |
+          bundle install
+          cp "$(ls "$GATE_GEMS"/gems/carve-lang-*/lib/carve/carve.so)" lib/carve/carve.so
+          bundle exec ruby -Ilib -Itest -e 'Dir["test/**/*_test.rb"].sort.each { |f| require File.expand_path(f) }'
