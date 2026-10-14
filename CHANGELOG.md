@@ -7,19 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Pin Rust engine `889e916f` for current spec conformance.
+## [0.1.8] - 2026-10-14
 
-- Adjacent alphabetic and Roman ordered lists stay separate through HTML import and formatting. Three blank lines end dialect lookahead.
+### Breaking
 
-- Markdown import reports assess construct fidelity, including preserved constructs and conversion losses.
+- The engine is the published `carve-lang` 0.1.9 crate, so the AST follows contract 1.1: a cell joined across lines holds a `cell_wrap` node between its text halves, tables carry `separatorWidths`, and `delim` and `bulletChar` appear only for `)` and `*` (#200, markup-carve/carve-rs#2482).
+- New loss codes such as `carrier-attribute-dropped`, `list-style-dropped` and `frontmatter-synthesized`. A check that fails on unknown codes has to list them (#200, markup-carve/carve-rs#2523).
+- Image alt text and quoted include paths decode punctuation escapes, so double a literal backslash. The include rename warning's rule id is now `include-id-rename` instead of `include-heading-id-rename` (#184, markup-carve/carve#2772).
 
-- Under the article profile, denied raw blocks become code blocks that retain their escaped payload.
+### Fixes
 
-- Ordered lists retain their authored delimiter in HTML as `data-delim`. Markdown import keeps `)` list delimiters and reports their fidelity as preserved. Markdown import preserves trailing form feeds and vertical tabs. Braced closers stay inside their bracket and code scopes.
+- A Markdown writer refusal raises `ArgumentError` instead of panicking in the engine (#184).
+- Adjacent alphabetic and Roman ordered lists stay separate through HTML import and formatting (#185).
+- Under the article profile, denied raw blocks become code blocks that keep their payload (#185).
 
-- A Markdown writer refusal returns ArgumentError instead of panicking in the engine.
+### Improvements
 
-- **Breaking:** Engine compatibility: image alt text and quoted include paths decode ASCII punctuation escapes; escape a literal backslash twice. Include rename warnings use `include-id-rename` instead of `include-heading-id-rename`.
+- Markdown import reports assess construct fidelity, including preserved constructs as well as losses (#185).
+- Ordered lists keep a `)` delimiter as `data-delim` in HTML and through Markdown import (#185).
 
 ## [0.1.7] - 2026-10-07
 
@@ -458,7 +463,8 @@ are not listed, because no release ever shipped them.
   Arrays (every AST node type is covered), enabling custom renderers such as
   [carve-hexapdf](https://github.com/markup-carve/carve-hexapdf).
 
-[Unreleased]: https://github.com/markup-carve/carve-rb/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/markup-carve/carve-rb/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/markup-carve/carve-rb/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/markup-carve/carve-rb/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/markup-carve/carve-rb/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/markup-carve/carve-rb/compare/v0.1.4...v0.1.5
