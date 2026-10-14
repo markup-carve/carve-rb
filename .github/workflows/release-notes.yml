@@ -12,6 +12,12 @@ on:
       - '.github/workflows/release.yml'
       - '.github/workflows/release-notes.yml'
 
+# A new push cancels the superseded run of the same pull request; other
+# events get a group per run so nothing queued is dropped.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
