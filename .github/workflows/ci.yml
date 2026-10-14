@@ -94,10 +94,12 @@ jobs:
         # conversion itself.
         run: bash scripts/check-panic-unwind.sh
 
+      # A supported Ruby. 3.2 is past end of life but still declared
+      # (required_ruby_version); it runs daily in eol-runtimes.yml.
       - name: Install Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: "3.2"
+          ruby-version: "3.4"
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
