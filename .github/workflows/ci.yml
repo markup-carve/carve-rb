@@ -83,11 +83,6 @@ jobs:
     timeout-minutes: 20
     outputs:
       spec-main: ${{ steps.drift.outputs.spec }}
-    env:
-      # One target dir for `rake compile` and the `gem install` inside the
-      # release gate, so the gem build reuses the compiled dependencies. The
-      # gem's own crate is still compiled from the gem's sources.
-      RB_SYS_CARGO_TARGET_DIR: ${{ github.workspace }}/target
     steps:
       - uses: actions/checkout@v4
 
@@ -107,10 +102,14 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache the Rust build
+      # Registry and git checkouts only. The one compile in this job happens
+      # inside `gem install`, and rb_sys deletes its target dir after the
+      # install (and `make clean` before it), so there is no target to keep.
+      - name: Cache the Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: ext/carve -> ../../target
+          workspaces: ext/carve
+          cache-targets: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       # Compiling only proves the extension builds. The Ruby suite is the
@@ -234,27 +233,15 @@ jobs:
           ref: ${{ steps.pin.outputs.spec }}
           path: spec
 
-      - name: Compile the extension and run the test suite
-        env:
-          CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
-        run: |
-          bundle install
-          bundle exec rake compile
-          bundle exec rake test
-
-      # Everything above tests the CHECKOUT: `rake compile` builds the extension
-      # into lib/carve/ from the working tree and the suite drives that. What
-      # gets published is a .gem, whose contents the gemspec's globs decide and
-      # whose extension `gem install` compiles under its own toolchain. Those
-      # are two artifacts, and release.yml used to push the second one having
-      # only ever tested the first.
+      # The extension is compiled ONCE, by `gem install` inside the release
+      # gate, from the .gem this commit builds. That is the artifact release.yml
+      # publishes, whose contents the gemspec's globs decide; testing only a
+      # `rake compile` of the working tree would test a different artifact.
       #
-      # The gate that closed that lives in release.yml, where it fires on a tag.
-      # A check that only ever runs during a release is a check nobody has seen
-      # work: it rots between releases, and the run that discovers it is broken
-      # is the run where a version is waiting to go out. So it also runs here,
-      # every push, over a gem built from this commit -- the same script, the
-      # same corpus, the same refusal.
+      # The gate in release.yml fires on a tag, and a check that only runs
+      # during a release rots between releases. So it also runs here, every
+      # push, over a gem built from this commit -- the same script, the same
+      # corpus, the same refusal.
       - name: Build the gem and run the release gate over it
         env:
           CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
@@ -262,6 +249,18 @@ jobs:
         run: |
           gem build carve.gemspec
           bash scripts/verify-release-artifact.sh "$(ls carve-lang-*.gem)"
+
+      # The Ruby suite against the extension that install compiled, so no
+      # second compile. Not `rake test`: its `compile` prerequisite would
+      # rebuild the extension from the working tree.
+      - name: Run the test suite against the packaged extension
+        env:
+          CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
+          GATE_GEMS: ${{ runner.temp }}/gate-gems
+        run: |
+          bundle install
+          cp "$(ls "$GATE_GEMS"/gems/carve-lang-*/lib/carve/carve.so)" lib/carve/carve.so
+          bundle exec ruby -Ilib -Itest -e 'Dir["test/**/*_test.rb"].sort.each { |f| require File.expand_path(f) }'
 
       # For corpus-drift below. It measures the SAME installed gem this job
       # gated rather than installing it again: a second install is a second
