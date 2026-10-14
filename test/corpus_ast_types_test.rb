@@ -41,7 +41,8 @@ class CorpusAstTypesTest < Minitest::Test
   # explicit list rather than a count: a count says "something went missing"
   # and this says which.
   EXPECTED = %w[
-    abbreviation abbreviation_def admonition autolink block_quote caption_number code
+    abbreviation abbreviation_def admonition autolink block_quote caption_number
+    cell_wrap code
     code_block comment critic_comment definition_description definition_list
     definition_term delete directive div document emphasis escaped_text figure
     figure_group footnote footnote_ref frontmatter hard_break heading heading_ref
