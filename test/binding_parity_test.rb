@@ -407,6 +407,13 @@ class BindingParityTest < Minitest::Test
   # stale, bump it" - was wrong for the state this gate spent 2026-09-23 and
   # 2026-09-24 in.
   def bump_advice(version)
+    if version.nil? && (revision = pinned_revision)
+      return "ext/carve/Cargo.toml pins carve-rs at revision #{revision}, not a published version. " \
+             "Moving that `rev` to carve-rs main and regenerating ext/carve/Cargo.lock closes this " \
+             "by construction; the comparison against the pinned engine shows whether the binding " \
+             "itself differs."
+    end
+
     if version.nil?
       return "The pin could not be read from ext/carve/Cargo.toml and ext/carve/Cargo.lock, " \
              "so this run cannot say whether a bump would close this. Run " \
