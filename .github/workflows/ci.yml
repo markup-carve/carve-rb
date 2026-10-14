@@ -527,6 +527,9 @@ jobs:
           # The script merges `main` into the branch on the preserve path, so it
           # needs more than the tip.
           fetch-depth: 0
+          # The script's `git push` uses this credential. A GITHUB_TOKEN push
+          # leaves the pull request's CI waiting for manual approval.
+          token: ${{ secrets.BUMP_TOKEN || github.token }}
 
       # continue-on-error, because the artifact is absent exactly when
       # corpus-drift's comparison never happened - and the script's own refusal
