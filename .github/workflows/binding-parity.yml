@@ -16,6 +16,10 @@ on:
       - "scripts/pinned-spec-commit.py"
       - "scripts/newest-published-engine.py"
       - "test/binding_parity_test.rb"
+      - "test/corpus_population.rb"
+      - "Gemfile"
+      - "Rakefile"
+      - "carve.gemspec"
       - ".github/workflows/binding-parity.yml"
   schedule:
     - cron: "15 6 * * *"
