@@ -19,6 +19,13 @@ on:
     - cron: "15 6 * * *"
   workflow_dispatch:
 
+# One run per pull request: a new push cancels the one it supersedes. Every
+# other event gets a group of its own, because GitHub keeps only one pending
+# run per group and would drop a queued schedule or push run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 # Jobs carry an explicit timeout-minutes: without one GitHub applies a
 # 360-minute default, long enough for a stalled job to go unnoticed.
 
@@ -74,6 +81,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      spec-main: ${{ steps.drift.outputs.spec }}
+    env:
+      # One target dir for `rake compile` and the `gem install` inside the
+      # release gate, so the gem build reuses the compiled dependencies. The
+      # gem's own crate is still compiled from the gem's sources.
+      RB_SYS_CARGO_TARGET_DIR: ${{ github.workspace }}/target
     steps:
       - uses: actions/checkout@v4
 
@@ -93,10 +107,13 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: cargo check (ext crate)
-        run: cargo check --manifest-path ext/carve/Cargo.toml
+      - name: Cache the Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ext/carve -> ../../target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
-      # `cargo check` only proves the extension COMPILES. The Ruby suite is the
+      # Compiling only proves the extension builds. The Ruby suite is the
       # only thing that exercises the gem's actual behavior through its public
       # API -- without it the engine can drift underneath us in silence, which
       # is exactly what happened: the carve-rs pin sat months behind and had
@@ -241,17 +258,39 @@ jobs:
       - name: Build the gem and run the release gate over it
         env:
           CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
+          CARVE_GATE_GEM_HOME: ${{ runner.temp }}/gate-gems
         run: |
           gem build carve.gemspec
           bash scripts/verify-release-artifact.sh "$(ls carve-lang-*.gem)"
 
-      # For corpus-drift below. It measures the SAME gem this job gated rather
-      # than building a second one: two builds would be two artifacts, and the
-      # drift number would be about the one nothing else looked at.
+      # For corpus-drift below. It measures the SAME installed gem this job
+      # gated rather than installing it again: a second install is a second
+      # compile, and the drift number would be about an artifact nothing else
+      # looked at. The verdict is corpus-drift's; this only produces the log.
+      - name: Check out the spec corpus at main
+        uses: actions/checkout@v4
+        with:
+          repository: markup-carve/carve
+          path: spec-main
+
+      # The exit status is discarded HERE and only here: divergence is what is
+      # being measured, so a non-zero exit is the expected shape of a
+      # measurement that found some. corpus-drift decides from its own exit code.
+      - name: Measure the gem against spec main
+        id: drift
+        env:
+          CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec-main/tests/corpus
+          CARVE_GATE_GEM_HOME: ${{ runner.temp }}/gate-gems
+        run: |
+          set -uo pipefail
+          echo "spec=$(git -C spec-main rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          bash scripts/verify-release-artifact.sh "$(ls carve-lang-*.gem)" > drift.log 2>&1 || true
+          cat drift.log
+
       - uses: actions/upload-artifact@v4
         with:
-          name: ci-gem
-          path: carve-lang-*.gem
+          name: drift-log
+          path: drift.log
           if-no-files-found: error
           retention-days: 7
 
@@ -355,99 +394,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check out the spec corpus at main
-        uses: actions/checkout@v4
-        with:
-          repository: markup-carve/carve
-          path: spec
-
-      - name: Install Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.2"
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      # `gem install` compiles the packaged extension, which runs rb-sys's
-      # bindgen. Same reason the verify job installs it.
-      - name: Install libclang (rb-sys bindgen)
-        # BOUNDED AND RETRIED. Bare `apt-get` has no timeout, so a wedged
-        # mirror hangs the job until the 6h runner limit - it produces no
-        # output, which makes it indistinguishable from a slow compile. On
-        # 2026-08-19 this step hung nine times across the two repositories that
-        # install libclang, for 28 to 113 minutes each, and every one was
-        # cleared only by cancelling and re-running.
-        #
-        # Three tries, each capped at 4 minutes. A hung mirror now costs 12
-        # minutes worst case and says so, instead of an hour of silence.
-        #
-        # THE CHEAPEST APT CALL IS THE ONE NOT MADE. Three attempts against one
-        # unhealthy mirror cost 12.6 minutes and then failed, taking `main` red
-        # for an infrastructure reason that the verdict ticket it filed reads as
-        # a gem defect (markup-carve/carve-rb#175). The runner image usually
-        # already ships llvm, so look first and make no network request at all
-        # on the common path.
-        #
-        # A LIBRARY IS NOT ENOUGH, so the probe does not stop at finding one.
-        # bindgen needs clang's own resource headers too, and a split package
-        # can ship libclang.so.1 with no lib/clang/<v>/include beside it -
-        # bindgen then fails on every header it opens rather than at load time.
-        # That is the same missing-resource-headers problem that makes a local
-        # `rake compile` need BINDGEN_EXTRA_CLANG_ARGS pointed at the GCC
-        # include directory. An install without them falls through to apt, so
-        # this step either skips apt for a usable libclang or installs one; it
-        # never hands bindgen a half-install and calls it a saving.
-        run: |
-          for lib in $(find /usr/lib -maxdepth 4 \
-                         \( -name 'libclang.so' -o -name 'libclang.so.*' \) \
-                         2>/dev/null | sort -V -r); do
-            dir="$(dirname "$lib")"
-            headers="$(find "$dir/clang" -maxdepth 3 -name stddef.h 2>/dev/null | sort -V | tail -1)"
-            if [ -n "$headers" ]; then
-              echo "libclang on the image: $lib (resource headers at $(dirname "$headers"))"
-              echo "LIBCLANG_PATH=$dir" >> "$GITHUB_ENV"
-              exit 0
-            fi
-            echo "::notice::$lib has no clang resource headers beside it"
-          done
-          echo "::notice::no usable libclang on the image; installing from apt"
-          for attempt in 1 2 3; do
-            if timeout 240 sudo apt-get update && timeout 240 sudo apt-get install -y libclang-dev; then
-              exit 0
-            fi
-            echo "::warning::apt attempt ${attempt} failed or timed out; retrying"
-            sleep 10
-          done
-          echo "::error::apt-get could not install libclang-dev after 3 attempts"
-          exit 1
-
-      - name: Download the gem the corpus gate ran over
+      # The measurement runs in `build`, over the gem that job installed and
+      # gated, against the spec main commit it reports as an output.
+      - name: Download the drift log the build job measured
         uses: actions/download-artifact@v4
         with:
-          name: ci-gem
-
-      # MEASURE. The exit status is discarded HERE and only here: this run's job
-      # is to produce the log, and divergence is what is being measured, so a
-      # non-zero exit is the expected shape of a measurement that found some.
-      # The verdict is a separate step that reads its own exit code, because
-      # deciding from a grep is exactly the bug #100 was.
-      - name: Measure the gem against spec main
-        env:
-          CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
-        run: |
-          set -uo pipefail
-          bash scripts/verify-release-artifact.sh "$(ls carve-lang-*.gem)" > drift.log 2>&1 || true
-          cat drift.log
+          name: drift-log
 
       # DECIDE. Exits non-zero on an undeclared divergence, and on a log that
       # measured nothing. Nothing downstream reads its output to work out what
       # happened; the exit code is the verdict.
       - name: Every declaration is real, and undeclared drift is reported
         id: verdict
+        env:
+          SPEC_MAIN: ${{ needs.build.outputs.spec-main }}
         run: |
           set -uo pipefail
-          spec="$(git -C spec rev-parse --short HEAD)"
+          spec="$SPEC_MAIN"
           echo "spec=$spec" >> "$GITHUB_OUTPUT"
           # errexit off around the pipeline only, so the summary below is
           # written on a refusal too - that is the run whose summary matters.
@@ -500,11 +463,11 @@ jobs:
   #
   # WHY IT IS A JOB HERE AND NOT ITS OWN WORKFLOW FILE, since a separate file
   # reads tidier: the drift number has to be about the gem something else looked
-  # at. corpus-drift deliberately downloads the artifact `build` produced
-  # instead of compiling a second one, because two builds are two artifacts and
-  # the drift would describe the one no other job gated. A standalone workflow
-  # cannot reach that artifact without rebuilding, so it would measure a gem
-  # nothing else has seen. The copyable unit for the other repositories is
+  # at. The drift is measured in `build` over the gem that job installed and
+  # gated, instead of compiling a second one, because two builds are two
+  # artifacts and the drift would describe the one no other job gated. A
+  # standalone workflow cannot reach that install without rebuilding, so it
+  # would measure a gem nothing else has seen. The copyable unit for the other repositories is
   # scripts/declare-spec-drift.sh plus this job, not the file boundary.
   declare-drift:
     name: Undeclared drift opens a pull request
@@ -527,6 +490,9 @@ jobs:
           # The script merges `main` into the branch on the preserve path, so it
           # needs more than the tip.
           fetch-depth: 0
+          # The script's `git push` uses this credential. A GITHUB_TOKEN push
+          # leaves the pull request's CI waiting for manual approval.
+          token: ${{ secrets.BUMP_TOKEN || github.token }}
 
       # continue-on-error, because the artifact is absent exactly when
       # corpus-drift's comparison never happened - and the script's own refusal

@@ -52,21 +52,37 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/carve-release-gate.XXXXXX")"
 cleanup() { rm -rf "$WORK"; }
 trap cleanup EXIT
 
-export GEM_HOME="$WORK/gems"
-export GEM_PATH="$WORK/gems"
+# CARVE_GATE_GEM_HOME keeps the install for a second corpus run in the same job
+# (ci.yml measures spec main after gating on the pinned corpus), so the native
+# extension is compiled once. It is reused only for the identical .gem file.
+if [ -n "${CARVE_GATE_GEM_HOME:-}" ]; then
+  mkdir -p "$CARVE_GATE_GEM_HOME"
+  GEM_HOME="$(cd "$CARVE_GATE_GEM_HOME" && pwd)"
+else
+    GEM_HOME="$WORK/gems"
+fi
+export GEM_HOME
+export GEM_PATH="$GEM_HOME"
 # Bundler's environment reaches into a `gem install` and a `ruby` run alike, and
 # it points at this checkout's Gemfile -- which would put the source tree back
 # on the load path, i.e. undo the one thing this script is for.
 unset RUBYOPT BUNDLE_GEMFILE BUNDLE_BIN_PATH BUNDLE_PATH RUBYLIB
 
-echo "==> installing $(basename "$GEM_FILE") into $GEM_HOME"
-# Not --local: the gem declares rb_sys as a runtime dependency, and it has to be
-# resolvable inside the isolated GEM_PATH at require time, not merely present
-# somewhere on the machine. minitest carries the assertions that
-# test/corpus_population.rb -- the single derivation of the expected corpus
-# size, shared with the ordinary corpus gate -- is written against.
-gem install --no-document minitest
-gem install --no-document "$GEM_FILE"
+GEM_SUM="$(sha256sum "$GEM_FILE" | cut -d' ' -f1)"
+STAMP="$GEM_HOME/.carve-gate-installed"
+if [ -n "${CARVE_GATE_GEM_HOME:-}" ] && [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$GEM_SUM" ]; then
+  echo "==> reusing the install of $(basename "$GEM_FILE") in $GEM_HOME"
+else
+  echo "==> installing $(basename "$GEM_FILE") into $GEM_HOME"
+  # Not --local: the gem declares rb_sys as a runtime dependency, and it has to be
+  # resolvable inside the isolated GEM_PATH at require time, not merely present
+  # somewhere on the machine. minitest carries the assertions that
+  # test/corpus_population.rb -- the single derivation of the expected corpus
+  # size, shared with the ordinary corpus gate -- is written against.
+  gem install --no-document minitest
+  gem install --no-document "$GEM_FILE"
+  if [ -n "${CARVE_GATE_GEM_HOME:-}" ]; then echo "$GEM_SUM" > "$STAMP"; fi
+fi
 
 echo "==> corpus: $CARVE_SPEC_CORPUS"
 cd "$WORK"
