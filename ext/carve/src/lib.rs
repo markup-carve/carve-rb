@@ -27,7 +27,9 @@
 use carve_rs::extensions::registry;
 use carve_rs::{CarveExtension, Mode, Options, Profile, StaticRenderers};
 use magnus::value::{InnerValue, Opaque};
-use magnus::{function, prelude::*, Error, ExceptionClass, RArray, RHash, Ruby, Value};
+use magnus::{
+    function, prelude::*, Error, ExceptionClass, RArray, RHash, RString, Ruby, TryConvert, Value,
+};
 use std::any::Any;
 use std::cell::RefCell;
 use std::panic::{self, AssertUnwindSafe};
@@ -842,42 +844,70 @@ macro_rules! guarded {
     ($wrapper:ident ( $($arg:ident : $ty:ty),* ) -> $ret:ty => $inner:ident) => {
         #[allow(clippy::too_many_arguments)]
         fn $wrapper($($arg: $ty),*) -> Result<$ret, Error> {
-            guard(|| Ok($inner($($arg),*)))
+            guard(|| Ok($inner($($arg.into()),*)))
         }
     };
     ($wrapper:ident ( $($arg:ident : $ty:ty),* ) -> $ret:ty =>? $inner:ident) => {
         #[allow(clippy::too_many_arguments)]
         fn $wrapper($($arg: $ty),*) -> Result<$ret, Error> {
-            guard(|| $inner($($arg),*))
+            guard(|| $inner($($arg.into()),*))
         }
     };
 }
 
-guarded!(g_to_html(source: String) -> String => to_html);
-guarded!(g_to_markdown(source: String) -> String => to_markdown);
-guarded!(g_to_plain_text(source: String) -> String => to_plain_text);
-guarded!(g_to_ansi(source: String) -> String => to_ansi);
-guarded!(g_to_carve(source: String) -> String => to_carve);
-guarded!(g_from_markdown_json(ruby: &Ruby, source: String) -> String =>? from_markdown_json);
-guarded!(g_to_ast_json(source: String) -> String => to_ast_json);
+struct Source(String);
+
+impl TryConvert for Source {
+    fn try_convert(value: Value) -> Result<Self, Error> {
+        let source = RString::try_convert(value)?;
+        let encoding: Value = source.funcall("encoding", ())?;
+        let name: String = encoding.funcall("name", ())?;
+        let text = if name == "ASCII-8BIT" {
+            String::from_utf8_lossy(unsafe { source.as_slice() }).into_owned()
+        } else {
+            let ruby = Ruby::get_with(source);
+            let options = ruby.hash_new();
+            options.aset(ruby.to_symbol("invalid"), ruby.to_symbol("replace"))?;
+            options.aset(ruby.to_symbol("undef"), ruby.to_symbol("replace"))?;
+            options.aset(ruby.to_symbol("replace"), "\u{FFFD}")?;
+            let encoded: RString = source.funcall("encode", ("UTF-8", magnus::KwArgs(options)))?;
+            encoded.to_string()?
+        };
+        Ok(Self(text))
+    }
+}
+
+impl From<Source> for String {
+    fn from(source: Source) -> Self {
+        source.0
+    }
+}
+
+guarded!(g_to_html(source: Source) -> String => to_html);
+guarded!(g_to_markdown(source: Source) -> String => to_markdown);
+guarded!(g_to_plain_text(source: Source) -> String => to_plain_text);
+guarded!(g_to_ansi(source: Source) -> String => to_ansi);
+guarded!(g_to_carve(source: Source) -> String => to_carve);
+guarded!(g_from_markdown_json(ruby: &Ruby, source: Source) -> String =>? from_markdown_json);
+guarded!(g_to_ast_json(source: Source) -> String => to_ast_json);
 guarded!(g_extension_names() -> Vec<String> => extension_names);
 guarded!(g_panic_probe() -> String => panic_probe);
 guarded!(
-    g_stamp_needs_review(source: String, current_version: Option<String>) -> bool
+    g_stamp_needs_review(source: Source, current_version: Option<String>) -> bool
         => stamp_needs_review
 );
 guarded!(
-    g_from_html_json(ruby: &Ruby, source: String, mode: String) -> String =>? from_html_json
+    g_from_html_json(ruby: &Ruby, source: Source, mode: String) -> String =>? from_html_json
 );
-guarded!(g_read_stamp(ruby: &Ruby, source: String) -> Value =>? read_stamp);
+guarded!(g_read_stamp(ruby: &Ruby, source: Source) -> Value =>? read_stamp);
 guarded!(
-    g_to_html_with_extensions(ruby: &Ruby, source: String, names: RArray) -> String
+    g_to_html_with_extensions(ruby: &Ruby, source: Source, names: RArray) -> String
         =>? to_html_with_extensions
 );
 guarded!(
     g_to_html_full(
         ruby: &Ruby,
-        source: String,
+        source: Source,
         names: RArray,
         mode: String,
         renderers: RHash
@@ -886,7 +916,7 @@ guarded!(
 guarded!(
     g_to_html_full_with_symbols(
         ruby: &Ruby,
-        source: String,
+        source: Source,
         names: RArray,
         mode: String,
         renderers: RHash,
@@ -896,7 +926,7 @@ guarded!(
 guarded!(
     g_to_html_safe(
         ruby: &Ruby,
-        source: String,
+        source: Source,
         names: RArray,
         mode: String,
         renderers: RHash,
@@ -909,7 +939,7 @@ guarded!(
 guarded!(
     g_render_with_includes_json(
         ruby: &Ruby,
-        source: String,
+        source: Source,
         root: String,
         source_path: String,
         target: String,
