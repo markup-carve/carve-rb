@@ -6,6 +6,34 @@ require "carve"
 require "tmpdir"
 
 class CarveTest < Minitest::Test
+  def test_ill_formed_utf8_is_replaced_at_the_native_boundary
+    incomplete = "A\xF0\x90\x80B".b.force_encoding(Encoding::UTF_8)
+    expected = "A\uFFFDB"
+
+    assert_includes Carve._to_html(incomplete), expected
+    assert_includes Carve.to_html(incomplete.b), expected
+    assert_includes Carve.to_markdown(incomplete), expected
+    assert_equal 1, Carve.to_plain_text(incomplete).count("\uFFFD")
+    shift_jis = "\x82\xA0\x80\x82\xA2".b.force_encoding(Encoding::Shift_JIS)
+    assert_includes Carve._to_html(shift_jis), "あ\uFFFDい"
+    assert_includes Carve.to_html("A\u{1F680}B"), "A\u{1F680}B"
+  end
+
+  def test_rust_0110_features_reach_the_binding
+    assert_includes Carve.to_html("[x]()"), '<a href="">x</a>'
+    assert_includes Carve.to_html("![alt]()"), '<img src="" alt="alt">'
+    assert_equal "[x]()\n", Carve.to_carve("[x]()")
+
+    { "csv" => "A,B\n1,2", "tsv" => "A\tB\n1\t2" }.each do |format, body|
+      source = "{table}\n```#{format}\n#{body}\n```"
+      assert_includes Carve.to_html(source), "<table>"
+      assert_equal "#{source}\n", Carve.to_carve(source)
+    end
+
+    source = "- first\n\n  continuation\n"
+    assert_equal source, Carve.to_plain_text(source)
+  end
+
   def test_include_expansion_requires_an_absolute_containment_root
     Dir.mktmpdir("carve-rb-includes-") do |root|
       File.write(File.join(root, "book.crv"), "{{ chapter.crv }}")
