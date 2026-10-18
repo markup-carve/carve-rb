@@ -123,6 +123,7 @@ class IncludesTest < Minitest::Test
     with_book do |root, book|
       result = Carve.parse_with_includes("{{ chapters/one.crv }}", root: root,
                                                                    source_path: book)
+      assert_equal "1.2", result[:value][:astVersion]
       text = result[:value][:children].first[:children].first
       assert_equal "One body.", text[:value]
     end

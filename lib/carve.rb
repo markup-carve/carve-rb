@@ -319,9 +319,10 @@ module Carve
     #   # => {type: "document",
     #   #     children: [{type: "heading", level: 1,
     #   #                 children: [{type: "text", value: "Hi"}], attrs: nil}],
-    #   #     srcByteLength: 4}
+    #   #     srcByteLength: 4, astVersion: "1.2"}
     #
-    # The root carries exactly +:type+, +:children+ and +:srcByteLength+ (spec
+    # The root carries exactly +:type+, +:children+, +:srcByteLength+ and
+    # +:astVersion+ (spec
     # PART 12 §7). Frontmatter and footnote definitions are block nodes in
     # +:children+, not root fields: a root field cannot carry the position §4
     # requires of every node, and both are source an editor navigates to.
