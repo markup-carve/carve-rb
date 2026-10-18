@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-10-18
+
+### Breaking
+
+- `Carve.parse` and AST include results carry `astVersion: "1.2"` on the root.
+  Exact-key readers must accept the new field (#210).
+- The carve-lang 0.1.10 pin adds `resolved` to resolved link and image references
+  and `form` to comments. `[text]()` and `![alt]()` render as links and images,
+  and a bare `[r]:` defines an empty destination. Escape `\[` to keep that
+  spelling literal. Checked render reports can also include
+  `table-span-flattened`, `table-header-row-demoted`,
+  `table-header-row-hoisted`, and `table-header-cell-demoted` (#207).
+
+### Fixes
+
+- Source strings in other encodings such as Shift_JIS are transcoded to UTF-8.
+  Malformed UTF-8 and binary bytes become replacement characters instead of
+  failing at the native boundary (#207).
+
+### Improvements
+
+- The carve-lang 0.1.10 pin adds CSV and TSV table fences and keeps plain-text
+  list continuation blocks at their item's indentation. It also corrects
+  parsing of nested lists with quotes and containers (#207).
+
 ## [0.1.8] - 2026-10-14
 
 ### Breaking
@@ -463,7 +488,8 @@ are not listed, because no release ever shipped them.
   Arrays (every AST node type is covered), enabling custom renderers such as
   [carve-hexapdf](https://github.com/markup-carve/carve-hexapdf).
 
-[Unreleased]: https://github.com/markup-carve/carve-rb/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/markup-carve/carve-rb/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/markup-carve/carve-rb/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/markup-carve/carve-rb/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/markup-carve/carve-rb/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/markup-carve/carve-rb/compare/v0.1.5...v0.1.6
