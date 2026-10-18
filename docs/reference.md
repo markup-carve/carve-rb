@@ -142,13 +142,8 @@ HTML - for example a custom PDF renderer (see
 
 ```ruby
 Carve.parse("# Hello *world*")
-# => {type: "document", frontmatter: {}, footnote_defs: {},
-#     children: [{type: "heading", level: 1,
-#                 children: [{type: "text", value: "Hello "},
-#                            {type: "emphasis", kind: "strong",
-#                             children: [{type: "text", value: "world"}], attrs: nil}],
-#                 attrs: nil}],
-#     source_len: 15}
+# => {type: "document", children: [...], srcByteLength: 15,
+#     astVersion: "1.2"}
 ```
 
 Every node is a Hash with a `:type` key plus its fields; child collections are

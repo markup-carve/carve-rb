@@ -477,16 +477,17 @@ class CarveTest < Minitest::Test
     assert_equal "document", ast[:type]
     assert_kind_of Array, ast[:children]
     assert_equal 4, ast[:srcByteLength]
+    assert_equal "1.2", ast[:astVersion]
   end
 
-  # PART 12 section 7: the root carries EXACTLY type, children and
-  # srcByteLength. Frontmatter and footnote definitions are block nodes in the
+  # PART 12 section 7: the root carries type, children, srcByteLength, and
+  # astVersion. Frontmatter and footnote definitions are block nodes in the
   # tree, because a root FIELD cannot carry the position section 4 requires of
   # every node, and both are source an editor navigates to (carve#411).
-  def test_parse_root_carries_exactly_three_keys
+  def test_parse_root_carries_exactly_four_keys
     ast = Carve.parse("---\ntitle: x\n---\n\nbody[^r]\n\n[^r]: d\n")
 
-    assert_equal %i[children srcByteLength type], ast.keys.sort
+    assert_equal %i[astVersion children srcByteLength type], ast.keys.sort
   end
 
   def test_parse_puts_frontmatter_in_the_tree_raw
@@ -757,7 +758,7 @@ class CarveTest < Minitest::Test
   def test_parse_root_uses_reference_field_names
     ast = Carve.parse("a[^r]\n\n[^r]: def\n")
 
-    # PART 12 §7: the root is exactly type, children and srcByteLength, so the
+    # PART 12 §7: the root carries type, children, srcByteLength and astVersion, so the
     # definition lives in the tree rather than in a root map (carve#411). What
     # this test still guards is the SPELLING: reference field names, not this
     # engine's internal snake_case.

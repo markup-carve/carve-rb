@@ -99,6 +99,14 @@ fn extension_names() -> Vec<String> {
     registry::keys().map(str::to_string).collect()
 }
 
+fn ast_json_with_version(json: String) -> String {
+    let (body, closing) = json.split_at(json.len() - 1);
+    format!(
+        "{body},\"astVersion\":\"{}\"{closing}",
+        carve_rs::AST_CONTRACT_VERSION
+    )
+}
+
 /// Map a Ruby-facing mode string to a carve-rs [`Mode`].
 ///
 /// Rejects any unknown string with `ArgumentError`, mirroring the spec's
@@ -380,7 +388,7 @@ fn render_with_includes_json(
         // parse JSON twice. Positions stay OFF, unlike `to_ast_json`: spec I4
         // leaves position remapping out of scope in every engine, so a child's
         // spans would point into a document the caller never passed.
-        IncludeTarget::Ast => Ok(carve_rs::to_json(&prepared.doc)),
+        IncludeTarget::Ast => Ok(ast_json_with_version(carve_rs::to_json(&prepared.doc))),
     }
     .map_err(|error| Error::new(ruby.exception_runtime_error(), error.to_string()))?;
     let value: serde_json::Value = if which == IncludeTarget::Ast {
@@ -524,7 +532,9 @@ fn migration_diagnostic_json(diagnostic: &carve_rs::MigrationDiagnostic) -> serd
 fn to_ast_json(source: String) -> String {
     let mut options = Options::new();
     options.positions = true;
-    carve_rs::to_json(&carve_rs::parse_with_options(&source, &options))
+    ast_json_with_version(carve_rs::to_json(&carve_rs::parse_with_options(
+        &source, &options,
+    )))
 }
 
 /// Render Carve source to HTML with the named extensions enabled.

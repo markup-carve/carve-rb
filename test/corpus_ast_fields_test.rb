@@ -59,7 +59,7 @@ class CorpusAstFieldsTest < Minitest::Test
     definition_description.children definition_list.items definition_list.loose
     definition_term.children delete.children directive.children directive.kind
     directive.label directive.title div.attrs
-    div.children div.label document.children document.srcByteLength emphasis.children
+    div.children div.label document.astVersion document.children document.srcByteLength emphasis.children
     escaped_text.value figure.attrs figure.caption figure.target figure_group.attrs
     figure_group.caption figure_group.children footnote.children footnote.label
     footnote_ref.attrs footnote_ref.label footnote_ref.number frontmatter.content
