@@ -9,17 +9,125 @@ on:
         description: Version to publish, without v; leave empty for rehearsal
         required: false
         type: string
+  # Builds and smoke-tests the platform gems without publishing: `verify` and
+  # `publish` are skipped on pull requests. Limited to the files that decide
+  # what goes into a gem, so ordinary PRs do not pay for the native matrix.
+  pull_request:
+    paths:
+      - "ext/**"
+      - "carve.gemspec"
+      - "Rakefile"
+      - "lib/carve.rb"
+      - "scripts/smoke-native-gem.sh"
+      - ".github/workflows/release.yml"
+
+permissions:
+  contents: read
 
 # Jobs carry an explicit timeout-minutes: without one GitHub applies a
 # 360-minute default, long enough for a stalled job to go unnoticed.
 
 jobs:
+  # One precompiled gem per platform, each carrying a binary for every Ruby ABI
+  # rb-sys-dock's image has (lib/carve/<minor>/carve.<dlext>). rake-compiler
+  # narrows the gem's required_ruby_version to that range, so other Rubies and
+  # other platforms resolve to the source gem.
+  native-gems:
+    name: Build the ${{ matrix.platform }} gem
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # Mirrored in NATIVE_PLATFORMS below; the verify job checks one gem
+        # arrived per entry.
+        platform:
+          - x86_64-linux
+          - x86_64-linux-musl
+          - aarch64-linux
+          - x86_64-darwin
+          - arm64-darwin
+          - x64-mingw-ucrt
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+
+      # rb-sys-dock bind-mounts ~/.cargo/registry when ~/.cargo exists and
+      # fails if the registry directory itself does not.
+      - name: Create the cargo registry directory rb-sys-dock mounts
+        run: mkdir -p ~/.cargo/registry
+
+      - name: Cross-compile the gem in rb-sys-dock
+        id: cross-gem
+        uses: oxidize-rb/actions/cross-gem@ec90b4aa48795518d79be3f5cc478d1d7ccd02a8 # v1.5.0
+        with:
+          platform: ${{ matrix.platform }}
+
+      - name: Upload the platform gem
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-gem-${{ matrix.platform }}
+          path: ${{ steps.cross-gem.outputs.gem-path }}
+          if-no-files-found: error
+          retention-days: 7
+
+  # Installs each platform gem offline into an empty GEM_HOME on a host of that
+  # platform and renders through it. Publishing needs this job.
+  smoke:
+    name: Smoke-test ${{ matrix.platform }} on Ruby ${{ matrix.ruby }}
+    needs: native-gems
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: x86_64-linux, os: ubuntu-latest, ruby: "3.1" }
+          - { platform: x86_64-linux, os: ubuntu-latest, ruby: "3.4" }
+          - { platform: x86_64-linux, os: ubuntu-latest, ruby: "4.0" }
+          - { platform: x86_64-linux-musl, os: ubuntu-latest, ruby: "3.4" }
+          - { platform: aarch64-linux, os: ubuntu-24.04-arm, ruby: "3.4" }
+          - { platform: arm64-darwin, os: macos-latest, ruby: "3.4" }
+          - { platform: x86_64-darwin, os: macos-15-intel, ruby: "3.4" }
+          - { platform: x64-mingw-ucrt, os: windows-latest, ruby: "3.4" }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the platform gem
+        uses: actions/download-artifact@v4
+        with:
+          name: cross-gem-${{ matrix.platform }}
+          path: native
+
+      - name: Install Ruby
+        if: matrix.platform != 'x86_64-linux-musl'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+
+      - name: Install the gem and render
+        if: matrix.platform != 'x86_64-linux-musl'
+        shell: bash
+        run: sh scripts/smoke-native-gem.sh native/carve-lang-*-${{ matrix.platform }}.gem
+
+      - name: Install the gem and render (Alpine)
+        if: matrix.platform == 'x86_64-linux-musl'
+        run: |
+          docker run --rm -v "$PWD:/w" -w /w "ruby:${{ matrix.ruby }}-alpine" \
+            sh -c 'sh scripts/smoke-native-gem.sh native/carve-lang-*-x86_64-linux-musl.gem'
+
   # Everything up to, but not including, making the artifact public. It ends by
   # uploading the exact .gem it verified, and the publish job pushes that file
   # rather than building its own -- so what RubyGems serves is the bytes this
   # job rendered the corpus through, not a second build of the same source.
   verify:
     name: Build the gem and run the corpus through it
+    needs: native-gems
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -218,14 +326,48 @@ jobs:
           CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
         run: bash scripts/verify-release-artifact.sh "$(ls carve-lang-*.gem)"
 
+      - name: Download the platform gems
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cross-gem-*
+          path: native
+          merge-multiple: true
+
+      # Exactly one gem per platform, all at the source gem's version: they are
+      # pushed beside it, so a missing or mis-versioned one must stop here.
+      - name: One platform gem per platform, at this version
+        env:
+          NATIVE_PLATFORMS: x86_64-linux x86_64-linux-musl aarch64-linux x86_64-darwin arm64-darwin x64-mingw-ucrt
+        run: |
+          source_gem="$(ls carve-lang-*.gem)"
+          version="${source_gem#carve-lang-}"
+          version="${version%.gem}"
+          want="$(for p in $NATIVE_PLATFORMS; do echo "carve-lang-$version-$p.gem"; done | sort)"
+          got="$(find native -maxdepth 1 -name '*.gem' -printf '%f\n' | sort)"
+          echo "$got"
+          if [ "$want" != "$got" ]; then
+            echo "::error::platform gems do not match the expected set for $version"
+            diff <(echo "$want") <(echo "$got") || true
+            exit 1
+          fi
+
+      # The same corpus gate, through the platform gem a Linux x86_64 host
+      # installs instead of the source gem.
+      - name: Run the spec corpus through the x86_64-linux gem
+        env:
+          CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
+        run: bash scripts/verify-release-artifact.sh "$(ls native/carve-lang-*-x86_64-linux.gem)"
+
       # The verified bytes, handed to the publish job. Uploading the artifact
       # rather than rebuilding is what makes "verified" and "published" the same
-      # object.
-      - name: Upload the verified gem
+      # object. The platform gems travel in native/.
+      - name: Upload the verified gems
         uses: actions/upload-artifact@v4
         with:
           name: verified-gem
-          path: carve-lang-*.gem
+          path: |
+            carve-lang-*.gem
+            native/carve-lang-*.gem
           if-no-files-found: error
           retention-days: 7
 
@@ -237,7 +379,7 @@ jobs:
     # unreachable. As a separate job that needs `verify`, the push cannot start
     # while the corpus gate is failing, and it has nothing to push except the
     # artifact that job uploaded.
-    needs: verify
+    needs: [verify, smoke]
     if: ((github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || inputs.version != '')) ||
       (github.event_name == 'workflow_dispatch' && inputs.version != ''))
     runs-on: ubuntu-latest
@@ -315,8 +457,16 @@ jobs:
             git tag "$RELEASE_TAG" "$GITHUB_SHA"
             git push origin "refs/tags/$RELEASE_TAG"
           fi
-      - name: Push gem to RubyGems
-        run: gem push carve-lang-*.gem
+      # The source gem first: if a platform push then fails, every platform
+      # still installs this version by compiling it, as before platform gems.
+      - name: Push the gems to RubyGems
+        shell: bash
+        run: |
+          set -euo pipefail
+          gem push carve-lang-*.gem
+          for native_gem in native/carve-lang-*.gem; do
+            gem push "$native_gem"
+          done
 
       # A registry publish is not finished until the release page exists. The
       # tag is pushed, CI publishes, the registry answers 200, and "released"

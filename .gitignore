@@ -8,6 +8,7 @@ ext/carve/target/
 Makefile
 mkmf.log
 /lib/carve/carve.so
+/lib/carve/[0-9]*/
 /pkg/
 Gemfile.lock
 /vendor/

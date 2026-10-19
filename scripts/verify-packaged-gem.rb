@@ -89,7 +89,7 @@ class PackagedGemTest < Minitest::Test
   # required, and unless that came out of the install of the .gem being
   # published, every assertion after it is about some other engine.
   def test_the_loaded_extension_is_the_one_installed_from_the_built_gem
-    loaded = $LOADED_FEATURES.grep(%r{/carve/carve\.#{Regexp.escape(DLEXT)}\z})
+    loaded = $LOADED_FEATURES.grep(%r{/carve/(?:\d+\.\d+/)?carve\.#{Regexp.escape(DLEXT)}\z})
     assert_equal 1, loaded.length,
                  "expected exactly one loaded carve native extension, got #{loaded.inspect}. " \
                  "More than one means two engines are in the process and which one answered " \

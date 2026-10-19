@@ -17,10 +17,18 @@ bundle install
 
 The distribution name is `carve-lang`, while the require path is `carve`.
 
+Releases after 0.1.9 ship precompiled gems for `x86_64-linux`,
+`x86_64-linux-musl`, `aarch64-linux`, `x86_64-darwin`, `arm64-darwin` and
+`x64-mingw-ucrt`, with a binary for each Ruby from 3.0 to 4.0 (from 3.1 on
+Windows, where Ruby 3.0 has no UCRT build). On those platforms `gem install`
+needs no Rust toolchain or libclang. Everywhere else, including newer Rubies,
+RubyGems installs the source gem and builds it as described below.
+
 ## Installing from source
 
-The published gem ships source only. `gem install carve-lang` compiles a Rust
-extension on your machine, so the install needs:
+Version 0.1.9 and earlier ship source only, and so does every release on a
+platform or Ruby without a precompiled gem. There `gem install carve-lang`
+compiles a Rust extension on your machine, so the install needs:
 
 - A Rust toolchain with `cargo`, Rust 1.77 or newer. [rustup](https://rustup.rs)
   is the usual way to get one.
