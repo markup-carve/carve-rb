@@ -42,11 +42,11 @@ CARVE_SPEC_CORPUS="$(cd "$CARVE_SPEC_CORPUS" && pwd)"
 export CARVE_SPEC_CORPUS
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-# carve-lang-0.1.0.gem -> 0.1.0. Taken from the file being installed rather than
-# from lib/carve/version.rb, so that the gate compares the package against
-# itself and notices an install that resolved to some other build.
-GEM_BASENAME="$(basename "$GEM_FILE" .gem)"
-GEM_VERSION="${GEM_BASENAME##*-}"
+# Read from the metadata of the file being installed rather than from
+# lib/carve/version.rb, so that the gate compares the package against itself
+# and notices an install that resolved to some other build. Not from the file
+# name: a platform gem's ends in its platform (carve-lang-0.1.0-x86_64-linux).
+GEM_VERSION="$(ruby -rrubygems/package -e 'puts Gem::Package.new(ARGV[0]).spec.version' "$GEM_FILE")"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/carve-release-gate.XXXXXX")"
 cleanup() { rm -rf "$WORK"; }

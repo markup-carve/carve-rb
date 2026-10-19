@@ -56,6 +56,11 @@ jobs:
         with:
           ruby-version: "3.4"
 
+      # rb-sys-dock bind-mounts ~/.cargo/registry when ~/.cargo exists and
+      # fails if the registry directory itself does not.
+      - name: Create the cargo registry directory rb-sys-dock mounts
+        run: mkdir -p ~/.cargo/registry
+
       - name: Cross-compile the gem in rb-sys-dock
         id: cross-gem
         uses: oxidize-rb/actions/cross-gem@ec90b4aa48795518d79be3f5cc478d1d7ccd02a8 # v1.5.0
