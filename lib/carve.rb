@@ -8,9 +8,17 @@
 require "json"
 require_relative "carve/version"
 
-# Load the compiled native extension. Built by `rake compile` to
-# lib/carve/carve.so (or .bundle on macOS).
-require_relative "carve/carve"
+# Load the compiled native extension. A precompiled platform gem ships one per
+# Ruby ABI under lib/carve/<major.minor>/; a source install and `rake compile`
+# build lib/carve/carve.so (or .bundle on macOS).
+# Chosen by directory rather than by rescuing LoadError, so a binary that is
+# present but cannot load (an older glibc, say) reports its own error.
+abi = RUBY_VERSION[/\A\d+\.\d+/]
+if File.directory?(File.join(__dir__, "carve", abi))
+  require_relative "carve/#{abi}/carve"
+else
+  require_relative "carve/carve"
+end
 
 module Carve
   # Extension names the native binding understands.

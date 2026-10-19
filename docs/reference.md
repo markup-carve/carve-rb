@@ -364,13 +364,14 @@ The build needs the same toolchain as a gem install; see
 
 ## carve-rs dependency pin
 
-`ext/carve/Cargo.toml` pins the engine to an exact Git revision for
-reproducible gem builds. Read its `rev` field for the current pin.
+`ext/carve/Cargo.toml` pins the engine to an exact crates.io release for
+reproducible gem builds, as an `=` requirement on the `version` field (for
+example `version = "=0.1.10"`). Read that field for the current pin.
 
 The dependency uses the package name `carve-lang` and the Rust import alias
 `carve_rs`.
 
-When updating the revision, run `rake compile` and commit the resulting
+When updating the version, run `rake compile` and commit the resulting
 `ext/carve/Cargo.lock` in the same change. The lock records the resolved engine.
 
 Whether the pin is current is not a judgment call: CI runs the mandatory spec
