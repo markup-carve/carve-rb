@@ -27,9 +27,10 @@ gem install carve-lang
 Then `require "carve"` as normal - the gem distribution name is `carve-lang`
 but the require path stays `carve`.
 
-Building from source requires a **Rust toolchain** (`cargo`, Rust >= 1.75) and
-Ruby development headers. RubyGems compiles the native extension at install
-time via `rb_sys`.
+RubyGems compiles the native extension at install time via `rb_sys`, so the
+install needs a Rust toolchain, Ruby development headers and libclang. The
+requirements and the fix for the `'stdarg.h' file not found` build error are in
+[Installing from source](../README.md#installing-from-source).
 
 ## Usage
 
@@ -358,16 +359,8 @@ rake compile   # builds the Rust extension into lib/carve/carve.so
 rake test      # runs the minitest suite
 ```
 
-> [!NOTE]
-> The native build uses `rb_sys` + `bindgen` (libclang) to read Ruby's
-> headers. On systems where libclang cannot find its builtin C headers (the
-> `'stdarg.h' file not found` error), point it at the GCC builtin include dir:
->
-> ```sh
-> export BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/gcc/x86_64-linux-gnu/13/include"
-> ```
->
-> (Adjust the GCC version directory to match your toolchain.)
+The build needs the same toolchain as a gem install; see
+[Installing from source](../README.md#installing-from-source).
 
 ## carve-rs dependency pin
 

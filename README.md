@@ -16,7 +16,40 @@ bundle install
 ```
 
 The distribution name is `carve-lang`, while the require path is `carve`.
-Building from source requires Rust 1.75 or newer and Ruby development headers.
+
+## Installing from source
+
+The published gem ships source only. `gem install carve-lang` compiles a Rust
+extension on your machine, so the install needs:
+
+- A Rust toolchain with `cargo`, Rust 1.77 or newer. [rustup](https://rustup.rs)
+  is the usual way to get one.
+- Ruby development headers (`ruby-dev` on Debian and Ubuntu).
+- libclang and clang. The build runs `bindgen` through `rb-sys` to read Ruby's
+  C headers. On Debian and Ubuntu:
+
+```bash
+sudo apt install libclang-dev clang
+```
+
+If only libclang is installed, without the `clang` package, the build stops
+with this error:
+
+```text
+/usr/include/ruby-3.2.0/ruby/ruby.h:23:10: fatal error: 'stdarg.h' file not found
+thread 'main' panicked at .../rb-sys-0.9.128/build/main.rs:52:6:
+generate bindings: ClangDiagnostic("/usr/include/ruby-3.2.0/ruby/ruby.h:23:10: fatal error: 'stdarg.h' file not found\n")
+error: failed to run custom build command for `rb-sys v0.9.128`
+```
+
+libclang cannot find its own builtin headers. Install `clang`, or point
+bindgen at GCC's copy of those headers:
+
+```bash
+BINDGEN_EXTRA_CLANG_ARGS="-I$(gcc -print-file-name=include)" gem install carve-lang
+```
+
+With Bundler, export the variable before running `bundle install`.
 
 ## Render Carve
 
