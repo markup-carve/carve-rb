@@ -226,8 +226,44 @@ fn to_ansi(source: String) -> String {
     carve_rs::to_ansi(&source)
 }
 
-fn to_carve(source: String) -> String {
-    carve_rs::to_carve(&source)
+/// Canonical Carve source; a writer refusal returns the source as authored.
+fn to_carve(source: String, align_tables: bool) -> String {
+    let options = Options::default().with_align_tables(align_tables);
+    carve_rs::try_to_carve_with_options(&source, &options).unwrap_or(source)
+}
+
+/// Resolve `@region:name` with the engine's marker rules (spec I1b).
+///
+/// Returns `[start, end]` (1-based, inclusive content lines) or, when the
+/// region is invalid, the warning rule id as a String; `lib/carve.rb` turns
+/// that into `Carve::IncludeRegionError`.
+fn select_include_region(
+    ruby: &Ruby,
+    source: String,
+    name: String,
+    mode: String,
+) -> Result<Value, Error> {
+    let mode = match mode.as_str() {
+        "carve" => carve_rs::IncludeRegionMode::Carve,
+        "code" => carve_rs::IncludeRegionMode::Code,
+        other => {
+            return Err(Error::new(
+                ruby.exception_arg_error(),
+                format!("mode must be :carve or :code, got {other:?}"),
+            ))
+        }
+    };
+    Ok(
+        match carve_rs::select_include_region(&source, &name, mode) {
+            Ok(region) => ruby
+                .ary_new_from_values(&[
+                    ruby.integer_from_u64(region.start as u64).as_value(),
+                    ruby.integer_from_u64(region.end as u64).as_value(),
+                ])
+                .as_value(),
+            Err(e) => ruby.str_new(e.rule()).as_value(),
+        },
+    )
 }
 
 /// Which renderer runs over the expanded document.
@@ -897,7 +933,11 @@ guarded!(g_to_html(source: Source) -> String => to_html);
 guarded!(g_to_markdown(source: Source) -> String => to_markdown);
 guarded!(g_to_plain_text(source: Source) -> String => to_plain_text);
 guarded!(g_to_ansi(source: Source) -> String => to_ansi);
-guarded!(g_to_carve(source: Source) -> String => to_carve);
+guarded!(g_to_carve(source: Source, align_tables: bool) -> String => to_carve);
+guarded!(
+    g_select_include_region(ruby: &Ruby, source: Source, name: String, mode: String) -> Value
+        =>? select_include_region
+);
 guarded!(g_from_markdown_json(ruby: &Ruby, source: Source) -> String =>? from_markdown_json);
 guarded!(g_to_ast_json(source: Source) -> String => to_ast_json);
 guarded!(g_extension_names() -> Vec<String> => extension_names);
@@ -990,7 +1030,11 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     module.define_singleton_method("to_markdown", function!(g_to_markdown, 1))?;
     module.define_singleton_method("to_plain_text", function!(g_to_plain_text, 1))?;
     module.define_singleton_method("to_ansi", function!(g_to_ansi, 1))?;
-    module.define_singleton_method("to_carve", function!(g_to_carve, 1))?;
+    module.define_singleton_method("_to_carve", function!(g_to_carve, 2))?;
+    module.define_singleton_method(
+        "_select_include_region",
+        function!(g_select_include_region, 3),
+    )?;
     module.define_singleton_method(
         "_render_with_includes_json",
         function!(g_render_with_includes_json, 15),

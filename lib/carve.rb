@@ -21,6 +21,17 @@ else
 end
 
 module Carve
+  # Raised by .select_include_region when the region is missing or a marker is
+  # malformed, unpaired or duplicated. +rule+ is the engine's warning rule id.
+  class IncludeRegionError < ArgumentError
+    attr_reader :rule
+
+    def initialize(rule, name)
+      @rule = rule
+      super("#{rule}: region #{name.inspect} is missing or its markers are malformed")
+    end
+  end
+
   # Extension names the native binding understands.
   #
   # Taken from the engine itself rather than typed out here. This was a literal
@@ -136,6 +147,28 @@ module Carve
         # a legal document would otherwise raise here. Same reason as .parse.
         max_nesting: false,
       )
+    end
+
+    # Format +source+ into canonical Carve. A writer refusal returns the source
+    # as authored. +align_tables:+ pads table cells into aligned columns.
+    def to_carve(source, align_tables: false)
+      _to_carve(source, align_tables ? true : false)
+    end
+
+    # Resolve <tt>@region:name</tt> in a file's text with the engine's marker
+    # rules, so an editor jumping to a region agrees with the render.
+    #
+    #   Carve.select_include_region(text, "setup", mode: :carve) # => 3..4
+    #
+    # Returns the 1-based, inclusive Range of content lines; an empty region is
+    # an empty Range such as +2..1+. +mode: :carve+ accepts only
+    # <tt>%% #region</tt> markers, +mode: :code+ also the source-comment forms
+    # of an +@code+ include. Raises IncludeRegionError otherwise.
+    def select_include_region(source, name, mode:)
+      result = _select_include_region(source, name.to_s, mode.to_s)
+      raise IncludeRegionError.new(result, name.to_s) if result.is_a?(String)
+
+      result[0]..result[1]
     end
 
     # Import HTML or Markdown into canonical Carve. Both methods return the

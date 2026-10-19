@@ -69,6 +69,7 @@ Carve.to_markdown(source)
 Carve.to_plain_text(source)
 Carve.to_ansi(source)
 Carve.to_carve(source)
+Carve.to_carve(source, align_tables: true) # pad table columns
 ```
 
 Options configure extensions, safe rendering, profiles, symbols, section
