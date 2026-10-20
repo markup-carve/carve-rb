@@ -57,13 +57,3 @@
 # EMPTY IS THE GOAL STATE. An empty file means this gem renders every document
 # in spec main exactly as the spec does, and it is the only state that may be
 # tagged.
-618-captions-in-list-items-do-not-create-a-paragraph-gap-10 # undeclared at spec main d7ee5b2 on 2026-10-19; the pinned engine carve-lang 0.1.10 predates it
-618-captions-in-list-items-do-not-create-a-paragraph-gap-12 # undeclared at spec main d7ee5b2 on 2026-10-19; the pinned engine carve-lang 0.1.10 predates it
-618-captions-in-list-items-do-not-create-a-paragraph-gap-14 # undeclared at spec main d7ee5b2 on 2026-10-19; the pinned engine carve-lang 0.1.10 predates it
-618-captions-in-list-items-do-not-create-a-paragraph-gap-15 # undeclared at spec main d7ee5b2 on 2026-10-19; the pinned engine carve-lang 0.1.10 predates it
-618-captions-in-list-items-do-not-create-a-paragraph-gap-2 # undeclared at spec main d7ee5b2 on 2026-10-19; the pinned engine carve-lang 0.1.10 predates it
-618-captions-in-list-items-do-not-create-a-paragraph-gap-4 # undeclared at spec main d7ee5b2 on 2026-10-19; the pinned engine carve-lang 0.1.10 predates it
-618-captions-in-list-items-do-not-create-a-paragraph-gap-5 # undeclared at spec main d7ee5b2 on 2026-10-19; the pinned engine carve-lang 0.1.10 predates it
-618-captions-in-list-items-do-not-create-a-paragraph-gap-6 # undeclared at spec main d7ee5b2 on 2026-10-19; the pinned engine carve-lang 0.1.10 predates it
-618-captions-in-list-items-do-not-create-a-paragraph-gap-7 # undeclared at spec main d7ee5b2 on 2026-10-19; the pinned engine carve-lang 0.1.10 predates it
-618-captions-in-list-items-do-not-create-a-paragraph-gap-8 # undeclared at spec main d7ee5b2 on 2026-10-19; the pinned engine carve-lang 0.1.10 predates it
