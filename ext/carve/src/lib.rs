@@ -380,6 +380,12 @@ fn render_with_includes_json(
     if !sections {
         render_options = render_options.with_sections(false);
     }
+    // Positions let the engine record the directive chain behind a warning
+    // (`includedBy`). The AST target keeps them off: spec I4 leaves position
+    // remapping out of scope, so a child's spans would point into the wrong file.
+    if which != IncludeTarget::Ast {
+        render_options = render_options.with_positions(true);
+    }
     let mut include_options = carve_rs::IncludeOptions::new()
         .with_resolver(&resolver)
         .with_source_path(source_real.to_string_lossy());
@@ -455,6 +461,17 @@ fn render_with_includes_json(
                 "rule": warning.rule,
                 "message": warning.message,
                 "file": warning.file.as_deref().map(&safe_path),
+                "includedBy": warning
+                    .included_by
+                    .iter()
+                    .map(|site| {
+                        serde_json::json!({
+                            "file": safe_path(&site.file),
+                            "line": site.line,
+                            "column": site.column,
+                        })
+                    })
+                    .collect::<Vec<_>>(),
             })
         })
         .collect::<Vec<_>>();
