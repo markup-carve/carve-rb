@@ -152,6 +152,16 @@ result[:warnings].first
 #                  {file: "chapters/one.crv", line: 3, column: 1}]}
 ```
 
+A directive with `@code:lang` (or a bare `@code`) splices the selected source as
+one code block instead of reading it as Carve, so a region of a source file
+renders as code:
+
+```ruby
+Carve.to_html_with_includes("{{ src/example.ts @region:demo @code:ts }}",
+                            root: root, source_path: File.join(root, "book.crv"))[:value]
+# => "<pre><code class=\"language-ts\">const x = 1;\n</code></pre>"
+```
+
 ### Selecting a region
 
 `Carve.select_include_region(source, name, mode:)` resolves `@region:name` in a
