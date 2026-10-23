@@ -94,11 +94,11 @@ jobs:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
       RB_SYS_CARGO_TARGET_DIR: ${{ github.workspace }}/target
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # main, deliberately unpinned: the reference is what carve-rs does TODAY.
       - name: Check out carve-rs at main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: markup-carve/carve-rs
           path: carve-rs
@@ -117,7 +117,7 @@ jobs:
       # and one of the three documents the 2026-08-22 drift showed up on was
       # exactly that.
       - name: Check out the spec corpus at main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: markup-carve/carve
           path: spec
@@ -231,7 +231,7 @@ jobs:
       contents: read
       issues: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: File the verdict where someone reads it
         env:

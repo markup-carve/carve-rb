@@ -49,7 +49,7 @@ jobs:
           - arm64-darwin
           - x64-mingw-ucrt
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Ruby
         uses: ruby/setup-ruby@v1
@@ -68,7 +68,7 @@ jobs:
           platform: ${{ matrix.platform }}
 
       - name: Upload the platform gem
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cross-gem-${{ matrix.platform }}
           path: ${{ steps.cross-gem.outputs.gem-path }}
@@ -95,10 +95,10 @@ jobs:
           - { platform: x86_64-darwin, os: macos-15-intel, ruby: "3.4" }
           - { platform: x64-mingw-ucrt, os: windows-latest, ruby: "3.4" }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download the platform gem
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: cross-gem-${{ matrix.platform }}
           path: native
@@ -131,7 +131,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Guard: the gem version AND the CHANGELOG must match the tag being
       # released, so a mistyped tag, a forgotten constant bump, or an un-cut
@@ -264,7 +264,7 @@ jobs:
       # reported by the corpus-drift job in ci.yml, on every push, every pull
       # request and a daily schedule.
       - name: Check out carve-rs
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: markup-carve/carve-rs
           path: carve-rs
@@ -301,7 +301,7 @@ jobs:
           echo "spec=$spec" >> "$GITHUB_OUTPUT"
 
       - name: Check out the spec corpus that engine was written against
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: markup-carve/carve
           ref: ${{ steps.pin.outputs.spec }}
@@ -327,7 +327,7 @@ jobs:
         run: bash scripts/verify-release-artifact.sh "$(ls carve-lang-*.gem)"
 
       - name: Download the platform gems
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: cross-gem-*
           path: native
@@ -362,7 +362,7 @@ jobs:
       # rather than rebuilding is what makes "verified" and "published" the same
       # object. The platform gems travel in native/.
       - name: Upload the verified gems
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: verified-gem
           path: |
@@ -417,7 +417,7 @@ jobs:
         run: bash tools/run-release-notes-gate.sh "$RELEASE_TAG"
 
       - name: Download the verified gem
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: verified-gem
 
