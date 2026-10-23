@@ -60,12 +60,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # fetch-depth: 0 is required. The guard runs `merge-base --is-ancestor`
       # against main, which needs the history to be there.
       - name: Check out carve-rs
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: markup-carve/carve-rs
           path: carve-rs
@@ -84,7 +84,7 @@ jobs:
     outputs:
       spec-main: ${{ steps.drift.outputs.spec }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Guard against panic = "abort" (preserves FFI catch_unwind safety)
         # The extension converts a Rust panic into a rescuable
@@ -211,7 +211,7 @@ jobs:
       # That is what corpus-drift below reports, and it is why deleting
       # corpus-drift would turn this into a loosening rather than a re-aiming.
       - name: Check out carve-rs
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: markup-carve/carve-rs
           path: carve-rs
@@ -229,7 +229,7 @@ jobs:
           echo "spec=$spec" >> "$GITHUB_OUTPUT"
 
       - name: Check out the spec corpus that engine was written against
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: markup-carve/carve
           ref: ${{ steps.pin.outputs.spec }}
@@ -269,7 +269,7 @@ jobs:
       # compile, and the drift number would be about an artifact nothing else
       # looked at. The verdict is corpus-drift's; this only produces the log.
       - name: Check out the spec corpus at main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: markup-carve/carve
           path: spec-main
@@ -288,7 +288,7 @@ jobs:
           bash scripts/verify-release-artifact.sh "$(ls carve-lang-*.gem)" > drift.log 2>&1 || true
           cat drift.log
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: drift-log
           path: drift.log
@@ -393,12 +393,12 @@ jobs:
     outputs:
       spec: ${{ steps.verdict.outputs.spec }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The measurement runs in `build`, over the gem that job installed and
       # gated, against the spec main commit it reports as an output.
       - name: Download the drift log the build job measured
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: drift-log
 
@@ -447,7 +447,7 @@ jobs:
       # did not happen.
       - name: Keep the undeclared rows
         if: always() && hashFiles('undeclared.txt') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: undeclared-drift
           path: undeclared.txt
@@ -486,7 +486,7 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # The script merges `main` into the branch on the preserve path, so it
           # needs more than the tip.
@@ -500,7 +500,7 @@ jobs:
       # for a missing file says that in words, where a failed download says
       # "Artifact not found". Both fail the job; only one of them tells the
       # reader which of the two states they are in.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         continue-on-error: true
         with:
           name: undeclared-drift
@@ -569,7 +569,7 @@ jobs:
       contents: read
       issues: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: File the verdict where someone reads it
         env:
