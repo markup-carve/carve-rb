@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-10-23
+
+### Breaking
+
+- The engine is the published `carve-lang` 0.1.11 crate. A quote-prefixed `+`
+  needs one space after each `>`, so `>+` and `>>+` now render as text, and a
+  continuation marker reads only at column 0 or right after a block opener.
+  Re-check documents that place `+` elsewhere (#215).
+- Includes of a file that is not valid UTF-8 are refused with an
+  `include-non-text` warning instead of being spliced (#215).
+
+### Fixes
+
+- The carve-lang 0.1.11 pin corrects container ownership for quotes, lazy lines,
+  colon divs and footnotes, fences inside nested lists and quotes, and list
+  tightness around captions (#215).
+- Includes see through a byte order mark and keep link definitions and region
+  markers in place. Markdown import keeps link destinations, autolink brackets
+  and pipe escapes as written (#215).
+
+### Improvements
+
+- Precompiled gems for `x86_64-linux`, `x86_64-linux-musl`, `aarch64-linux`,
+  `x86_64-darwin`, `arm64-darwin` and `x64-mingw-ucrt` install without a Rust
+  toolchain on Ruby 3.0 to 4.0 (#214).
+- `Carve.to_carve(source, align_tables: true)` pads table columns to display
+  width (#215).
+- `Carve.select_include_region(source, name, mode:)` resolves a named
+  `@region` to a Range of content lines and raises `Carve::IncludeRegionError`
+  for a missing or malformed region (#215).
+- An include with `@code` or `@code:lang` splices a file or region as one code
+  block (#215).
+
 ## [0.1.9] - 2026-10-18
 
 ### Breaking
@@ -488,7 +521,8 @@ are not listed, because no release ever shipped them.
   Arrays (every AST node type is covered), enabling custom renderers such as
   [carve-hexapdf](https://github.com/markup-carve/carve-hexapdf).
 
-[Unreleased]: https://github.com/markup-carve/carve-rb/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/markup-carve/carve-rb/compare/v0.1.10...HEAD
+[0.1.10]: https://github.com/markup-carve/carve-rb/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/markup-carve/carve-rb/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/markup-carve/carve-rb/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/markup-carve/carve-rb/compare/v0.1.6...v0.1.7
