@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and pipe escapes as written (#215).
 - `Carve.render_with_includes` with the `markdown`, `plain` and `ansi` targets
   keeps a link definition where it was written, as `Carve.to_markdown` does,
-  instead of moving it to the end (#220).
+  instead of moving it to the end (#221).
 
 ### Improvements
 
@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An include with `@code` or `@code:lang` splices a file or region as one code
   block (#215).
 - Include warnings carry `includedBy`, the chain of directives that reached the
-  file the warning arose in, with root-relative paths, lines and columns (#220).
+  file the warning arose in, with root-relative paths, lines and columns (#221).
 
 ## [0.1.9] - 2026-10-18
 
