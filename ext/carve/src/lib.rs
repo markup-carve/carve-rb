@@ -297,28 +297,16 @@ fn parse_include_target(ruby: &Ruby, name: &str) -> Result<IncludeTarget, Error>
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn render_with_includes_json(
+/// Canonicalize an include root and the document's own path, and refuse a
+/// document outside the root. Both must be absolute: a relative one would root
+/// containment at the process working directory.
+fn contained_include_paths(
     ruby: &Ruby,
-    source: String,
-    root: String,
-    source_path: String,
-    target: String,
-    names: RArray,
-    mode: String,
-    renderers: RHash,
-    symbols: RHash,
-    safe: bool,
-    profile: Option<String>,
-    sections: bool,
-    max_depth: Option<usize>,
-    max_bytes: Option<usize>,
-    max_resolver_calls: Option<usize>,
-    max_warnings: Option<usize>,
-) -> Result<String, Error> {
-    let which = parse_include_target(ruby, &target)?;
-    let root_path = Path::new(&root);
-    let source_path = Path::new(&source_path);
+    root: &str,
+    source_path: &str,
+) -> Result<(PathBuf, PathBuf), Error> {
+    let root_path = Path::new(root);
+    let source_path = Path::new(source_path);
     if !root_path.is_absolute() || !source_path.is_absolute() {
         return Err(Error::new(
             ruby.exception_arg_error(),
@@ -343,6 +331,42 @@ fn render_with_includes_json(
             "include source_path must be a file inside the include root".to_string(),
         ));
     }
+    Ok((root_real, source_real))
+}
+
+/// A path as a reader sees it: relative to the include root.
+fn root_relative(root_real: &Path, value: &str) -> String {
+    let path = PathBuf::from(value);
+    if path.is_absolute() {
+        path.strip_prefix(root_real)
+            .map(|relative| relative.to_string_lossy().replace('\\', "/"))
+            .unwrap_or_else(|_| "[outside-root]".to_string())
+    } else {
+        value.to_string()
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_with_includes_json(
+    ruby: &Ruby,
+    source: String,
+    root: String,
+    source_path: String,
+    target: String,
+    names: RArray,
+    mode: String,
+    renderers: RHash,
+    symbols: RHash,
+    safe: bool,
+    profile: Option<String>,
+    sections: bool,
+    max_depth: Option<usize>,
+    max_bytes: Option<usize>,
+    max_resolver_calls: Option<usize>,
+    max_warnings: Option<usize>,
+) -> Result<String, Error> {
+    let which = parse_include_target(ruby, &target)?;
+    let (root_real, source_real) = contained_include_paths(ruby, &root, &source_path)?;
 
     let resolver = carve_rs::FileSystemResolver::new(&root_real).map_err(|_| {
         Error::new(
@@ -443,16 +467,7 @@ fn render_with_includes_json(
     } else {
         serde_json::Value::String(rendered)
     };
-    let safe_path = |value: &str| {
-        let path = PathBuf::from(value);
-        if path.is_absolute() {
-            path.strip_prefix(&root_real)
-                .map(|relative| relative.to_string_lossy().replace('\\', "/"))
-                .unwrap_or_else(|_| "[outside-root]".to_string())
-        } else {
-            value.to_string()
-        }
-    };
+    let safe_path = |value: &str| root_relative(&root_real, value);
     let warnings = prepared
         .warnings
         .iter()
@@ -493,6 +508,122 @@ fn render_with_includes_json(
         "suppressedWarnings": prepared.suppressed_warnings,
     })
     .to_string())
+}
+
+/// Byte offset -> codepoint offset over `source`.
+///
+/// `LintWarning` reports `start`/`end` in bytes so a Rust caller can slice its
+/// `&str`; a Ruby String indexes by character, so a byte offset would mis-slice
+/// every document with a non-ASCII character before the finding. A byte inside a
+/// character maps to that character, and the final slot is the total.
+fn codepoint_table(source: &str) -> Vec<usize> {
+    let mut table = Vec::with_capacity(source.len() + 1);
+    let mut count = 0usize;
+    for ch in source.chars() {
+        for _ in 0..ch.len_utf8() {
+            table.push(count);
+        }
+        count += 1;
+    }
+    table.push(count);
+    table
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lint_json(
+    ruby: &Ruby,
+    source: String,
+    names: RArray,
+    root: Option<String>,
+    source_path: Option<String>,
+    max_depth: Option<usize>,
+    max_bytes: Option<usize>,
+    max_resolver_calls: Option<usize>,
+    max_warnings: Option<usize>,
+) -> Result<String, Error> {
+    let boxed = boxed_extensions(ruby, names)?;
+    let mut options = Options::new();
+    for extension in &boxed {
+        options = options.with_extension(extension.as_ref());
+    }
+    // The document's own findings come first in `lint_carve_with_options`, and
+    // they are the only ones whose offsets index `source`. Linting it alone
+    // first tells the two apart without guessing from a finding's fields.
+    let own = carve_rs::lint_carve_with_options(&source, &options);
+    let own_count = own.len();
+    let (warnings, root_real) = match (root, source_path) {
+        (None, None) => (own, None),
+        (Some(root), Some(source_path)) => {
+            let (root_real, source_real) = contained_include_paths(ruby, &root, &source_path)?;
+            let resolver = carve_rs::FileSystemResolver::new(&root_real).map_err(|_| {
+                Error::new(
+                    ruby.exception_arg_error(),
+                    "include root is not usable".to_string(),
+                )
+            })?;
+            let mut include_options = carve_rs::IncludeOptions::new()
+                .with_resolver(&resolver)
+                .with_source_path(source_real.to_string_lossy());
+            if let Some(value) = max_depth {
+                include_options = include_options.with_max_depth(value);
+            }
+            if let Some(value) = max_bytes {
+                include_options = include_options.with_max_bytes(value);
+            }
+            if let Some(value) = max_resolver_calls {
+                include_options = include_options.with_max_resolver_calls(value);
+            }
+            if let Some(value) = max_warnings {
+                include_options = include_options.with_max_warnings(value);
+            }
+            let options = options.with_lint_includes(include_options);
+            (
+                carve_rs::lint_carve_with_options(&source, &options),
+                Some(root_real),
+            )
+        }
+        _ => {
+            return Err(Error::new(
+                ruby.exception_arg_error(),
+                "lint needs both root: and source_path: to follow includes".to_string(),
+            ))
+        }
+    };
+    let table = codepoint_table(&source);
+    let total = table.len() - 1;
+    let to_codepoint = |byte: usize| table.get(byte).copied().unwrap_or(total);
+    let path = |value: &str| match &root_real {
+        Some(root_real) => root_relative(root_real, value),
+        None => value.to_string(),
+    };
+    let findings = warnings
+        .iter()
+        .enumerate()
+        .map(|(index, warning)| {
+            let own = index < own_count;
+            serde_json::json!({
+                "rule": warning.rule,
+                "message": warning.message,
+                "line": warning.line,
+                "column": warning.column,
+                "start": own.then(|| to_codepoint(warning.start)),
+                "end": own.then(|| to_codepoint(warning.end)),
+                "file": warning.file.as_deref().map(&path),
+                "includedBy": warning
+                    .included_by
+                    .iter()
+                    .map(|site| {
+                        serde_json::json!({
+                            "file": path(&site.file),
+                            "line": site.line,
+                            "column": site.column,
+                        })
+                    })
+                    .collect::<Vec<_>>(),
+            })
+        })
+        .collect::<Vec<_>>();
+    Ok(serde_json::Value::Array(findings).to_string())
 }
 
 fn from_html_json(ruby: &Ruby, source: String, mode: String) -> Result<String, Error> {
@@ -1024,6 +1155,20 @@ guarded!(
     ) -> String =>? render_with_includes_json
 );
 
+guarded!(
+    g_lint_json(
+        ruby: &Ruby,
+        source: Source,
+        names: RArray,
+        root: Option<String>,
+        source_path: Option<String>,
+        max_depth: Option<usize>,
+        max_bytes: Option<usize>,
+        max_resolver_calls: Option<usize>,
+        max_warnings: Option<usize>
+    ) -> String =>? lint_json
+);
+
 /// Entry point invoked by Ruby when the extension is loaded.
 ///
 /// `name = "carve"` makes the macro emit the `Init_carve` symbol that matches
@@ -1073,5 +1218,6 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     module.define_singleton_method("_read_stamp", function!(g_read_stamp, 1))?;
     module.define_singleton_method("_stamp_needs_review", function!(g_stamp_needs_review, 2))?;
     module.define_singleton_method("_panic_probe", function!(g_panic_probe, 0))?;
+    module.define_singleton_method("_lint_json", function!(g_lint_json, 8))?;
     Ok(())
 }

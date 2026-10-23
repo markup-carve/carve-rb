@@ -140,6 +140,21 @@ Other render methods leave directives literal. See the
 [include reference](docs/reference.md#file-includes) for budgets, AST expansion,
 targets, and containment behavior.
 
+## Lint
+
+`Carve.lint(source)` reports constructs that render but lose what the author
+wrote, such as an unattached attribute or a link to a missing id:
+
+```ruby
+Carve.lint("é [x](#nope)\n").map { |f| [f[:rule], f[:line], f[:column]] }
+# => [["broken-fragment-link", 1, 3]]
+```
+
+Columns and the `:start`/`:end` offsets count characters, not bytes. Pass
+`root:` and `source_path:` to lint included files too; each such finding names
+its file and the `:includedBy` chain. See the
+[lint reference](docs/reference.md#linting).
+
 ## Security
 
 Use `safe: true` and a restrictive profile for untrusted documents. Custom

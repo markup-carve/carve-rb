@@ -150,6 +150,55 @@ module Carve
       )
     end
 
+    # Report constructs that parse and render, but not the way the author
+    # meant: an attribute that attaches to nothing, an unclosed fence, a
+    # fragment link with no target.
+    #
+    #   Carve.lint("Text.\n\n{#gone}\n")
+    #   # => [{rule: "unattached-block-attribute", message: "...", line: 3,
+    #   #      column: 1, start: 7, end: 14, file: nil, includedBy: []}]
+    #
+    # Returns an Array of Hashes, empty for a clean document:
+    #
+    # * +:rule+ - the engine's stable rule id, the same in every Carve engine.
+    # * +:message+ - what degrades, in prose.
+    # * +:line+, +:column+ - 1-based; the column counts characters, not bytes.
+    # * +:start+, +:end+ - 0-based character offsets into +source+, end
+    #   exclusive, so <tt>source[f[:start]...f[:end]]</tt> is the offending text.
+    #   +nil+ on a finding the include pass adds (below), whose offsets would
+    #   index another text.
+    # * +:file+, +:includedBy+ - see below; +nil+ and +[]+ without includes.
+    #
+    # The engine reports no severity: every finding is a warning.
+    #
+    # Pass the same +extensions:+ you render with, since they change which
+    # constructs are elements and which rules apply.
+    #
+    # ==== Following includes
+    #
+    # With +root:+ and +source_path:+ (absolute, as for .to_html_with_includes)
+    # the pass also lints every included Carve file and reports include
+    # directives that stay literal (a missing target, a cycle, a budget). Such a
+    # finding names its +:file+ relative to the root and its +:includedBy+ chain,
+    # top-level first, as +{file:, line:, column:}+. The budgets
+    # (+max_depth:+ and the rest) mean what they mean for rendering.
+    def lint(source, extensions: nil, root: nil, source_path: nil, max_depth: nil,
+             max_bytes: nil, max_resolver_calls: nil, max_warnings: nil)
+      JSON.parse(
+        _lint_json(
+          source.to_s,
+          Array(extensions).map(&:to_s),
+          root&.to_s,
+          source_path&.to_s,
+          max_depth,
+          max_bytes,
+          max_resolver_calls,
+          max_warnings,
+        ),
+        symbolize_names: true,
+      )
+    end
+
     # Format +source+ into canonical Carve. A writer refusal returns the source
     # as authored. +align_tables:+ pads table cells into aligned columns.
     def to_carve(source, align_tables: false)

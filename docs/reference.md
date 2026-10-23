@@ -181,6 +181,42 @@ a malformed, unpaired or duplicate marker raises `Carve::IncludeRegionError`, an
 `ArgumentError` whose `rule` is `"include-region-invalid"`, the warning rule
 expansion reports for the same file.
 
+## Linting
+
+`Carve.lint` reports constructs that parse and render, but not the way the
+author meant: an attribute that attaches to nothing, an unclosed fence, a
+fragment link with no target. It returns an Array of findings, empty for a
+clean document.
+
+```ruby
+Carve.lint("é [x](#nope)\n")
+# => [{rule: "broken-fragment-link", line: 1, column: 3, start: 2, end: 12,
+#      message: "Link to \"#nope\" matches no id in this document, ...",
+#      file: nil, includedBy: []}]
+```
+
+- `:rule` is the engine's stable rule id, shared by every Carve engine.
+- `:line` and `:column` are 1-based, and the column counts characters.
+- `:start` and `:end` are 0-based character offsets into the source, end
+  exclusive, so `source[f[:start]...f[:end]]` is the offending text. The engine
+  reports bytes; the binding converts them, because a byte offset would
+  mis-slice a Ruby String after any non-ASCII character.
+- The engine assigns no severity, so findings carry none.
+
+Pass the `extensions:` you render with: they decide which rules apply.
+
+With `root:` and `source_path:`, as for `Carve.to_html_with_includes`, the pass
+also lints every included Carve file and reports include directives that stay
+literal, such as `include-unresolved` or `include-cycle`. Those findings name
+their `:file` relative to the root and the `:includedBy` chain, top-level first.
+Their `:start` and `:end` are `nil`, since the offsets would index another text.
+The include budgets (`max_depth:`, `max_bytes:`, `max_resolver_calls:`,
+`max_warnings:`) are accepted as for rendering.
+
+```ruby
+Carve.lint(File.read(book), root: File.dirname(book), source_path: book)
+```
+
 ## Parsing to an AST
 
 `Carve.parse` returns the parsed document as a tree of Ruby Hashes and Arrays,
@@ -387,6 +423,7 @@ a document change.
 | `Carve.to_html_with_includes(source, root:, source_path:)` | Render contained file includes and return warnings and dependencies. |
 | `Carve.parse_with_includes(source, root:, source_path:)` | The same expansion, published as an AST instead of HTML. |
 | `Carve.render_with_includes(source, root:, source_path:, target:)` | The expansion over any render target: html, markdown, plain, ansi or ast. |
+| `Carve.lint(source, extensions: [...])` | Report silent degradations as findings with rule, message, line, column and offsets; `root:` and `source_path:` follow includes. |
 | `Carve.to_carve(source, align_tables: false)` | Format into canonical Carve; `align_tables: true` pads table columns. A writer refusal returns the source as authored. |
 | `Carve.select_include_region(source, name, mode:)` | Resolve `@region:name` (`mode: :carve` or `:code`) to a Range of content lines; raises `Carve::IncludeRegionError`. |
 | `Carve.read_stamp(source)` | Read a document's provenance marker: `{version:, generated_by:}` or `nil`. |
