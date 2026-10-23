@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Improvements
+
+- `Carve.lint(source, extensions:)` exposes the engine's linter: findings carry
+  the rule id, message, 1-based line and column, and character offsets. With
+  `root:` and `source_path:` it lints included files and reports each finding's
+  file and `includedBy` chain (#223).
+
 ## [0.1.10] - 2026-10-23
 
 ### Breaking
