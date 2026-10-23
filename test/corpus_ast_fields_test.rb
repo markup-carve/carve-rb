@@ -55,7 +55,7 @@ class CorpusAstFieldsTest < Minitest::Test
     block_quote.attrs block_quote.children block_quote.fenced caption_number.n
     cell_wrap.col cell_wrap.line cell_wrap.row code.attrs code.cellWraps
     code.value code_block.attrs code_block.content code_block.header code_block.label
-    code_block.lang comment.block comment.content comment.delimited critic_comment.text
+    code_block.lang comment.block comment.content comment.delimited comment.form critic_comment.text
     definition_description.children definition_list.items definition_list.loose
     definition_term.children delete.children directive.children directive.kind
     directive.label directive.title div.attrs
@@ -68,7 +68,7 @@ class CorpusAstFieldsTest < Minitest::Test
     image.src image.title inline_extension.attrs inline_extension.content
     inline_extension.name inline_footnote.attrs inline_footnote.inline
     inline_footnote.number insert.attrs insert.children line_block.attrs
-    line_block.children link.attrs link.children link.href link.rawRef link.ref link.title
+    line_block.children link.attrs link.children link.href link.rawRef link.ref link.resolved link.title
     link_reference_definition.attrs link_reference_definition.href
     link_reference_definition.label link_reference_definition.title list.attrs
     list.bareMarker list.bulletChar list.delim list.items list.olType list.ordered
@@ -80,7 +80,7 @@ class CorpusAstFieldsTest < Minitest::Test
     smart_punctuation.value span.attrs span.children strike.children strong.attrs
     strong.boldItalic strong.children subscript.children substitution.new substitution.old
     superscript.children symbol.attrs symbol.name table.attrs table.caption table.columns
-    table.rowGroups table.rows table.separatorWidths table_cell.align table_cell.attrs
+    table.rowGroups table.rows table.separatorWidths table.sourceFormat table_cell.align table_cell.attrs
     table_cell.children
     table_cell.colspan table_cell.header table_cell.rowspan table_cell.span
     table_cell.valign table_row.attrs table_row.cells table_row.continuationLines
