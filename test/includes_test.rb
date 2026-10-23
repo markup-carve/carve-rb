@@ -232,4 +232,40 @@ class IncludesTest < Minitest::Test
       assert_includes result[:value], "id=\"dup-2\""
     end
   end
+
+  # --- the directive chain behind a warning -------------------------------
+
+  def test_a_warning_two_includes_deep_names_the_directives_that_reached_it
+    with_book do |root, book|
+      write(root, "chapters/one.crv", "One\n\n{{ two.crv }}\n")
+      write(root, "chapters/two.crv", "Two\n\n{{ missing.crv }}\n")
+      %w[html markdown plain ansi].each do |target|
+        result = Carve.render_with_includes("Top\n\n{{ chapters/one.crv }}\n",
+                                            root: root, source_path: book, target: target)
+        warning = result[:warnings].fetch(0)
+        assert_equal "include-unresolved", warning[:rule], target
+        assert_equal "chapters/two.crv", warning[:file], target
+        assert_equal [{ file: "book.crv", line: 3, column: 1 },
+                      { file: "chapters/one.crv", line: 3, column: 1 }],
+                     warning[:includedBy], target
+      end
+    end
+  end
+
+  def test_a_top_level_warning_has_an_empty_chain
+    with_book do |root, book|
+      result = Carve.to_html_with_includes("{{ missing.crv }}", root: root, source_path: book)
+      assert_equal [], result[:warnings].fetch(0)[:includedBy]
+    end
+  end
+
+  def test_the_text_targets_keep_a_link_definition_where_it_was_written
+    with_book do |root, book|
+      source = "[bold]: /x\n\nsee [*bold*][]\n"
+      { "markdown" => :to_markdown, "plain" => :to_plain_text, "ansi" => :to_ansi }.each do |target, plain|
+        result = Carve.render_with_includes(source, root: root, source_path: book, target: target)
+        assert_equal Carve.send(plain, source), result[:value], target
+      end
+    end
+  end
 end

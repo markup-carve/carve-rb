@@ -74,7 +74,8 @@ module Carve
     #
     # Returns +{value:, warnings:, dependencies:, suppressedWarnings:}+. Paths
     # in +warnings+ and +dependencies+ are relative to the root, so a report can
-    # be shown to a reader as it stands.
+    # be shown to a reader as it stands. Each warning's +includedBy+ lists the
+    # directives that reached its file, top-level first, as +{file:, line:, column:}+.
     #
     # Every render option +to_html+ takes is accepted and reaches the included
     # children too: an extension, a symbol map or a profile means the same thing

@@ -133,7 +133,9 @@ result = Carve.to_html_with_includes(
 )
 ```
 
-The result contains the value, warnings, and root-relative dependencies.
+The result contains the value, warnings, and root-relative dependencies. A
+warning from an included file names the chain of directives that reached it in
+`:includedBy`.
 Other render methods leave directives literal. See the
 [include reference](docs/reference.md#file-includes) for budgets, AST expansion,
 targets, and containment behavior.

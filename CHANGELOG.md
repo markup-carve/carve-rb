@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Includes see through a byte order mark and keep link definitions and region
   markers in place. Markdown import keeps link destinations, autolink brackets
   and pipe escapes as written (#215).
+- `Carve.render_with_includes` with the `markdown`, `plain` and `ansi` targets
+  keeps a link definition where it was written, as `Carve.to_markdown` does,
+  instead of moving it to the end (#220).
 
 ### Improvements
 
@@ -39,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for a missing or malformed region (#215).
 - An include with `@code` or `@code:lang` splices a file or region as one code
   block (#215).
+- Include warnings carry `includedBy`, the chain of directives that reached the
+  file the warning arose in, with root-relative paths, lines and columns (#220).
 
 ## [0.1.9] - 2026-10-18
 

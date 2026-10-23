@@ -137,6 +137,21 @@ section 19 charges the budget for what the resolver handed back and a target is
 resolved before its size is known. A target that is not text (a NUL byte, or
 bytes that are not valid UTF-8) warns as `include-non-text` and stays literal.
 
+Each warning is a Hash with `:rule`, `:message`, `:file` (the root-relative file
+the warning arose in) and `:includedBy`, the directives that reached that file,
+top-level directive first. Each entry names the root-relative file holding the
+directive and its 1-based `:line` and `:column`. A warning in the top-level
+document has an empty chain, and the `"ast"` target always reports an empty one,
+because it parses without positions.
+
+```ruby
+result[:warnings].first
+# => {rule: "include-unresolved", file: "chapters/two.crv",
+#     message: "Include \"missing.crv\" could not be resolved.",
+#     includedBy: [{file: "book.crv", line: 3, column: 1},
+#                  {file: "chapters/one.crv", line: 3, column: 1}]}
+```
+
 ### Selecting a region
 
 `Carve.select_include_region(source, name, mode:)` resolves `@region:name` in a
