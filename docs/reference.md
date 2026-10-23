@@ -45,6 +45,8 @@ Carve.to_markdown(source)
 Carve.to_plain_text(source)
 Carve.to_ansi(source)
 Carve.to_carve(source)
+# `align_tables: true` pads table cells into aligned columns.
+Carve.to_carve(source, align_tables: true)
 # Import reports use schema version 2, with fidelity and confidence per finding.
 # Markdown reports construct outcomes and known losses. Incomplete assessments
 # emit fidelity-unverified/dropped/fallback.
@@ -132,7 +134,27 @@ The budgets `max_depth:`, `max_bytes:`, `max_resolver_calls:` and
 `max_warnings:` pass through to the engine; omit one to keep its default. A
 target refused by the byte budget still reports `resolved: true`, because
 section 19 charges the budget for what the resolver handed back and a target is
-resolved before its size is known.
+resolved before its size is known. A target that is not text (a NUL byte, or
+bytes that are not valid UTF-8) warns as `include-non-text` and stays literal.
+
+### Selecting a region
+
+`Carve.select_include_region(source, name, mode:)` resolves `@region:name` in a
+file's text with the marker rules the engine applies during expansion, so an
+editor that jumps to a region agrees with the render. It returns the 1-based,
+inclusive Range of content lines; an empty region is an empty Range like `2..1`.
+
+```ruby
+text = "intro\n%% #region setup\na\nb\n%% #endregion\n"
+Carve.select_include_region(text, "setup", mode: :carve) # => 3..4
+```
+
+`mode: :carve` accepts only `%% #region` / `%% #endregion` markers, as a Carve
+include does. `mode: :code` also accepts the source-comment forms (`//`, `--`,
+`/* */`, `<!-- -->`, bare `#region`) of an `@code` include. A missing region or
+a malformed, unpaired or duplicate marker raises `Carve::IncludeRegionError`, an
+`ArgumentError` whose `rule` is `"include-region-invalid"`, the warning rule
+expansion reports for the same file.
 
 ## Parsing to an AST
 
@@ -340,6 +362,8 @@ a document change.
 | `Carve.to_html_with_includes(source, root:, source_path:)` | Render contained file includes and return warnings and dependencies. |
 | `Carve.parse_with_includes(source, root:, source_path:)` | The same expansion, published as an AST instead of HTML. |
 | `Carve.render_with_includes(source, root:, source_path:, target:)` | The expansion over any render target: html, markdown, plain, ansi or ast. |
+| `Carve.to_carve(source, align_tables: false)` | Format into canonical Carve; `align_tables: true` pads table columns. A writer refusal returns the source as authored. |
+| `Carve.select_include_region(source, name, mode:)` | Resolve `@region:name` (`mode: :carve` or `:code`) to a Range of content lines; raises `Carve::IncludeRegionError`. |
 | `Carve.read_stamp(source)` | Read a document's provenance marker: `{version:, generated_by:}` or `nil`. |
 | `Carve.needs_review?(source)` | Whether a document predates this engine's spec version (unstamped counts as yes). |
 | `Carve.to_html_with_extensions(source, names_array)` | Native primitive (Array of Strings). |
@@ -349,6 +373,7 @@ a document change.
 | `Carve::EXTENSIONS` | Array of recognized extension symbols. |
 | `Carve::MODES` | Array of recognized render modes (`:interactive`, `:static`). |
 | `Carve::RENDERER_KEYS` | Array of recognized `renderers:` keys. |
+| `Carve::IncludeRegionError` | `ArgumentError` raised by `select_include_region`; `rule` is the engine's warning rule id. |
 | `Carve::EnginePanic` | `StandardError` raised when the engine panics; see [Untrusted input](#untrusted-input). |
 
 ## Develop
@@ -366,7 +391,7 @@ The build needs the same toolchain as a gem install; see
 
 `ext/carve/Cargo.toml` pins the engine to an exact crates.io release for
 reproducible gem builds, as an `=` requirement on the `version` field (for
-example `version = "=0.1.10"`). Read that field for the current pin.
+example `version = "=0.1.11"`). Read that field for the current pin.
 
 The dependency uses the package name `carve-lang` and the Rust import alias
 `carve_rs`.
