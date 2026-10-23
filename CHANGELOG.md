@@ -14,9 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The engine is the published `carve-lang` 0.1.11 crate. A quote-prefixed `+`
   needs one space after each `>`, so `>+` and `>>+` now render as text, and a
   continuation marker reads only at column 0 or right after a block opener.
-  Re-check documents that place `+` elsewhere (#215).
+  Re-check documents that place `+` elsewhere (#215, markup-carve/carve#3421).
 - Includes of a file that is not valid UTF-8 are refused with an
-  `include-non-text` warning instead of being spliced (#215).
+  `include-non-text` warning instead of being spliced (#215,
+  markup-carve/carve-rs#2885).
 
 ### Fixes
 
