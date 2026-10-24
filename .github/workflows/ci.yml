@@ -226,6 +226,8 @@ jobs:
           spec="$(python3 scripts/pinned-spec-commit.py \
             --engine carve-rs \
             --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock)"
+          # The corpus is unchanged since the engine gitlink; this pins the spec release notes.
+          spec="$(cat spec-corpus-revision.txt)"
           echo "spec=$spec" >> "$GITHUB_OUTPUT"
 
       - name: Check out the spec corpus that engine was written against
@@ -412,6 +414,8 @@ jobs:
         run: |
           set -uo pipefail
           spec="$SPEC_MAIN"
+          # The corpus is unchanged since the engine gitlink; this pins the spec release notes.
+          spec="$(cat spec-corpus-revision.txt)"
           echo "spec=$spec" >> "$GITHUB_OUTPUT"
           # errexit off around the pipeline only, so the summary below is
           # written on a refusal too - that is the run whose summary matters.
