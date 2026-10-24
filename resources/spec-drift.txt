@@ -57,3 +57,8 @@
 # EMPTY IS THE GOAL STATE. An empty file means this gem renders every document
 # in spec main exactly as the spec does, and it is the only state that may be
 # tagged.
+19-smart-typography-dashes-and-quotes-35 # undeclared at spec main 52f84af on 2026-10-24; the pinned engine carve-lang 0.1.11 predates it
+658-a-definition-marker-line-keeps-a-straddling-tab-s-residual-columns # undeclared at spec main 52f84af on 2026-10-24; the pinned engine carve-lang 0.1.11 predates it
+659-table-spans-keep-alignment-defaults-in-physical-columns-2 # undeclared at spec main 52f84af on 2026-10-24; the pinned engine carve-lang 0.1.11 predates it
+659-table-spans-keep-alignment-defaults-in-physical-columns-5 # undeclared at spec main 52f84af on 2026-10-24; the pinned engine carve-lang 0.1.11 predates it
+659-table-spans-keep-alignment-defaults-in-physical-columns-7 # undeclared at spec main 52f84af on 2026-10-24; the pinned engine carve-lang 0.1.11 predates it
