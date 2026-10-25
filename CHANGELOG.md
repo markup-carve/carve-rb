@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-10-25
+
+Task lists carry progress and blocked states through the Ruby binding. Rendering and import follow the 0.1.13 engine fixes.
+
+### Fixes
+
+- List items stay open after line comments. Empty link destinations keep literal tabs, and Markdown destinations keep escaped parentheses (#231).
+- HTML import preserves header rowspans and empty header alignment. Markdown export reports a dropped title on a fence without a language (#231).
+
+### Improvements
+
+- Progress `[/]` and blocked `[!]` tasks render and round trip; `[_]` is accepted as an open task alias (#231).
+
+**Full Changelog**: https://github.com/markup-carve/carve-rb/compare/v0.1.12...v0.1.13
+
 ## [0.1.12] - 2026-10-24
 
 ### Improvements
