@@ -30,10 +30,21 @@ class AlignTablesAndRegionsTest < Minitest::Test
     JSON.parse(File.read(path, encoding: "UTF-8"))
   end
 
+  # A roundtrip row keeps a GFM separator only under a roundtrip writer; the
+  # canonical writer bound here writes native `|=` headers (CARVE-P11-066).
+  GFM_SEPARATOR = /^\|(\s*:?-+:?\s*\|)+\s*$/
+
   def test_align_tables_matches_every_shared_fixture
     rows = alignment_rows
     assert_operator rows.length, :>=, 13
     rows.each do |row|
+      if GFM_SEPARATOR.match?(row.fetch("canonical"))
+        written = Carve.to_carve(row.fetch("canonical"), align_tables: true)
+        refute_match GFM_SEPARATOR, written, row.fetch("name")
+        assert_equal written, Carve.to_carve(written, align_tables: true), row.fetch("name")
+        assert_equal Carve.to_html(row.fetch("canonical")), Carve.to_html(written), row.fetch("name")
+        next
+      end
       assert_equal row.fetch("aligned"), Carve.to_carve(row.fetch("canonical"), align_tables: true),
                    row.fetch("name")
       assert_equal row.fetch("canonical"), Carve.to_carve(row.fetch("aligned")), row.fetch("name")
