@@ -72,6 +72,11 @@ Carve.to_carve(source)
 Carve.to_carve(source, align_tables: true) # pad table columns
 ```
 
+`to_carve` writes canonical Carve: every thematic break as `***`, table
+headers as native `|=` cells and cell alignment in braces (`|={>} Price |`).
+It reads the 0.1.13 glued markers (`|=>`) and GFM separator rows and rewrites
+them.
+
 Options configure extensions, safe rendering, profiles, symbols, section
 wrappers, and custom renderers:
 
@@ -152,8 +157,13 @@ Carve.lint("é [x](#nope)\n").map { |f| [f[:rule], f[:line], f[:column]] }
 
 Columns and the `:start`/`:end` offsets count characters, not bytes. Pass
 `root:` and `source_path:` to lint included files too; each such finding names
-its file and the `:includedBy` chain. See the
+its file and the `:includedBy` chain. `caption_hints: true` adds the opt-in
+`caption-looking-paragraph` hint. See the
 [lint reference](../docs/reference.md#linting).
+
+`Carve.decision_trace(source)` returns the engine's block decision trace as
+JSON lines, one record per source line, for debugging why a line landed in a
+container.
 
 ## Security
 

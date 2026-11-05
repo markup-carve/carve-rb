@@ -172,7 +172,9 @@ module Carve
     # The engine reports no severity: every finding is a warning.
     #
     # Pass the same +extensions:+ you render with, since they change which
-    # constructs are elements and which rules apply.
+    # constructs are elements and which rules apply. +caption_hints: true+
+    # turns on the opt-in +caption-looking-paragraph+ hint for a paragraph
+    # beside an image or table that reads like a caption.
     #
     # ==== Following includes
     #
@@ -183,7 +185,7 @@ module Carve
     # top-level first, as +{file:, line:, column:}+. The budgets
     # (+max_depth:+ and the rest) mean what they mean for rendering.
     def lint(source, extensions: nil, root: nil, source_path: nil, max_depth: nil,
-             max_bytes: nil, max_resolver_calls: nil, max_warnings: nil)
+             max_bytes: nil, max_resolver_calls: nil, max_warnings: nil, caption_hints: false)
       JSON.parse(
         _lint_json(
           source.to_s,
@@ -194,6 +196,7 @@ module Carve
           max_bytes,
           max_resolver_calls,
           max_warnings,
+          caption_hints ? true : false,
         ),
         symbolize_names: true,
       )
