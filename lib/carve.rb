@@ -420,8 +420,8 @@ module Carve
     # Frontmatter is the first child, carrying +:format+ and RAW +:content+.
     #
     # Every node is a Hash with a +:type+ key plus its fields; child collections
-    # are Arrays; +:attrs+ is +nil+ or a Hash of +{id:, classes:, key_values:}+.
-    # Keys are symbols. This is the raw parse tree (default profile, no
+    # are Arrays; +:attrs+ is +nil+ or a Hash holding whichever of +:id+,
+    # +:classes+, +:keyValues+ and +:order+ the source wrote. Keys are symbols. This is the raw parse tree (default profile, no
     # extensions), suitable for a custom renderer (e.g. Carve -> PDF).
     def parse(source)
       # max_nesting: false - the engine already bounds nesting (its own
