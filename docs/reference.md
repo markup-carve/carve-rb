@@ -231,8 +231,8 @@ Carve.parse("# Hello *world*")
 ```
 
 Every node is a Hash with a `:type` key plus its fields; child collections are
-Arrays; `:attrs` is `nil` or a Hash of `{id:, classes:, key_values:}`. Keys are
-symbols. This is the raw parse tree (default profile, no extensions), so
+Arrays; `:attrs` is `nil` or a Hash holding whichever of `:id`, `:classes`,
+`:keyValues` and `:order` the source wrote. Keys are symbols. This is the raw parse tree (default profile, no extensions), so
 render-stage extension rewrites are not applied.
 
 ## Static render mode + renderers
