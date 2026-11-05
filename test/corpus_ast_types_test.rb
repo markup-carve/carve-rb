@@ -63,7 +63,8 @@ class CorpusAstTypesTest < Minitest::Test
       case node
       when Hash
         seen << node[:type] if node[:type]
-        node.each_value { |v| walk.call(v) }
+        # An attribute map is author data: `{type=text}` is not a node.
+        node.each { |key, v| walk.call(v) unless key == :keyValues }
       when Array
         node.each { |v| walk.call(v) }
       end

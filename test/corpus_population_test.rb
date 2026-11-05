@@ -2,6 +2,8 @@
 
 require "minitest/autorun"
 require "corpus_population"
+require "tmpdir"
+require "fileutils"
 
 # The counter's own test, because the corpus can no longer be its test.
 #
@@ -11,6 +13,8 @@ require "corpus_population"
 # block upstream that had it, so a corpus run cannot demonstrate the difference
 # any more. A synthetic page can.
 class CorpusPopulationTest < Minitest::Test
+  include CorpusPopulation
+
   PAGE = [
     "::: compare",
     "```carve", "one", "```",
@@ -43,5 +47,46 @@ class CorpusPopulationTest < Minitest::Test
   def test_an_unclosed_block_is_reported_rather_than_counted_silently
     blocks = CorpusPopulation.census_compare_pairs(["::: compare", "```carve", "x", "```"])
     assert_equal true, blocks.first[:unclosed]
+  end
+
+  PAIR = ["::: compare", "```carve", "x", "```", "```html", "<p>x</p>", "```", ":::"].freeze
+
+  def example_tree(root)
+    examples = File.join(root, "resources", "examples")
+    FileUtils.mkdir_p(File.join(examples, "edge-cases"))
+    File.write(File.join(examples, "core.md"), PAIR.join("\n"))
+    File.write(File.join(examples, "extensions.md"), PAIR.join("\n"))
+    examples
+  end
+
+  def test_edge_case_sections_in_their_own_files
+    Dir.mktmpdir do |root|
+      sections = File.join(example_tree(root), "edge-cases")
+      File.write(File.join(sections, "0049-b.md"), (["## B", ""] + PAIR).join("\n"))
+      File.write(File.join(sections, "0048-a.md"), (["---", "page: tables", "---", "", "## A", ""] + PAIR + PAIR).join("\n"))
+      File.write(File.join(sections, "README.md"), PAIR.join("\n"))
+      pages = CorpusPopulation.example_pages(File.join(root, "resources", "examples"))
+      assert_equal %w[core.md extensions.md 0048-a.md 0049-b.md], pages.map { |path| File.basename(path) }
+      assert_equal 5, declared_corpus_size(File.join(root, "tests", "corpus"))
+    end
+  end
+
+  def test_the_single_edge_case_page_wins_when_it_exists
+    Dir.mktmpdir do |root|
+      examples = example_tree(root)
+      File.write(File.join(examples, "edge-cases.md"), PAIR.join("\n"))
+      assert_equal "edge-cases.md", File.basename(CorpusPopulation.example_pages(examples).last)
+    end
+  end
+
+  def test_an_empty_section_directory_is_refused
+    Dir.mktmpdir do |root|
+      assert_raises(RuntimeError) { CorpusPopulation.example_pages(example_tree(root)) }
+    end
+  end
+
+  def test_front_matter_is_not_section_content
+    assert_equal ["## A"], CorpusPopulation.section_body("---\npage: x\n---\n## A")
+    assert_equal ["---", "x"], CorpusPopulation.section_body("---\nx")
   end
 end

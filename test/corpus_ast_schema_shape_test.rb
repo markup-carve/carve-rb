@@ -55,7 +55,8 @@ class CorpusAstSchemaShapeTest < Minitest::Test
     case node
     when Hash
       block.call(node) if node[:type]
-      node.each_value { |v| each_node(v, &block) }
+      # An attribute map is author data: `{type=text}` is not a node.
+      node.each { |key, v| each_node(v, &block) unless key == :keyValues }
     when Array
       node.each { |v| each_node(v, &block) }
     end
@@ -99,6 +100,12 @@ class CorpusAstSchemaShapeTest < Minitest::Test
     assert_operator defs.length, :>=, 40,
                     "the schema has only #{defs.length} type definitions, which is too few to be " \
                     "the spec's - check CARVE_SPEC_SCHEMA"
+  end
+
+  def test_an_attribute_named_type_is_not_a_node
+    seen = []
+    each_node(Carve.parse("{type=text}\nhello\n")) { |node| seen << node[:type] }
+    assert_equal %w[document paragraph text], seen
   end
 
   def test_the_corpus_is_actually_walked

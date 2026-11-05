@@ -23,8 +23,10 @@
 #
 # So the reference is the corpus's SOURCE, not the corpus. tests/corpus is
 # generated from the `::: compare` blocks in
-# resources/examples/{core,extensions,edge-cases}.md (see
-# scripts/generate-corpus.mjs in the spec repository), and the generator refuses
+# resources/examples/{core,extensions}.md plus the edge-case sections (one
+# edge-cases.md page up to spec 0.1.13, one edge-cases/NNNN-slug.md file per
+# section after it; see scripts/lib/example-sections.mjs in the spec
+# repository), and the generator refuses
 # to write a corpus where the two disagree. Both live in the same spec checkout
 # CI already clones, one directory away from CARVE_SPEC_CORPUS - the same route
 # corpus_ast_schema_shape_test.rb already takes to resources/ast-schema.json.
@@ -37,6 +39,8 @@ module CorpusPopulation
   # The pages the corpus is generated from, in the order the generator reads
   # them. Order is irrelevant to a count; the list is the generator's.
   EXAMPLE_PAGES = %w[core.md extensions.md edge-cases.md].freeze
+  SECTION_DIR = "edge-cases"
+  SECTION_NUMBER = /\A(\d{4,})-/
 
   # Mirrors the generator: `::: compare`, or a longer colon run, with optional
   # modifiers such as `::: compare no-render`.
@@ -93,6 +97,33 @@ module CorpusPopulation
     blocks
   end
 
+  # The source pages in the spec's reading order. The spec split edge-cases.md
+  # into edge-cases/NNNN-slug.md after 0.1.13; either layout is read, the single
+  # page when it exists.
+  def self.example_pages(examples_dir)
+    pages = EXAMPLE_PAGES.first(2).map { |page| File.join(examples_dir, page) }
+    single = File.join(examples_dir, EXAMPLE_PAGES.last)
+    sections = File.join(examples_dir, SECTION_DIR)
+    return pages + [single] if File.exist?(single) || !File.directory?(sections)
+
+    files = Dir.children(sections).select { |name| name.end_with?(".md") && name != "README.md" }
+    raise "#{sections} holds no section files; the corpus source is incomplete" if files.empty?
+
+    pages + files.sort_by { |name| section_order(name) }.map { |name| File.join(sections, name) }
+  end
+
+  def self.section_order(name)
+    number = SECTION_NUMBER.match(name)
+    [number ? number[1].to_i : Float::INFINITY, name]
+  end
+
+  # A section file may open with `page:` front matter, which is not section content.
+  def self.section_body(text)
+    lines = text.split("\n")
+    close = lines.first == "---" && lines.drop(1).index("---")
+    close ? lines.drop(close + 2) : lines
+  end
+
   # Counts the example pairs the spec DECLARES. corpus_dir is
   # CARVE_SPEC_CORPUS, i.e. <spec>/tests/corpus.
   #
@@ -101,15 +132,15 @@ module CorpusPopulation
   def declared_corpus_size(corpus_dir)
     examples_dir = File.expand_path(File.join(corpus_dir, "..", "..", "resources", "examples"))
     declared = 0
-    EXAMPLE_PAGES.each do |page|
-      path = File.join(examples_dir, page)
+    CorpusPopulation.example_pages(examples_dir).each do |path|
       # Not a soft skip. Without this file there is no independent statement of
       # how big the corpus should be, and a corpus check with nothing to compare
       # against is the failure shape this helper exists to remove.
       assert File.exist?(path),
              "no corpus source page at #{path}. tests/corpus is generated from these pages; " \
              "if the spec moved them, this helper has to move with them"
-      CorpusPopulation.census_compare_pairs(File.read(path).split("\n")).each do |block|
+      lines = CorpusPopulation.section_body(File.read(path, encoding: "utf-8"))
+      CorpusPopulation.census_compare_pairs(lines).each do |block|
         assert_nil block[:unclosed], "unclosed compare block in #{path} at line #{block[:line]}"
         assert_nil block[:unclosed_fence], "unclosed fence in #{path}"
         assert block["carve"].positive? && block["carve"] == block["html"],
@@ -135,8 +166,8 @@ module CorpusPopulation
     declared = declared_corpus_size(corpus_dir)
     assert_equal declared, got,
                  "#{what}: #{got}, but the spec's example pages declare #{declared}. Every " \
-                 "::: compare block in resources/examples/{core,extensions,edge-cases}.md " \
-                 "yields one corpus pair per `carve` fence, so a difference means the corpus " \
+                 "::: compare block in resources/examples/{core,extensions}.md and the " \
+                 "edge-case sections yields one corpus pair per `carve` fence, so a difference means the corpus " \
                  "at #{corpus_dir} " \
                  "is not the one those pages describe - a truncated or stale checkout, a wrong " \
                  "CARVE_SPEC_CORPUS, or a corpus that needs regenerating (npm run corpus:build " \

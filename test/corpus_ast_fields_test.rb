@@ -103,7 +103,8 @@ class CorpusAstFieldsTest < Minitest::Test
         if node[:type]
           node.each_key { |key| seen << "#{node[:type]}.#{key}" unless IGNORED_KEYS.include?(key) }
         end
-        node.each_value { |value| walk.call(value) }
+        # An attribute map is author data: `{type=text}` is not a node.
+        node.each { |key, value| walk.call(value) unless key == :keyValues }
       when Array
         node.each { |value| walk.call(value) }
       end
