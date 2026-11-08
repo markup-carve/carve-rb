@@ -192,7 +192,7 @@ class PackagedGemTest < Minitest::Test
     # trust; "400/400 byte-identical" is what a truncated corpus looks like when
     # only the content half gets reported.
     $stdout.puts "packaged gem #{File.basename(GEM_FILE)}: #{all.length} of " \
-                 "#{declared_corpus_size(CORPUS)} declared corpus documents byte-identical"
+                 "#{expected_corpus_size(CORPUS)} declared corpus documents byte-identical"
   end
 
   private

@@ -68,9 +68,15 @@ module CorpusPopulation
     blocks = []
     block = nil
     fence = nil
+    input = nil
     lines.each_with_index do |line, index|
       if fence
-        fence = nil if line.start_with?(fence) && line[fence.length..].strip.empty?
+        if line.start_with?(fence) && line[fence.length..].strip.empty?
+          fence = nil
+          input = nil
+        else
+          input&.push(line)
+        end
         next
       end
       ticks = line[/\A`*/].length
@@ -78,12 +84,14 @@ module CorpusPopulation
         fence = line[0, ticks]
         language = line[ticks..].strip
         block[language] += 1 if block && block.key?(language)
+        input = (block[:inputs] << []).last if block && language == "carve"
         next
       end
       trimmed = line.strip
       if block.nil?
         if COMPARE_OPEN.match?(trimmed)
-          block = { line: index + 1, marker: MARKER_RUN.match(trimmed)[0], "carve" => 0, "html" => 0 }
+          block = { line: index + 1, marker: MARKER_RUN.match(trimmed)[0], "carve" => 0, "html" => 0,
+                    modifiers: trimmed.split(/\s+/).drop(2), inputs: [] }
         end
         next
       end
@@ -95,6 +103,17 @@ module CorpusPopulation
     blocks << block.merge(unclosed: true) if block
     blocks << { unclosed_fence: fence } if fence
     blocks
+  end
+
+  # The bytes the generator writes for one authored input, transforms in its order.
+  def self.input_bytes(lines, modifiers)
+    out = "#{lines.join("\n")}\n"
+    out = out.sub(/\n\z/, "") if modifiers.include?("no-final-newline")
+    out = out.gsub("\n", "\r\n") if modifiers.include?("crlf")
+    out = out.gsub("\n", "\r") if modifiers.include?("cr")
+    out = "\uFEFF#{out}" if modifiers.include?("bom")
+    out = out.gsub("\u2400", "\u0000") if modifiers.include?("nul")
+    out.b
   end
 
   # The source pages in the spec's reading order. The spec split edge-cases.md
@@ -130,8 +149,13 @@ module CorpusPopulation
   # Every `carve` fence inside a compare block is one pair. Each block must
   # carry equal, nonzero counts; literal fenced content is ignored.
   def declared_corpus_size(corpus_dir)
+    declared_corpus_inputs(corpus_dir).length
+  end
+
+  # One entry per authored pair: the input bytes the generator writes for it.
+  def declared_corpus_inputs(corpus_dir)
     examples_dir = File.expand_path(File.join(corpus_dir, "..", "..", "resources", "examples"))
-    declared = 0
+    declared = []
     CorpusPopulation.example_pages(examples_dir).each do |path|
       # Not a soft skip. Without this file there is no independent statement of
       # how big the corpus should be, and a corpus check with nothing to compare
@@ -146,10 +170,10 @@ module CorpusPopulation
         assert block["carve"].positive? && block["carve"] == block["html"],
                "unpaired or empty compare block in #{path} at line #{block[:line]}: " \
                "#{block['carve']} carve, #{block['html']} html"
-        declared += block["carve"]
+        declared.concat(block[:inputs].map { |input| CorpusPopulation.input_bytes(input, block[:modifiers]) })
       end
     end
-    refute_equal 0, declared,
+    refute_empty declared,
                  "the corpus source pages under #{examples_dir} declare no ::: compare blocks " \
                  "at all; this is a wiring problem, not a corpus of size zero"
     declared
@@ -162,12 +186,24 @@ module CorpusPopulation
   # times here, and it answers the wrong question: "at least 400" cannot tell a
   # whole corpus from a truncated checkout, and truncation is the failure being
   # guarded against.
+  #
+  # Since markup-carve/carve#5244 the generator writes one pair per DISTINCT
+  # input, so authored pairs with identical bytes share one corpus file. A
+  # corpus that still holds two identical inputs comes from a generator before
+  # that change, which wrote every authored pair. The choice cannot hide a cut:
+  # a corpus without duplicates must hold every distinct input.
+  def expected_corpus_size(corpus_dir)
+    inputs = declared_corpus_inputs(corpus_dir)
+    written = Dir.glob(File.join(corpus_dir, "*.crv")).map { |path| File.binread(path) }
+    written.uniq.length == written.length ? inputs.uniq.length : inputs.length
+  end
+
   def assert_whole_corpus(corpus_dir, got, what)
-    declared = declared_corpus_size(corpus_dir)
+    declared = expected_corpus_size(corpus_dir)
     assert_equal declared, got,
                  "#{what}: #{got}, but the spec's example pages declare #{declared}. Every " \
                  "::: compare block in resources/examples/{core,extensions}.md and the " \
-                 "edge-case sections yields one corpus pair per `carve` fence, so a difference means the corpus " \
+                 "edge-case sections yields one corpus pair per distinct `carve` input, so a difference means the corpus " \
                  "at #{corpus_dir} " \
                  "is not the one those pages describe - a truncated or stale checkout, a wrong " \
                  "CARVE_SPEC_CORPUS, or a corpus that needs regenerating (npm run corpus:build " \
