@@ -190,8 +190,9 @@ module CorpusPopulation
   # Since markup-carve/carve#5244 the generator writes one pair per DISTINCT
   # input, so authored pairs with identical bytes share one corpus file. A
   # corpus that still holds two identical inputs comes from a generator before
-  # that change, which wrote every authored pair. The choice cannot hide a cut:
-  # a corpus without duplicates must hold every distinct input.
+  # that change, which wrote every authored pair. A legacy corpus with only its
+  # duplicate copies removed is read as deduplicated; it still holds, and
+  # assert_whole_corpus still renders, every distinct input.
   def expected_corpus_size(corpus_dir)
     inputs = declared_corpus_inputs(corpus_dir)
     written = Dir.glob(File.join(corpus_dir, "*.crv")).map { |path| File.binread(path) }
@@ -208,5 +209,16 @@ module CorpusPopulation
                  "is not the one those pages describe - a truncated or stale checkout, a wrong " \
                  "CARVE_SPEC_CORPUS, or a corpus that needs regenerating (npm run corpus:build " \
                  "in the spec repository). It does not mean this run was clean."
+
+    # Content, not only size: every distinct authored input is on disk, and
+    # nothing else is.
+    want = declared_corpus_inputs(corpus_dir).uniq
+    have = Dir.glob(File.join(corpus_dir, "*.crv")).map { |path| File.binread(path) }.uniq
+    missing = (want - have).length
+    extra = (have - want).length
+    assert missing.zero? && extra.zero?,
+           "#{what}: the corpus at #{corpus_dir} lacks #{missing} input(s) the spec's example " \
+           "pages declare and holds #{extra} they do not. It is not the corpus those pages " \
+           "describe; regenerate it (npm run corpus:build in the spec repository)."
   end
 end

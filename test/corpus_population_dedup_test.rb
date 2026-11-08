@@ -60,6 +60,14 @@ class CorpusPopulationDedupTest < Minitest::Test
     end
   end
 
+  def test_a_corpus_with_a_changed_input_fails_at_the_right_size
+    Dir.mktmpdir do |root|
+      corpus = tree(root, pages)
+      write_corpus(corpus, ["x\n", "z\n", "x\r\n"])
+      assert_raises(Minitest::Assertion) { assert_whole_corpus(corpus, 3, "pairs") }
+    end
+  end
+
   def test_an_empty_corpus_still_fails
     Dir.mktmpdir do |root|
       corpus = tree(root, pages)
