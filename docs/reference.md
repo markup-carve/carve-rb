@@ -47,6 +47,8 @@ Carve.to_ansi(source)
 Carve.to_carve(source)
 # `align_tables: true` pads table cells into aligned columns.
 Carve.to_carve(source, align_tables: true)
+# The block decision trace, as JSON lines.
+Carve.decision_trace(source)
 # Import reports use schema version 2, with fidelity and confidence per finding.
 # Markdown reports construct outcomes and known losses. Incomplete assessments
 # emit fidelity-unverified/dropped/fallback.
@@ -204,6 +206,14 @@ Carve.lint("é [x](#nope)\n")
 - The engine assigns no severity, so findings carry none.
 
 Pass the `extensions:` you render with: they decide which rules apply.
+`caption_hints: true` turns on the opt-in `caption-looking-paragraph` hint for a
+paragraph beside an image or table that reads like a caption.
+
+Deprecated spellings have their own rules: `deprecated-cell-alignment` for the
+0.1.13 glued alignment markers (`|=>`, `|<`), which `Carve.to_carve` rewrites
+into braces (`|={>}`), and `thematic-break-spelling` for a break other than
+`***`. The engine retired `fence-delimiter-indentation`, `raw-block-syntax` and
+`ordered-list-split-by-indent`; filters naming them match nothing now.
 
 With `root:` and `source_path:`, as for `Carve.to_html_with_includes`, the pass
 also lints every included Carve file and reports include directives that stay
@@ -423,8 +433,9 @@ a document change.
 | `Carve.to_html_with_includes(source, root:, source_path:)` | Render contained file includes and return warnings and dependencies. |
 | `Carve.parse_with_includes(source, root:, source_path:)` | The same expansion, published as an AST instead of HTML. |
 | `Carve.render_with_includes(source, root:, source_path:, target:)` | The expansion over any render target: html, markdown, plain, ansi or ast. |
-| `Carve.lint(source, extensions: [...])` | Report silent degradations as findings with rule, message, line, column and offsets; `root:` and `source_path:` follow includes. |
+| `Carve.lint(source, extensions: [...])` | Report silent degradations as findings with rule, message, line, column and offsets; `root:` and `source_path:` follow includes, `caption_hints: true` adds the caption hint. |
 | `Carve.to_carve(source, align_tables: false)` | Format into canonical Carve; `align_tables: true` pads table columns. A writer refusal returns the source as authored. |
+| `Carve.decision_trace(source)` | The block decision trace (format version 1) as JSON lines: a header, then one record per source line. |
 | `Carve.select_include_region(source, name, mode:)` | Resolve `@region:name` (`mode: :carve` or `:code`) to a Range of content lines; raises `Carve::IncludeRegionError`. |
 | `Carve.read_stamp(source)` | Read a document's provenance marker: `{version:, generated_by:}` or `nil`. |
 | `Carve.needs_review?(source)` | Whether a document predates this engine's spec version (unstamped counts as yes). |

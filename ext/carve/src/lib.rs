@@ -227,6 +227,10 @@ fn to_ansi(source: String) -> String {
 }
 
 /// Canonical Carve source; a writer refusal returns the source as authored.
+fn decision_trace(source: String) -> String {
+    carve_rs::decision_trace(&source)
+}
+
 fn to_carve(source: String, align_tables: bool) -> String {
     let options = Options::default().with_align_tables(align_tables);
     carve_rs::try_to_carve_with_options(&source, &options).unwrap_or(source)
@@ -540,12 +544,14 @@ fn lint_json(
     max_bytes: Option<usize>,
     max_resolver_calls: Option<usize>,
     max_warnings: Option<usize>,
+    caption_hints: bool,
 ) -> Result<String, Error> {
     let boxed = boxed_extensions(ruby, names)?;
     let mut options = Options::new();
     for extension in &boxed {
         options = options.with_extension(extension.as_ref());
     }
+    options.lint_caption_looking_paragraph = caption_hints;
     // The document's own findings come first in `lint_carve_with_options`, and
     // they are the only ones whose offsets index `source`. Linting it alone
     // first tells the two apart without guessing from a finding's fields.
@@ -1079,6 +1085,7 @@ impl From<Source> for String {
 
 guarded!(g_to_html(source: Source) -> String => to_html);
 guarded!(g_to_markdown(source: Source) -> String => to_markdown);
+guarded!(g_decision_trace(source: Source) -> String => decision_trace);
 guarded!(g_to_plain_text(source: Source) -> String => to_plain_text);
 guarded!(g_to_ansi(source: Source) -> String => to_ansi);
 guarded!(g_to_carve(source: Source, align_tables: bool) -> String => to_carve);
@@ -1165,7 +1172,8 @@ guarded!(
         max_depth: Option<usize>,
         max_bytes: Option<usize>,
         max_resolver_calls: Option<usize>,
-        max_warnings: Option<usize>
+        max_warnings: Option<usize>,
+        caption_hints: bool
     ) -> String =>? lint_json
 );
 
@@ -1218,6 +1226,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     module.define_singleton_method("_read_stamp", function!(g_read_stamp, 1))?;
     module.define_singleton_method("_stamp_needs_review", function!(g_stamp_needs_review, 2))?;
     module.define_singleton_method("_panic_probe", function!(g_panic_probe, 0))?;
-    module.define_singleton_method("_lint_json", function!(g_lint_json, 8))?;
+    module.define_singleton_method("_lint_json", function!(g_lint_json, 9))?;
+    module.define_singleton_method("decision_trace", function!(g_decision_trace, 1))?;
     Ok(())
 }
