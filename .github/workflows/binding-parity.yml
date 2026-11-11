@@ -131,10 +131,22 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install libclang (rb-sys bindgen)
-        # BOUNDED AND RETRIED, for the reason spelled out in the build job: bare
-        # `apt-get` has no timeout, and a wedged mirror is indistinguishable
-        # from a slow compile until the 6h runner limit.
+        # Same probe as ci.yml: use the image's libclang when it is complete,
+        # otherwise install it from apt with bounded retries.
         run: |
+          for lib in $(find /usr/lib -maxdepth 4 \
+                         \( -name 'libclang.so' -o -name 'libclang.so.*' \) \
+                         2>/dev/null | sort -V -r); do
+            dir="$(dirname "$lib")"
+            headers="$(find "$dir/clang" -maxdepth 3 -name stddef.h 2>/dev/null | sort -V | tail -1)"
+            if [ -n "$headers" ]; then
+              echo "libclang on the image: $lib (resource headers at $(dirname "$headers"))"
+              echo "LIBCLANG_PATH=$dir" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "::notice::$lib has no clang resource headers beside it"
+          done
+          echo "::notice::no usable libclang on the image; installing from apt"
           for attempt in 1 2 3; do
             if timeout 240 sudo apt-get update && timeout 240 sudo apt-get install -y libclang-dev; then
               exit 0
