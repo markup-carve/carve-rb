@@ -446,21 +446,25 @@ fn render_with_includes_json(
     )
     .map_err(|error| Error::new(ruby.exception_arg_error(), error.to_string()))?;
     let rendered = match which {
-        IncludeTarget::Html => carve_rs::render_html_with_options(&prepared.doc, &render_options),
+        IncludeTarget::Html => carve_rs::render_html_with_options(&prepared.doc, &render_options)
+            .map_err(|error| error.to_string()),
         IncludeTarget::Markdown => {
             carve_rs::render_markdown_with_options(&prepared.doc, &render_options)
+                .map_err(|error| error.to_string())
         }
         IncludeTarget::Plain => {
             carve_rs::render_plain_text_with_options(&prepared.doc, &render_options)
+                .map_err(|error| error.to_string())
         }
-        IncludeTarget::Ansi => carve_rs::render_ansi_with_options(&prepared.doc, &render_options),
+        IncludeTarget::Ansi => carve_rs::render_ansi_with_options(&prepared.doc, &render_options)
+            .map_err(|error| error.to_string()),
         // The AST is published as a tree, not as a string, so a caller does not
         // parse JSON twice. Positions stay OFF, unlike `to_ast_json`: spec I4
         // leaves position remapping out of scope in every engine, so a child's
         // spans would point into a document the caller never passed.
         IncludeTarget::Ast => Ok(ast_json_with_version(carve_rs::to_json(&prepared.doc))),
     }
-    .map_err(|error| Error::new(ruby.exception_runtime_error(), error.to_string()))?;
+    .map_err(|error| Error::new(ruby.exception_runtime_error(), error))?;
     let value: serde_json::Value = if which == IncludeTarget::Ast {
         serde_json::from_str(&rendered).map_err(|error| {
             Error::new(

@@ -16,6 +16,7 @@
 require "minitest/autorun"
 require "carve"
 require "corpus_population"
+require "engine_behind"
 
 class CorpusTest < Minitest::Test
   include CorpusPopulation
@@ -43,11 +44,7 @@ class CorpusTest < Minitest::Test
     skip "CARVE_SPEC_CORPUS not set (see .github/workflows/ci.yml)" unless CORPUS
 
     all = pairs
-    mismatches = all.reject do |crv, html|
-      want = File.read(html).sub(/\n+\z/, "")
-      got = Carve.to_html(File.read(crv)).sub(/\n+\z/, "")
-      got == want
-    end.map { |crv, _| File.basename(crv, ".crv") }
+    mismatches = EngineBehind.mismatches(all)
 
     assert_empty mismatches,
                  "#{mismatches.length} of #{all.length} corpus cases diverge from the spec: " \
