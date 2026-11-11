@@ -31,11 +31,17 @@ module EngineBehind
     declared
   end
 
+  # CARVE_ENGINE_BEHIND=ignore turns the allowance off, for the spec-main drift
+  # measurement: there every divergence from the golden is drift.
+  def active
+    ENV["CARVE_ENGINE_BEHIND"] == "ignore" ? {} : load
+  end
+
   # The names of the pairs that differ from the golden, after the declared
   # pairs that render as the engine declares are taken out. A declared pair
   # that matches the golden, renders something else, or is missing from the
   # corpus is reported, so the copy cannot outlive the engine's declaration.
-  def mismatches(pairs, declared = load)
+  def mismatches(pairs, declared = active)
     found = pairs.map { |crv, _| File.basename(crv, ".crv") }
     absent = (declared.keys - found).sort.map { |slug| "#{slug} (declared in engine-behind.txt, not in this corpus)" }
     absent + pairs.filter_map do |crv, html|
@@ -43,7 +49,7 @@ module EngineBehind
       want = File.read(html).sub(/\n+\z/, "")
       got = Carve.to_html(File.read(crv)).sub(/\n+\z/, "")
       if declared.key?(name)
-        "#{name} (declared in engine-behind.txt)" if got.strip != declared[name] || got == want
+        "#{name} (declared in engine-behind.txt)" if got != declared[name] || got == want
       elsif got != want
         name
       end

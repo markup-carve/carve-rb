@@ -287,6 +287,7 @@ jobs:
         env:
           CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec-main/tests/corpus
           CARVE_GATE_GEM_HOME: ${{ runner.temp }}/gate-gems
+          CARVE_ENGINE_BEHIND: ignore
         run: |
           set -uo pipefail
           echo "spec=$(git -C spec-main rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"

@@ -188,7 +188,7 @@ class PackagedGemTest < Minitest::Test
     # see the population the verdict covers without taking "0 failures" on
     # trust; "400/400 byte-identical" is what a truncated corpus looks like when
     # only the content half gets reported.
-    declared = EngineBehind.load.length
+    declared = EngineBehind.active.length
     $stdout.puts "packaged gem #{File.basename(GEM_FILE)}: #{all.length - declared} of " \
                  "#{expected_corpus_size(CORPUS)} declared corpus documents byte-identical, " \
                  "#{declared} rendered as the pinned engine declares (resources/engine-behind.txt)"
