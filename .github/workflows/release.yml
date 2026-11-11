@@ -211,7 +211,23 @@ jobs:
         #
         # Three tries, each capped at 4 minutes. A hung mirror now costs 12
         # minutes worst case and says so, instead of an hour of silence.
+        #
+        # The image probe comes first, as in ci.yml: a usable libclang on the
+        # runner means no apt call at all.
         run: |
+          for lib in $(find /usr/lib -maxdepth 4 \
+                         \( -name 'libclang.so' -o -name 'libclang.so.*' \) \
+                         2>/dev/null | sort -V -r); do
+            dir="$(dirname "$lib")"
+            headers="$(find "$dir/clang" -maxdepth 3 -name stddef.h 2>/dev/null | sort -V | tail -1)"
+            if [ -n "$headers" ]; then
+              echo "libclang on the image: $lib (resource headers at $(dirname "$headers"))"
+              echo "LIBCLANG_PATH=$dir" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "::notice::$lib has no clang resource headers beside it"
+          done
+          echo "::notice::no usable libclang on the image; installing from apt"
           for attempt in 1 2 3; do
             if timeout 240 sudo apt-get update && timeout 240 sudo apt-get install -y libclang-dev; then
               exit 0
