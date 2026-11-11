@@ -230,6 +230,9 @@ jobs:
           spec="$(cat spec-corpus-revision.txt)"
           echo "spec=$spec" >> "$GITHUB_OUTPUT"
 
+      - name: The engine-declared corpus pairs match the pinned carve-rs
+        run: python3 scripts/check-engine-behind.py --engine carve-rs --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock
+
       - name: Check out the spec corpus that engine was written against
         uses: actions/checkout@v7
         with:
@@ -284,6 +287,7 @@ jobs:
         env:
           CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec-main/tests/corpus
           CARVE_GATE_GEM_HOME: ${{ runner.temp }}/gate-gems
+          CARVE_ENGINE_BEHIND: ignore
         run: |
           set -uo pipefail
           echo "spec=$(git -C spec-main rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"

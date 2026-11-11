@@ -302,6 +302,9 @@ jobs:
           spec="$(cat spec-corpus-revision.txt)"
           echo "spec=$spec" >> "$GITHUB_OUTPUT"
 
+      - name: The engine-declared corpus pairs match the pinned carve-rs
+        run: python3 scripts/check-engine-behind.py --engine carve-rs --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock
+
       - name: Check out the spec corpus that engine was written against
         uses: actions/checkout@v7
         with:

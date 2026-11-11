@@ -70,6 +70,7 @@ end
 
 require "minitest/autorun"
 require "corpus_population"
+require "engine_behind"
 
 class PackagedGemTest < Minitest::Test
   include CorpusPopulation
@@ -160,11 +161,7 @@ class PackagedGemTest < Minitest::Test
     all = pairs
     assert_whole_corpus(CORPUS, all.length, "corpus pairs rendered")
 
-    mismatches = all.reject do |crv, html|
-      want = File.read(html).sub(/\n+\z/, "")
-      got = Carve.to_html(File.read(crv)).sub(/\n+\z/, "")
-      got == want
-    end.map { |crv, _| File.basename(crv, ".crv") }
+    mismatches = EngineBehind.mismatches(all)
 
     # PRINTED, one line per document, BEFORE the assertion. The assertion
     # message truncates at twenty names, and scripts/check-spec-drift.py reads
@@ -191,8 +188,10 @@ class PackagedGemTest < Minitest::Test
     # see the population the verdict covers without taking "0 failures" on
     # trust; "400/400 byte-identical" is what a truncated corpus looks like when
     # only the content half gets reported.
-    $stdout.puts "packaged gem #{File.basename(GEM_FILE)}: #{all.length} of " \
-                 "#{expected_corpus_size(CORPUS)} declared corpus documents byte-identical"
+    declared = EngineBehind.active.length
+    $stdout.puts "packaged gem #{File.basename(GEM_FILE)}: #{all.length - declared} of " \
+                 "#{expected_corpus_size(CORPUS)} declared corpus documents byte-identical, " \
+                 "#{declared} rendered as the pinned engine declares (resources/engine-behind.txt)"
   end
 
   private
