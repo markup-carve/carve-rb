@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-11-12
+
+The Ruby binding moves to the published carve-rs 0.1.14 engine and the 0.1.14 spec: one attach rule for `+`, comment lines erased before layout, braced table alignment, and a canonical writer that writes `***` and native `|=` headers.
+
+### Breaking
+
+- Update to carve-rs 0.1.14. Block layout, `+` continuation markers, comment lines and lazy lines follow the 0.1.14 spec, so some documents parse differently (#253, #258).
+- HTML import reads only `data-carve-*` roundtrip carriers; `data-djot-*` is no longer read. Lint configuration and suppression directives accept only `heading-level-skip`, not `a11y/heading-jump` (markup-carve/carve#5735).
+- Lint reports a refused own-line `+` after a block as `refused-continuation-marker`; a refused first-block `+` keeps `continuation-marker-refused` (markup-carve/carve-rs#4201).
+- `Carve.to_carve` writes every thematic break as `***` and table headers as native `|=` cells.
+
+### Improvements
+
+- `Carve.decision_trace(source)` returns the block decision trace as JSON lines, and `Carve.lint(source, caption_hints: true)` turns on the opt-in caption hint (#244).
+- Table cell alignment reads the braced form (`|={<}`, `|={~}`, `|={>}`); lint reports the 0.1.13 prefixes as `deprecated-cell-alignment`.
+
+**Full Changelog**: https://github.com/markup-carve/carve-rb/compare/v0.1.13...v0.1.14
+
 ## [0.1.13] - 2026-10-25
 
 Task lists carry progress and blocked states through the Ruby binding. Rendering and import follow the 0.1.13 engine fixes.
