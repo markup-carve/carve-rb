@@ -57,3 +57,8 @@
 # EMPTY IS THE GOAL STATE. An empty file means this gem renders every document
 # in spec main exactly as the spec does, and it is the only state that may be
 # tagged.
+1063-a-block-shaped-line-inside-a-comment-run-keeps-the-item-tight # undeclared at spec main 51c5631 on 2026-11-12; the pinned engine carve-lang 0.1.14 predates it
+1063-a-block-shaped-line-inside-a-comment-run-keeps-the-item-tight-2 # undeclared at spec main 51c5631 on 2026-11-12; the pinned engine carve-lang 0.1.14 predates it
+1063-a-block-shaped-line-inside-a-comment-run-keeps-the-item-tight-3 # undeclared at spec main 51c5631 on 2026-11-12; the pinned engine carve-lang 0.1.14 predates it
+1070-a-lazy-comment-opener-is-measured-where-its-brace-is-written-4 # undeclared at spec main 51c5631 on 2026-11-12; the pinned engine carve-lang 0.1.14 predates it
+1076-a-line-that-ends-a-span-in-an-item-s-description-leaves-the-item-s-paragraph-open-5 # undeclared at spec main 51c5631 on 2026-11-12; the pinned engine carve-lang 0.1.14 predates it
