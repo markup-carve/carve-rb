@@ -253,6 +253,22 @@ class SpecDriftGateTest < Minitest::Test
     assert_equal 0, run_gate(nil, "# only comments\n", ["--require-empty-ledger"])
   end
 
+  def test_release_mode_accepts_rows_of_the_released_engine_under_the_flag
+    skip("engine pinned by rev") unless pinned_engine.start_with?("carve-lang ")
+    ledger = "367-002  # the pinned engine #{pinned_engine} predates it\n"
+    assert_equal 0, run_gate(nil, ledger, ["--require-empty-ledger", "--allow-released-engine-rows"])
+  end
+
+  def test_release_mode_still_refuses_those_rows_without_the_flag
+    ledger = "367-002  # the pinned engine #{pinned_engine} predates it\n"
+    assert_equal 1, run_gate(nil, ledger, ["--require-empty-ledger"])
+  end
+
+  def test_the_flag_refuses_a_row_that_does_not_name_the_engine
+    ledger = "367-002  # the pinned engine #{pinned_engine} predates it\n367-003  # renders differently\n"
+    assert_equal 1, run_gate(nil, ledger, ["--require-empty-ledger", "--allow-released-engine-rows"])
+  end
+
   # Returns the written rows, or nil when the script wrote no file at all.
   def undeclared_file(log_body, ledger_body)
     Dir.mktmpdir("drift-gate") do |dir|

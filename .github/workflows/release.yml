@@ -181,10 +181,13 @@ jobs:
       # to ship drift. The corpus gate further down cannot catch it, because it
       # holds the gem to the spec the PINNED engine was written against, and a
       # declared window is by definition outside that.
-      - name: Every declared drift window is closed
+      # A row naming the released engine pin ships what that engine release
+      # renders; the engine itself shipped with the same difference.
+      - name: Every declared drift window is closed or belongs to the released engine
         run: |
           python3 scripts/check-spec-drift.py \
-            --require-empty-ledger --ledger resources/spec-drift.txt --github
+            --require-empty-ledger --allow-released-engine-rows \
+            --ledger resources/spec-drift.txt --github
 
       - name: Install Ruby
         uses: ruby/setup-ruby@v1

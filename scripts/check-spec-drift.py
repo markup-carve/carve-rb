@@ -38,6 +38,9 @@ markup-carve/carve-go#44 deleted rather than retuned.
 
 --require-empty-ledger is the release gate's mode: at a tag, every declared
 window must be closed, so a non-empty ledger is a refusal.
+With --allow-released-engine-rows it accepts rows whose reason names the
+released carve-lang version the manifest pins: the gem then renders exactly
+what that engine release does.
 
 It also keeps the guard the old shape had, because that guard was real: a run
 that logged NEITHER a divergence count nor a byte-identical count measured
@@ -49,7 +52,8 @@ Usage:
                               [--spec <short-sha>] [--github]
                               [--on-undeclared error|notice] [--on-stale notice|error]
                               [--write-undeclared undeclared.txt]
-  scripts/check-spec-drift.py --require-empty-ledger [--ledger ...] [--github]
+  scripts/check-spec-drift.py --require-empty-ledger [--allow-released-engine-rows]
+                              [--ledger ...] [--github]
 
 Exit codes: 0 clear, 1 refused, 2 misuse.
 """
@@ -226,6 +230,13 @@ def main(argv: list[str] | None = None) -> int:
         default=Path(__file__).resolve().parent.parent / "ext" / "carve" / "Cargo.toml",
         help="the manifest carrying the engine pin, read to expire a dated reason",
     )
+    p.add_argument(
+        "--allow-released-engine-rows",
+        action="store_true",
+        help="release mode: accept rows whose reason names the RELEASED carve-lang version "
+        "the manifest pins; the gem then ships exactly what that engine release renders. "
+        "A rev pin or any other reason is still refused.",
+    )
     p.add_argument("--github", action="store_true", help="emit GitHub Actions annotations")
     args = p.parse_args(argv)
 
@@ -238,6 +249,7 @@ def main(argv: list[str] | None = None) -> int:
     # none there is nothing to read. What it changes there is the message, and
     # a test asserting the release exit code could not tell the two apart - so
     # there is no such test, rather than one that cannot fail.
+    kind = value = None
     if rows:
         kind, value = read_manifest_pin(args.manifest)
         pin = f"carve-lang {value}" if kind == "version" else f"rev {value}"
@@ -245,6 +257,17 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     if args.require_empty_ledger:
+        if declared and args.allow_released_engine_rows and kind == "version":
+            pin = f"carve-lang {value}"
+            open_rows = [r.name for r in rows if not (m := PREDATES.search(r.reason)) or m.group(1) != pin]
+            if not open_rows:
+                annotate(
+                    "notice",
+                    f"{len(declared)} declared row(s) ship as rendered by the released engine "
+                    f"{pin}: {', '.join(declared[:20])}{' ...' if len(declared) > 20 else ''}.",
+                    args.github,
+                )
+                declared = []
         if declared:
             annotate(
                 "error",
@@ -257,7 +280,8 @@ def main(argv: list[str] | None = None) -> int:
                 args.github,
             )
             return 1
-        print(f"check-spec-drift: {args.ledger} declares no open drift; clear to tag.")
+        what = "no drift outside the released engine" if rows else "no open drift"
+        print(f"check-spec-drift: {args.ledger} declares {what}; clear to tag.")
         if not args.log:
             return 0
 
