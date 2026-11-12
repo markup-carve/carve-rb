@@ -13,7 +13,7 @@ The Ruby binding moves to the published carve-rs 0.1.14 engine and the 0.1.14 sp
 
 ### Breaking
 
-- Update to carve-rs 0.1.14. Block layout, `+` continuation markers, comment lines and lazy lines follow the 0.1.14 spec, so some documents parse differently (#253, #258).
+- Update to carve-rs 0.1.14. Block layout, `+` continuation markers, comment lines and lazy lines follow the 0.1.14 spec, so some documents parse differently (#237, #239, #253, #258).
 - HTML import reads only `data-carve-*` roundtrip carriers; `data-djot-*` is no longer read. Lint configuration and suppression directives accept only `heading-level-skip`, not `a11y/heading-jump` (markup-carve/carve#5735).
 - Lint reports a refused own-line `+` after a block as `refused-continuation-marker`; a refused first-block `+` keeps `continuation-marker-refused` (markup-carve/carve-rs#4201).
 - `Carve.to_carve` writes every thematic break as `***` and table headers as native `|=` cells.
