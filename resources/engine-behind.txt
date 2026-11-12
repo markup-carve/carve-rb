@@ -31,3 +31,39 @@ z %}</li>
     </li>
   </ul>
 </blockquote>
+
+== 1070-a-lazy-comment-opener-is-measured-where-its-brace-is-written-4
+<p>x<a id="fnref1" href="#fn1" role="doc-noteref"><sup>1</sup></a></p>
+<section role="doc-endnotes" aria-label="Footnotes">
+  <hr>
+  <ol>
+    <li id="fn1">
+      <p>p</p>
+      <dl>
+        <dt>t</dt>
+        <dd>pre
+</dd>
+      </dl>
+      <p><a href="#fnref1" role="doc-backlink" aria-label="Back to reference">↩</a></p>
+    </li>
+  </ol>
+</section>
+
+== 1076-a-line-that-ends-a-span-in-an-item-s-description-leaves-the-item-s-paragraph-open-5
+<blockquote>
+  <blockquote>
+    <ul>
+      <li>
+        <dl>
+          <dt>t</dt>
+          <dd>
+            <p>d</p>
+            <pre><code></code></pre>
+          </dd>
+        </dl>
+        z
+      </li>
+    </ul>
+  </blockquote>
+</blockquote>
+<p>plain</p>
