@@ -2,6 +2,8 @@
 //!
 //! Keeping one boundary lets the engine validate options, errors, and tree
 //! shapes in the same place as its CLI and other language bindings.
+mod host;
+
 use magnus::{function, prelude::*, Error, Ruby};
 use std::any::Any;
 use std::cell::RefCell;
@@ -71,6 +73,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     module.define_error("EnginePanic", ruby.exception_standard_error())?;
     module.define_singleton_method("_call_json", function!(g_call_json, 1))?;
     module.define_singleton_method("_parse_json", function!(g_parse_json, 1))?;
+    module.define_singleton_method("_render_host", function!(host::render_host, 6))?;
     module.define_singleton_method("_panic_probe", function!(g_panic_probe, 0))?;
     Ok(())
 }

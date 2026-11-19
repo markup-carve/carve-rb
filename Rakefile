@@ -41,6 +41,7 @@ Rake::TestTask.new(:test) do |t|
   # version-independent safety and CI checks.
   t.test_files = FileList[
     "test/v2_test.rb",
+    "test/native_host_test.rb",
     "test/panic_unwind_test.rb",
     "test/ci_verdict_test.rb",
     "test/release_gate_wiring_test.rb",

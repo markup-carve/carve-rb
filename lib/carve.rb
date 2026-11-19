@@ -81,16 +81,51 @@ module Carve
 
     public
 
-    def to_html(source, extensions: nil, mode: nil, renderers: nil, symbols: nil,
+    def to_html(source, extensions: nil, mode: nil, renderers: nil, transforms: nil, symbols: nil,
                 safe: nil, raw_html: false, url_policy: nil, profile: nil,
                 sections: true, **options)
       config = options.merge(rawHtml: raw_html && safe != true, sections: sections)
+      if renderers && renderers.any? { |name, value| EXTENSIONS.include?(name.to_s) && (value.respond_to?(:call) || value.is_a?(Hash)) }
+        raise ExtensionUnavailable, "standard extension callbacks are not selected by the JSON options (C2-T-010)"
+      end
+      if (renderers && renderers.values.any? { |value| value.respond_to?(:call) || value.is_a?(Hash) }) || (transforms && !transforms.empty?)
+        raise ExtensionUnavailable, "native host does not read symbols, profile, or url policy" if symbols || profile || url_policy
+        config[:extensions] = Array(extensions).map(&:to_s) if extensions
+        config[:mode] = mode.to_s if mode
+        return render_with_host(source, options: config, renderers: renderers, transforms: transforms).fetch("html")
+      end
       config.merge!(extension_options(extensions, renderers))
       config[:mode] = mode.to_s if mode
       config[:profile] = profile.to_s if profile
       config[:symbols] = stringify(symbols) if symbols
       config[:urlPolicy] = stringify(url_policy) if url_policy
       call("render", source: source, options: config).fetch("html")
+    end
+
+
+    # Native extension renderers and ordered document transforms (C2-X-052/053).
+    # A renderer may be a callable for both channels, or a hash with
+    # :interactive and :static callables. A transform receives a mutable
+    # JSON-shaped resolved document and returns a document.
+    def render_with_host(source = "", tree: nil, options: {}, renderers: nil, transforms: nil)
+      names = []
+      callbacks = []
+      (renderers || {}).each do |name, renderer|
+        channels = renderer.is_a?(Hash) ? renderer : { interactive: renderer, static: renderer }
+        channels.each do |channel, callback|
+          raise ExtensionUnavailable, "renderer #{name} must respond to call" unless callback.respond_to?(:call)
+          key = channel.to_s == "build_time" ? "static" : channel.to_s
+          raise ExtensionUnavailable, "renderer channel must be interactive or static" unless %w[interactive static].include?(key)
+          names << "#{name}\u001f#{key}"
+          callbacks << callback
+        end
+      end
+      transforms = Array(transforms)
+      transforms.each do |callback|
+        raise ExtensionUnavailable, "transform must respond to call" unless callback.respond_to?(:call)
+      end
+      tree_json = tree.nil? ? nil : JSON.generate(stringify(tree))
+      JSON.parse(_render_host(source_text(source), tree_json, JSON.generate(stringify(options)), names, callbacks, transforms), max_nesting: false)
     end
 
     def render_with_diagnostics(source, **options)
@@ -114,6 +149,7 @@ module Carve
     end
 
     def write(source, target:, **options)
+      reserved_writer!(target)
       tree = call("parse", source: source).fetch("tree")
       call("write", options: options, tree: tree, target: target.to_s).fetch("output")
     end
@@ -183,6 +219,7 @@ module Carve
         diagnostics = parsed.fetch("diagnostics")
         suppressed = parsed.fetch("suppressedDiagnostics")
       else
+        reserved_writer!(target)
         written = call("write", tree: tree, target: target.to_s)
         value = written.fetch("output")
         diagnostics = written.fetch("diagnostics")
@@ -238,6 +275,12 @@ module Carve
 
     # Standard extensions and their standard renderers travel as options;
     # a Ruby callable has no JSON form (C2-T-010).
+    def reserved_writer!(target)
+      return unless %w[markdown plain ansi].include?(target.to_s)
+      raise WriterUnavailable.new("name" => "CarveWriteError", "category" => "writer-refused",
+                                  "status" => 1, "message" => "#{target} writer not available yet through this binding")
+    end
+
     def extension_options(extensions, renderers)
       config = {}
       names = Array(extensions).map(&:to_s)
