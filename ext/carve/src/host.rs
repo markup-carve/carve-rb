@@ -57,6 +57,7 @@ impl DocumentTransform for RubyTransform {
 fn register(
     host: &mut api::Carve,
     name: String,
+    version: String,
     renderers: Vec<(Channel, Box<dyn Renderer>)>,
     transform: Option<Box<dyn DocumentTransform>>,
 ) -> Result<(), Error> {
@@ -64,7 +65,7 @@ fn register(
     host.register_extension(Extension {
         declaration: ExtensionDeclaration {
             name,
-            version: "1".into(),
+            version,
             required: false,
             slots: Vec::new(),
         },
@@ -99,45 +100,28 @@ pub(super) fn render_host(
         .collect();
     let options: Json = serde_json::from_str(&options_json)
         .map_err(|e| Error::new(ruby.exception_arg_error(), e.to_string()))?;
-    let mut opts = api::Options::default();
-    if let Some(map) = options.as_object() {
-        for key in map.keys() {
-            if !matches!(key.as_str(), "mode" | "sections" | "rawHtml" | "extensions") {
-                return Err(Error::new(
-                    ruby.exception_arg_error(),
-                    format!("native host does not read option {key}"),
-                ));
-            }
-        }
-    }
-    if let Some(mode) = options.get("mode").and_then(Json::as_str) {
-        opts.mode = match mode {
-            "interactive" => api::Mode::Interactive,
-            "static" => api::Mode::Static,
-            _ => {
-                return Err(Error::new(
-                    ruby.exception_arg_error(),
-                    "mode must be interactive or static",
-                ))
-            }
-        };
-    }
-    if let Some(sections) = options.get("sections").and_then(Json::as_bool) {
-        opts.sections = sections;
-    }
-    if let Some(raw) = options.get("rawHtml").and_then(Json::as_bool) {
-        opts.raw_html = raw;
-    }
+    let opts = super::host_options::read(&options)
+        .map_err(|e| Error::new(ruby.exception_arg_error(), e))?;
     let mut host = api::Carve::new();
     if let Some(extensions) = options.get("extensions").and_then(Json::as_array) {
         for name in extensions.iter().filter_map(Json::as_str) {
-            host.enable_standard(name, false)
+            let selected = options
+                .get("renderers")
+                .and_then(Json::as_object)
+                .and_then(|map| map.get(name))
+                .and_then(Json::as_str)
+                == Some("standard");
+            host.enable_standard(name, selected)
                 .map_err(|e| Error::new(ruby.exception_arg_error(), e.to_string()))?;
         }
     }
-    let mut grouped: BTreeMap<String, Vec<(Channel, Box<dyn Renderer>)>> = BTreeMap::new();
+    let mut grouped: BTreeMap<(String, String), Vec<(Channel, Box<dyn Renderer>)>> =
+        BTreeMap::new();
     for (i, descriptor) in renderer_names.into_iter().enumerate() {
-        let (name, channel) = descriptor
+        let (name_version, channel) = descriptor
+            .rsplit_once('\u{1f}')
+            .ok_or_else(|| Error::new(ruby.exception_arg_error(), "invalid renderer descriptor"))?;
+        let (name, version) = name_version
             .rsplit_once('\u{1f}')
             .ok_or_else(|| Error::new(ruby.exception_arg_error(), "invalid renderer descriptor"))?;
         let callback = Opaque::from(*roots[i].as_ref());
@@ -152,12 +136,12 @@ pub(super) fn render_host(
             }
         };
         grouped
-            .entry(name.to_string())
+            .entry((name.to_string(), version.to_string()))
             .or_default()
             .push((selected, Box::new(RubyRenderer(callback))));
     }
-    for (name, channels) in grouped {
-        register(&mut host, name, channels, None)?;
+    for ((name, version), channels) in grouped {
+        register(&mut host, name, version, channels, None)?;
     }
     let offset = roots.len() - transform_callbacks.len();
     for i in 0..transform_callbacks.len() {
@@ -165,6 +149,7 @@ pub(super) fn render_host(
         register(
             &mut host,
             format!("host.transform.{i}"),
+            "1".into(),
             Vec::new(),
             Some(Box::new(RubyTransform(callback))),
         )?;

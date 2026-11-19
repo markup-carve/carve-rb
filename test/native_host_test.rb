@@ -70,6 +70,26 @@ class NativeHostTest < Minitest::Test
     assert_empty result.fetch("diagnostics")
   end
 
+  def test_standard_renderer_remains_selected_with_transform
+    source = "::: tabs\n::: tab {title=A}\nx\n:::\n:::\n"
+    expected = Carve.to_html(source, extensions: ["carve.tabs"],
+                              renderers: { "carve.tabs" => :standard })
+    actual = Carve.to_html(source, extensions: ["carve.tabs"],
+                            renderers: { "carve.tabs" => :standard }, transforms: [->(tree) { tree }])
+    assert_equal expected, actual
+  end
+
+  def test_declared_version_and_existing_render_options
+    tree = note_tree
+    tree.fetch("extensions").first["version"] = "2"
+    tree.fetch("children").first["version"] = "2"
+    result = Carve.render_with_host("", tree: tree,
+                                    renderers: { "ex.note" => ->(_node) { "<aside>version 2</aside>" } })
+    assert_equal "<aside>version 2</aside>", result.fetch("html")
+    assert_equal "<p>Ship 🚀</p>", Carve.to_html("Ship :rocket:", symbols: { rocket: "🚀" },
+                                                 transforms: [->(view) { view }])
+  end
+
   def test_callback_stays_alive_during_gc_and_drops_after_render
     callback = ->(_node) { GC.start; "<aside>alive</aside>" }
     reference = WeakRef.new(callback)

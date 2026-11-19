@@ -89,7 +89,9 @@ module Carve
         raise ExtensionUnavailable, "standard extension callbacks are not selected by the JSON options (C2-T-010)"
       end
       if (renderers && renderers.values.any? { |value| value.respond_to?(:call) || value.is_a?(Hash) }) || (transforms && !transforms.empty?)
-        raise ExtensionUnavailable, "native host does not read symbols, profile, or url policy" if symbols || profile || url_policy
+        config[:symbols] = stringify(symbols) if symbols
+        config[:profile] = profile.to_s if profile
+        config[:urlPolicy] = stringify(url_policy) if url_policy
         config[:extensions] = Array(extensions).map(&:to_s) if extensions
         config[:mode] = mode.to_s if mode
         return render_with_host(source, options: config, renderers: renderers, transforms: transforms).fetch("html")
@@ -110,13 +112,21 @@ module Carve
     def render_with_host(source = "", tree: nil, options: {}, renderers: nil, transforms: nil)
       names = []
       callbacks = []
+      standard = {}
+      declared = tree.nil? ? [] : Array(stringify(tree)["extensions"])
       (renderers || {}).each do |name, renderer|
-        channels = renderer.is_a?(Hash) ? renderer : { interactive: renderer, static: renderer }
+        if renderer.to_s == "standard" && (renderer.is_a?(String) || renderer.is_a?(Symbol))
+          standard[name.to_s] = "standard"
+          next
+        end
+        declared_version = declared.find { |row| row["name"] == name.to_s }&.fetch("version", nil)
+        version = renderer.is_a?(Hash) ? renderer.fetch(:version, renderer.fetch("version", declared_version || "1")) : (declared_version || "1")
+        channels = renderer.is_a?(Hash) ? renderer.reject { |key, _| key.to_s == "version" } : { interactive: renderer, static: renderer }
         channels.each do |channel, callback|
           raise ExtensionUnavailable, "renderer #{name} must respond to call" unless callback.respond_to?(:call)
           key = channel.to_s == "build_time" ? "static" : channel.to_s
           raise ExtensionUnavailable, "renderer channel must be interactive or static" unless %w[interactive static].include?(key)
-          names << "#{name}\u001f#{key}"
+          names << "#{name}\u001f#{version}\u001f#{key}"
           callbacks << callback
         end
       end
@@ -125,7 +135,8 @@ module Carve
         raise ExtensionUnavailable, "transform must respond to call" unless callback.respond_to?(:call)
       end
       tree_json = tree.nil? ? nil : JSON.generate(stringify(tree))
-      JSON.parse(_render_host(source_text(source), tree_json, JSON.generate(stringify(options)), names, callbacks, transforms), max_nesting: false)
+      host_options = standard.empty? ? options : options.merge(renderers: standard)
+      JSON.parse(_render_host(source_text(source), tree_json, JSON.generate(stringify(host_options)), names, callbacks, transforms), max_nesting: false)
     end
 
     def render_with_diagnostics(source, **options)
