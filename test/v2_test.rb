@@ -148,25 +148,21 @@ class CarveV2Test < Minitest::Test
     assert_equal "| a | longer |\n| b | c      |\n", Carve.to_carve(source, align_tables: true)
   end
 
-  def test_include_writer_reaches_the_writer_registry_carve_rs_4327
+  def test_include_writer_returns_markdown
     Dir.mktmpdir("carve-rb-v2-") do |root|
       page = File.join(root, "page.crv")
       File.write(page, "Text")
-      error = assert_raises(Carve::WriterUnavailable) do
-        Carve.render_with_includes("Text", root: root, source_path: page,
-                                   target: "markdown")
-      end
-      assert_match(/markdown writer not available yet/, error.message)
+      result = Carve.render_with_includes("Text", root: root, source_path: page,
+                                          target: "markdown")
+      assert_equal "Text\n", result.fetch(:value)
+      assert_empty result.fetch(:warnings)
     end
-    skip "carve-rs#4327, carve-rs#4349: Markdown include writer target pending"
   end
 
-  def test_markdown_plain_and_ansi_writers_are_reserved_carve_rs_4327
-    %i[to_markdown to_plain_text to_ansi].each do |name|
-      error = assert_raises(Carve::WriterUnavailable) { Carve.public_send(name, "Hi") }
-      assert_match(/writer not available yet/, error.message)
-    end
-    skip "carve-rs#4327, carve-rs#4349: Markdown, plain, and ANSI writer registrations pending"
+  def test_markdown_plain_and_ansi_writers_return_output
+    assert_equal "Hi\n", Carve.to_markdown("Hi")
+    assert_equal "Hi\n", Carve.to_plain_text("Hi")
+    assert_equal "Hi\n", Carve.to_ansi("Hi")
   end
 
   def test_html_import_c2_t_005
