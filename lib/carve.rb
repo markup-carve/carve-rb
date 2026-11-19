@@ -37,31 +37,49 @@ module Carve
     # C2-T-010. A public escape hatch for every 0.2 call and option.
     # The engine checks each option for the stage named by the call.
     def call(name, source: nil, options: {}, **fields)
-      request = { "call" => name.to_s }
-      request["source"] = source_text(source) unless source.nil?
-      request["options"] = stringify(options) unless options.empty?
-      fields.each { |key, value| request[camel(key)] = stringify(value) }
-      response = JSON.parse(_call_json(JSON.generate(request)), max_nesting: false)
-      if (row = response["error"])
-        if fields[:target] && row["message"].match?(/not available|unsupported/i)
-          raise WriterUnavailable.new(row.merge("message" => "#{fields[:target]} writer not available yet: #{row.fetch('message')}"))
-        end
-        raise EngineError.new(row)
-      end
-      response.fetch("ok")
+      call_response(name, source, options, fields, symbolize_names: false)
     end
 
     def parse(source, **options)
       positions = options.delete(:positions)
       fields = positions.nil? ? {} : { positions: positions }
-      symbolize(call("parse", source: source, options: options, **fields).fetch("tree"))
+      if options.empty? && positions != false
+        tree_json = _parse_json(source_text(source))
+        return JSON.parse(tree_json, max_nesting: false, symbolize_names: true) unless tree_json.empty?
+      end
+      call_response("parse", source, options, fields, symbolize_names: true).fetch(:tree)
     end
 
     def parse_with_diagnostics(source, **options)
       positions = options.delete(:positions)
       fields = positions.nil? ? {} : { positions: positions }
-      symbolize(call("parseWithDiagnostics", source: source, options: options, **fields))
+      call_response("parseWithDiagnostics", source, options, fields, symbolize_names: true)
     end
+
+    private
+
+    # Build parse trees with symbol keys during JSON decoding. The public
+    # generic call keeps its string-key contract, while parse avoids a second
+    # recursive allocation of the entire tree.
+    def call_response(name, source, options, fields, symbolize_names:)
+      request = { "call" => name.to_s }
+      request["source"] = source_text(source) unless source.nil?
+      request["options"] = stringify(options) unless options.empty?
+      fields.each { |key, value| request[camel(key)] = stringify(value) }
+      response = JSON.parse(_call_json(JSON.generate(request)), max_nesting: false,
+                            symbolize_names: symbolize_names)
+      key = symbolize_names ? :error : "error"
+      if (row = response[key])
+        row = row.transform_keys(&:to_s) if symbolize_names
+        if fields[:target] && row["message"].match?(/not available|unsupported/i)
+          raise WriterUnavailable.new(row.merge("message" => "#{fields[:target]} writer not available yet: #{row.fetch('message')}"))
+        end
+        raise EngineError.new(row)
+      end
+      response.fetch(symbolize_names ? :ok : "ok")
+    end
+
+    public
 
     def to_html(source, extensions: nil, mode: nil, renderers: nil, symbols: nil,
                 safe: nil, raw_html: false, url_policy: nil, profile: nil,
