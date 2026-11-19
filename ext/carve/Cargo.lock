@@ -59,26 +59,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "carve-rb"
+name = "carve-lang"
 version = "0.1.14"
-dependencies = [
- "carve2",
- "magnus",
- "rb-sys",
-]
-
-[[package]]
-name = "carve2"
-version = "0.0.0"
-source = "git+https://github.com/markup-carve/carve-rs?rev=dd5f0e7ac90856c220c6a6afdc6b56dba8817844#dd5f0e7ac90856c220c6a6afdc6b56dba8817844"
+source = "git+https://github.com/markup-carve/carve-rs?rev=7fb7c24956298e78bc4716ff7e0e1fb96e60ecdf#7fb7c24956298e78bc4716ff7e0e1fb96e60ecdf"
 dependencies = [
  "bumpalo",
- "carve-lang",
+ "carve-lang 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "html5ever",
+ "markup5ever_rcdom",
  "regex",
  "serde",
  "serde_json",
  "typed-arena",
  "unicode-normalization",
+]
+
+[[package]]
+name = "carve-rb"
+version = "0.1.14"
+dependencies = [
+ "carve-lang 0.1.14 (git+https://github.com/markup-carve/carve-rs?rev=7fb7c24956298e78bc4716ff7e0e1fb96e60ecdf)",
+ "magnus",
+ "rb-sys",
 ]
 
 [[package]]

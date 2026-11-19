@@ -51,13 +51,13 @@ fn guard<T>(f: impl FnOnce() -> T) -> Result<T, Error> {
 }
 
 fn g_call_json(request: String) -> Result<String, Error> {
-    guard(|| carve2::api::json::call(&request))
+    guard(|| ::carve::api::json::call(&request))
 }
 
 // The default parse response is already a JSON tree. Returning it directly
 // avoids the public JSON boundary's Tree::read and re-encoding passes.
 fn g_parse_json(source: String) -> Result<String, Error> {
-    guard(|| carve2::tree_json(&source, &carve2::Options::default()))
+    guard(|| ::carve::tree_json(&source, &::carve::Options::default()))
 }
 
 fn g_panic_probe() -> Result<String, Error> {

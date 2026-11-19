@@ -1,9 +1,3 @@
-## Unreleased
-
-- Port the Ruby binding on `next2` to the unreleased Carve 0.2 Rust JSON API, with a Git SHA pin.
-- Escape raw HTML by default and expose the 0.2 option, diagnostic, tree, and include shapes.
-- Keep writer and extension entry points visible with explicit availability errors until the upstream registry ports land.
-
 # Changelog
 
 All notable changes to this project are documented in this file.
@@ -12,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+- Port the Ruby binding on `next2` to the unreleased Carve 0.2 Rust JSON API, with a Git SHA pin.
+- Escape raw HTML by default and expose the 0.2 option, diagnostic, tree, and include shapes.
+- Keep the Markdown, plain-text and ANSI writer entry points visible with explicit availability errors until the engine ports them.
+- Pin the renamed engine: the `carve-lang` crate on carve-rs `next2` at `7fb7c249`, where `carve2` used to be.
+- `Carve.to_carve` and `Carve.from_html` work against the engine's canonical writer and HTML importer.
+- `extensions:` and `renderers:` select the engine's standard extensions (`carve.tabs`, `carve.wiki`, `carve.cite`, `carve.imgFence.img`, `carve.imgFence.image`); `Carve::EXTENSIONS` lists them.
 
 ## [0.1.14] - 2026-11-12
 

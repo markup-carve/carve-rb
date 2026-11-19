@@ -52,7 +52,7 @@ class AlignTablesAndRegionsTest < Minitest::Test
   end
 
   def test_align_tables_is_off_by_default
-    skip "carve-rs#4327 (C2-T-005 writer registry): pending in the 0.2 engine"
+    skip "0.1 expectation: the 0.2 writer escapes the bare < cell; align_tables is tested in v2_test"
     source = "| a | longer |\n| < | c |\n"
     assert_equal source, Carve.to_carve(source)
     assert_equal "| a | longer |\n| < | c      |\n", Carve.to_carve(source, align_tables: true)
