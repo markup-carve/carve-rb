@@ -160,9 +160,15 @@ def lock_pin(lock: Path) -> tuple[str, str]:
         fail(
             f"{lock} carries no sourced `{ENGINE_PACKAGE}` package."
         )
-    if len(set(found)) != 1:
+    # Carve 0.2 uses the published 0.1 engine for upgrade behavior. That
+    # registry package is transitive; the binding directly pins the Git engine.
+    # Keep rejecting multiple Git revisions, which would leave the direct pin
+    # ambiguous, while ignoring the independent published dependency.
+    git_pins = {pin for pin in found if pin[0] == "revision"}
+    direct = git_pins if git_pins else set(found)
+    if len(direct) != 1:
         fail(f"{lock} resolves more than one engine pin: {found}.")
-    return found[0]
+    return next(iter(direct))
 
 
 def resolve_pin(engine: Path | None, pin: tuple[str, str]) -> str:
@@ -221,9 +227,16 @@ def spec_gitlink(engine: Path, revision: str) -> str:
         )
     line = completed.stdout.strip()
     if not line:
+        # The 0.2 engine no longer carries the 0.1 corpus as a gitlink. The
+        # binding names that compatibility corpus explicitly instead.
+        corpus_pin = Path("spec-corpus-revision.txt")
+        if corpus_pin.is_file():
+            spec = corpus_pin.read_text().strip()
+            if FULL_REV_RE.match(spec):
+                return spec
         fail(
-            f"carve-rs {revision} has no `{SPEC_PATH}` gitlink, so there is no spec commit to "
-            "hold this artifact to."
+            f"carve-rs {revision} has no `{SPEC_PATH}` gitlink and this binding "
+            "has no valid spec-corpus-revision.txt."
         )
     fields = line.split()
     if len(fields) < 3 or fields[1] != "commit":
