@@ -13,6 +13,7 @@ on:
   # `publish` are skipped on pull requests. Limited to the files that decide
   # what goes into a gem, so ordinary PRs do not pay for the native matrix.
   pull_request:
+    branches: [main]
     paths:
       - "ext/**"
       - "carve.gemspec"

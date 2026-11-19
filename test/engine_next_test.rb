@@ -7,6 +7,7 @@ require "carve"
 # What the engine after 0.1.13 adds or changes, pinned through the binding.
 class EngineNextTest < Minitest::Test
   def test_the_writer_moves_alignment_into_braces
+    skip "carve-rs#4327 (C2-T-005 writer registry): pending in the 0.2 engine"
     assert_equal "|={>} A |= B |\n| x | y |\n", Carve.to_carve("|=> A |= B |\n| x | y |\n")
   end
 
@@ -17,6 +18,7 @@ class EngineNextTest < Minitest::Test
   end
 
   def test_the_writer_spells_every_thematic_break_as_stars
+    skip "carve-rs#4327 (C2-T-005 writer registry): pending in the 0.2 engine"
     assert_equal "a\n\n***\n\nb\n", Carve.to_carve("a\n\n---\n\nb\n")
   end
 
@@ -42,8 +44,10 @@ class EngineNextTest < Minitest::Test
     assert_equal "<p>a. item</p>", Carve.to_html("a. item\n").chomp
   end
 
-  def test_markdown_import_reads_a_github_alert_as_an_admonition
-    assert_equal "::: note\nHi\n:::\n", Carve.from_markdown("> [!NOTE]\n> Hi\n")[:value]
+  def test_markdown_import_is_removed_in_c2_t_003
+    # C2-T-003 has no Markdown import entry in the 0.2 tooling surface.
+    error = assert_raises(ArgumentError) { Carve.from_markdown("> [!NOTE]\n> Hi\n") }
+    assert_match(/not part of Carve 0.2/, error.message)
   end
 
   private

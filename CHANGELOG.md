@@ -1,3 +1,9 @@
+## Unreleased
+
+- Port the Ruby binding on `next2` to the unreleased Carve 0.2 Rust JSON API, with a Git SHA pin.
+- Escape raw HTML by default and expose the 0.2 option, diagnostic, tree, and include shapes.
+- Keep writer and extension entry points visible with explicit availability errors until the upstream registry ports land.
+
 # Changelog
 
 All notable changes to this project are documented in this file.

@@ -1,0 +1,26 @@
+name: Carve 0.2 Ruby binding
+
+on:
+  push:
+    branches: [next2]
+  pull_request:
+    branches: [next2]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install libclang for the native extension
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+      - name: Compile the pinned 0.2 engine and run the Ruby tests
+        run: |
+          bundle install
+          bundle exec rake test

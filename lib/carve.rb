@@ -1,18 +1,9 @@
 # frozen_string_literal: true
 
-# Carve: Ruby bindings for the Carve markup language.
-#
-# This file loads the compiled native extension (built from ext/carve, a Rust
-# crate wrapping the carve-rs engine via magnus) and layers a small,
-# idiomatic Ruby API on top of the raw primitives it exports.
 require "json"
+require "pathname"
 require_relative "carve/version"
 
-# Load the compiled native extension. A precompiled platform gem ships one per
-# Ruby ABI under lib/carve/<major.minor>/; a source install and `rake compile`
-# build lib/carve/carve.so (or .bundle on macOS).
-# Chosen by directory rather than by rescuing LoadError, so a binary that is
-# present but cannot load (an older glibc, say) reports its own error.
 abi = RUBY_VERSION[/\A\d+\.\d+/]
 if File.directory?(File.join(__dir__, "carve", abi))
   require_relative "carve/#{abi}/carve"
@@ -20,418 +11,253 @@ else
   require_relative "carve/carve"
 end
 
+# Ruby facade over the Carve 0.2 engine's public JSON boundary (C2-T-010).
 module Carve
-  # Raised by .select_include_region when the region is missing or a marker is
-  # malformed, unpaired or duplicated. +rule+ is the engine's warning rule id.
-  class IncludeRegionError < ArgumentError
-    attr_reader :rule
+  class EngineError < ArgumentError
+    attr_reader :name, :category, :status
 
-    def initialize(rule, name)
-      @rule = rule
-      super("#{rule}: region #{name.inspect} is missing or its markers are malformed")
+    def initialize(row)
+      @name = row.fetch("name")
+      @category = row.fetch("category")
+      @status = row.fetch("status")
+      super(row.fetch("message"))
     end
   end
 
-  # Extension names the native binding understands.
-  #
-  # Taken from the engine itself rather than typed out here. This was a literal
-  # array, and the native binding had its own match arm listing the same names,
-  # so an extension carve-rs gained was unreachable from Ruby until somebody
-  # updated both by hand - and nothing failed in the meantime.
-  #
-  # The names are the engine's kebab-case keys, exposed as symbols
-  # (`:"math-block"`). The snake_case spellings this binding has always taken
-  # (`:math_block`) and its short aliases (`:mermaid`, `:dot`, `:toc`) still
-  # work as ARGUMENTS; this constant lists the canonical names.
-  EXTENSIONS = _extension_names.map(&:to_sym).freeze
+  class WriterUnavailable < EngineError; end
+  class ExtensionUnavailable < ArgumentError; end
+  class IncludeRegionError < ArgumentError; end
 
-  # Render modes the native binding understands.
-  #
-  # +:interactive+ (default) emits live HTML with client-script hooks (e.g.
-  # `<pre class="mermaid">`, `<details>`). +:static+ emits self-contained HTML
-  # for print / PDF / archival: it forces disclosure (`<details open>`) and
-  # pre-renders client-script constructs through the +renderers:+ callables,
-  # degrading to (escaped) source when a renderer is absent or fails.
+  # The 0.2 extension host is provisional and has no registered entries yet.
+  EXTENSIONS = [].freeze
   MODES = %i[interactive static].freeze
-
-  # Renderer keys accepted by the +renderers:+ Hash (see .to_html). Each maps a
-  # construct's source to a self-contained HTML string emitted on the static
-  # path. +mermaid+ / +chart+ / +graphviz+ are callables `(String) -> String`;
-  # +math+ is `(String, display_bool) -> String`.
   RENDERER_KEYS = %i[mermaid chart graphviz math].freeze
 
   class << self
-    # Render +source+ to HTML with its <tt>{{ path }}</tt> includes expanded,
-    # contained to +root:+.
-    #
-    #   Carve.to_html_with_includes(File.read(page), root: "/srv/site",
-    #                               source_path: page, symbols: {smile: "\u{1F604}"})
-    #
-    # +root:+ and +source_path:+ are absolute, and the source file lives inside
-    # the root. A relative value raises ArgumentError rather than rooting
-    # containment at the process working directory, which is arbitrary with
-    # respect to the document.
-    #
-    # Returns +{value:, warnings:, dependencies:, suppressedWarnings:}+. Paths
-    # in +warnings+ and +dependencies+ are relative to the root, so a report can
-    # be shown to a reader as it stands. Each warning's +includedBy+ lists the
-    # directives that reached its file, top-level first, as +{file:, line:, column:}+.
-    #
-    # Every render option +to_html+ takes is accepted and reaches the included
-    # children too: an extension, a symbol map or a profile means the same thing
-    # in a child as in the parent.
-    def to_html_with_includes(source, root:, source_path:, extensions: nil, mode: nil,
-                              renderers: nil, symbols: nil, safe: false, profile: nil,
-                              sections: true, max_depth: nil, max_bytes: nil,
-                              max_resolver_calls: nil, max_warnings: nil)
-      render_with_includes(
-        source, target: "html", root: root, source_path: source_path,
-        extensions: extensions, mode: mode, renderers: renderers, symbols: symbols,
-        safe: safe, profile: profile, sections: sections, max_depth: max_depth,
-        max_bytes: max_bytes, max_resolver_calls: max_resolver_calls,
-        max_warnings: max_warnings
-      )
+    # C2-T-010. A public escape hatch for every 0.2 call and option.
+    # The engine checks each option for the stage named by the call.
+    def call(name, source: nil, options: {}, **fields)
+      request = { "call" => name.to_s }
+      request["source"] = source_text(source) unless source.nil?
+      request["options"] = stringify(options) unless options.empty?
+      fields.each { |key, value| request[camel(key)] = stringify(value) }
+      response = JSON.parse(_call_json(JSON.generate(request)), max_nesting: false)
+      if (row = response["error"])
+        if fields[:target] && row["message"].match?(/not available|unsupported/i)
+          raise WriterUnavailable.new(row.merge("message" => "#{fields[:target]} writer not available yet: #{row.fetch('message')}"))
+        end
+        raise EngineError.new(row)
+      end
+      response.fetch("ok")
     end
 
-    # The expanded document as an AST, in the shape +.parse+ returns.
-    #
-    #   Carve.parse_with_includes(File.read(page), root: root, source_path: page)
-    #   # => {value: {type: "document", ...}, warnings: [], dependencies: [...], ...}
-    #
-    # For a host that walks the tree rather than rendering HTML - carve-hexapdf
-    # draws its PDF from this shape.
-    #
-    # Nodes carry NO +:pos+, unlike +.parse+. Spec I4 leaves position remapping
-    # out of scope in every engine, so a span on an included node would name an
-    # offset in a document the caller never passed.
-    def parse_with_includes(source, root:, source_path:, extensions: nil, profile: nil,
-                            max_depth: nil, max_bytes: nil, max_resolver_calls: nil,
-                            max_warnings: nil)
-      render_with_includes(
-        source, target: "ast", root: root, source_path: source_path,
-        extensions: extensions, profile: profile, max_depth: max_depth,
-        max_bytes: max_bytes, max_resolver_calls: max_resolver_calls,
-        max_warnings: max_warnings
-      )
+    def parse(source, **options)
+      positions = options.delete(:positions)
+      fields = positions.nil? ? {} : { positions: positions }
+      symbolize(call("parse", source: source, options: options, **fields).fetch("tree"))
     end
 
-    # The include pass over any render target: +"html"+, +"markdown"+,
-    # +"plain"+, +"ansi"+ or +"ast"+.
-    #
-    # There is no +"carve"+ target. Spec I15 excludes the Carve writer from
-    # expansion, because inlining a child into the formatter's output rewrites
-    # the author's document rather than formatting it.
-    def render_with_includes(source, root:, source_path:, target: "html", extensions: nil,
-                             mode: nil, renderers: nil, symbols: nil, safe: false,
-                             profile: nil, sections: true, max_depth: nil, max_bytes: nil,
-                             max_resolver_calls: nil, max_warnings: nil)
-      JSON.parse(
-        _render_with_includes_json(
-          source.to_s,
-          root.to_s,
-          source_path.to_s,
-          target.to_s,
-          Array(extensions).map(&:to_s),
-          (mode || :interactive).to_s,
-          renderers || {},
-          symbols || {},
-          !!safe,
-          profile&.to_s,
-          !!sections,
-          max_depth,
-          max_bytes,
-          max_resolver_calls,
-          max_warnings,
-        ),
-        symbolize_names: true,
-        # The engine bounds nesting itself, above Ruby JSON's default of 100, so
-        # a legal document would otherwise raise here. Same reason as .parse.
-        max_nesting: false,
-      )
+    def parse_with_diagnostics(source, **options)
+      positions = options.delete(:positions)
+      fields = positions.nil? ? {} : { positions: positions }
+      symbolize(call("parseWithDiagnostics", source: source, options: options, **fields))
     end
 
-    # Report constructs that parse and render, but not the way the author
-    # meant: an attribute that attaches to nothing, an unclosed fence, a
-    # fragment link with no target.
-    #
-    #   Carve.lint("Text.\n\n{#gone}\n")
-    #   # => [{rule: "unattached-block-attribute", message: "...", line: 3,
-    #   #      column: 1, start: 7, end: 14, file: nil, includedBy: []}]
-    #
-    # Returns an Array of Hashes, empty for a clean document:
-    #
-    # * +:rule+ - the engine's stable rule id, the same in every Carve engine.
-    # * +:message+ - what degrades, in prose.
-    # * +:line+, +:column+ - 1-based; the column counts characters, not bytes.
-    # * +:start+, +:end+ - 0-based character offsets into +source+, end
-    #   exclusive, so <tt>source[f[:start]...f[:end]]</tt> is the offending text.
-    #   +nil+ on a finding the include pass adds (below), whose offsets would
-    #   index another text.
-    # * +:file+, +:includedBy+ - see below; +nil+ and +[]+ without includes.
-    #
-    # The engine reports no severity: every finding is a warning.
-    #
-    # Pass the same +extensions:+ you render with, since they change which
-    # constructs are elements and which rules apply. +caption_hints: true+
-    # turns on the opt-in +caption-looking-paragraph+ hint for a paragraph
-    # beside an image or table that reads like a caption.
-    #
-    # ==== Following includes
-    #
-    # With +root:+ and +source_path:+ (absolute, as for .to_html_with_includes)
-    # the pass also lints every included Carve file and reports include
-    # directives that stay literal (a missing target, a cycle, a budget). Such a
-    # finding names its +:file+ relative to the root and its +:includedBy+ chain,
-    # top-level first, as +{file:, line:, column:}+. The budgets
-    # (+max_depth:+ and the rest) mean what they mean for rendering.
-    def lint(source, extensions: nil, root: nil, source_path: nil, max_depth: nil,
-             max_bytes: nil, max_resolver_calls: nil, max_warnings: nil, caption_hints: false)
-      JSON.parse(
-        _lint_json(
-          source.to_s,
-          Array(extensions).map(&:to_s),
-          root&.to_s,
-          source_path&.to_s,
-          max_depth,
-          max_bytes,
-          max_resolver_calls,
-          max_warnings,
-          caption_hints ? true : false,
-        ),
-        symbolize_names: true,
-      )
+    def to_html(source, extensions: nil, mode: nil, renderers: nil, symbols: nil,
+                safe: nil, raw_html: false, url_policy: nil, profile: nil,
+                sections: true, **options)
+      require_extensions!(extensions, renderers)
+      config = options.merge(rawHtml: raw_html && safe != true, sections: sections)
+      config[:mode] = mode.to_s if mode
+      config[:profile] = profile.to_s if profile
+      config[:symbols] = stringify(symbols) if symbols
+      config[:urlPolicy] = stringify(url_policy) if url_policy
+      call("render", source: source, options: config).fetch("html")
     end
 
-    # Format +source+ into canonical Carve. A writer refusal returns the source
-    # as authored. +align_tables:+ pads table cells into aligned columns.
+    def render_with_diagnostics(source, **options)
+      symbolize(call("renderWithDiagnostics", source: source, options: options))
+    end
+
+    def _to_html(source)
+      to_html(source)
+    end
+
+    def to_html_with_extensions(source, extensions)
+      to_html(source, extensions: extensions)
+    end
+
+    def to_html_full(source, extensions, mode, renderers)
+      to_html(source, extensions: extensions, mode: mode, renderers: renderers)
+    end
+
+    def to_html_full_with_symbols(source, extensions, mode, renderers, symbols)
+      to_html(source, extensions: extensions, mode: mode, renderers: renderers, symbols: symbols)
+    end
+
+    def write(source, target:, **options)
+      tree = call("parse", source: source).fetch("tree")
+      call("write", options: options, tree: tree, target: target.to_s).fetch("output")
+    end
+
     def to_carve(source, align_tables: false)
-      _to_carve(source, align_tables ? true : false)
+      call("format", source: source, options: { alignTables: align_tables }).fetch("source")
+    rescue EngineError => error
+      if error.message.match?(/not available|unsupported/i)
+        raise WriterUnavailable.new(error_row(error).merge("message" => "carve writer not available yet: #{error.message}"))
+      end
+      raise
     end
 
-    # Resolve <tt>@region:name</tt> in a file's text with the engine's marker
-    # rules, so an editor jumping to a region agrees with the render.
-    #
-    #   Carve.select_include_region(text, "setup", mode: :carve) # => 3..4
-    #
-    # Returns the 1-based, inclusive Range of content lines; an empty region is
-    # an empty Range such as +2..1+. +mode: :carve+ accepts only
-    # <tt>%% #region</tt> markers, +mode: :code+ also the source-comment forms
-    # of an +@code+ include. Raises IncludeRegionError otherwise.
-    def select_include_region(source, name, mode:)
-      result = _select_include_region(source, name.to_s, mode.to_s)
-      raise IncludeRegionError.new(result, name.to_s) if result.is_a?(String)
-
-      result[0]..result[1]
+    def to_markdown(source)
+      write(source, target: "markdown")
     end
 
-    # Import HTML or Markdown into canonical Carve. Both methods return the
-    # shared migration shape `{ value:, report: }`.
+    def to_plain_text(source)
+      write(source, target: "plain")
+    end
+
+    def to_ansi(source)
+      write(source, target: "ansi")
+    end
+
+    def lint(source, extensions: nil, root: nil, source_path: nil, rules: nil,
+             platforms: nil, max_depth: nil, max_bytes: nil,
+             max_resolver_calls: nil, max_warnings: nil, caption_hints: false)
+      require_extensions!(extensions)
+      unsupported = { max_resolver_calls: max_resolver_calls, max_warnings: max_warnings,
+                      caption_hints: caption_hints ? true : nil }.compact
+      raise ArgumentError, "0.2 lint does not accept #{unsupported.keys.join(', ')}" unless unsupported.empty?
+      opts = {}
+      opts[:rules] = stringify(rules) if rules
+      opts[:platforms] = platforms if platforms
+      opts[:includes] = include_options(root, source_path, max_depth, max_bytes) if root
+      symbolize(call("lint", source: source, options: opts).fetch("diagnostics"))
+    end
+
+    def render_with_includes(source, root:, source_path:, target: "html",
+                             extensions: nil, mode: nil, renderers: nil,
+                             symbols: nil, safe: nil, raw_html: false,
+                             url_policy: nil, profile: nil, sections: true,
+                             max_depth: nil, max_bytes: nil,
+                             max_resolver_calls: nil, max_warnings: nil)
+      require_extensions!(extensions, renderers)
+      raise ArgumentError, "0.2 includes does not accept max_resolver_calls or max_warnings" if max_resolver_calls || max_warnings
+      config = { includes: include_options(root, source_path, max_depth, max_bytes),
+                 rawHtml: raw_html && safe != true, sections: sections }
+      config[:mode] = mode.to_s if mode
+      config[:symbols] = stringify(symbols) if symbols
+      config[:profile] = profile.to_s if profile
+      config[:urlPolicy] = stringify(url_policy) if url_policy
+      parsed = call("parseWithDiagnostics", source: source,
+                    options: { includes: config.fetch(:includes) })
+      tree = parsed.fetch("tree")
+      if target.to_s == "html"
+        rendered = call("renderWithDiagnostics", source: source, options: config)
+        value = rendered.fetch("html")
+        diagnostics = rendered.fetch("diagnostics")
+        suppressed = rendered.fetch("suppressedDiagnostics")
+      elsif target.to_s == "ast"
+        value = symbolize(tree)
+        diagnostics = parsed.fetch("diagnostics")
+        suppressed = parsed.fetch("suppressedDiagnostics")
+      else
+        written = call("write", tree: tree, target: target.to_s)
+        value = written.fetch("output")
+        diagnostics = written.fetch("diagnostics")
+        suppressed = 0
+      end
+      file_id = Pathname.new(source_path.to_s).relative_path_from(Pathname.new(root.to_s)).to_s
+      dependencies = call("includeDependencies", tree: tree, file: file_id).fetch("dependencies")
+      { value: value, warnings: symbolize(diagnostics),
+        dependencies: symbolize(dependencies),
+        suppressedWarnings: suppressed }
+    end
+
+    def to_html_with_includes(source, root:, source_path:, **options)
+      render_with_includes(source, root: root, source_path: source_path, **options)
+    end
+
+    def parse_with_includes(source, root:, source_path:, **options)
+      render_with_includes(source, root: root, source_path: source_path,
+                           target: "ast", **options)
+    end
+
     def from_html(source, mode: :safe)
-      JSON.parse(_from_html_json(source, mode.to_s), symbolize_names: true)
+      raise ArgumentError, "HTML import modes were removed in Carve 0.2 (C2-M-008)" unless mode.to_s == "safe"
+      call("importDocument", source: source)
     end
 
-    def from_markdown(source)
-      result = JSON.parse(_from_markdown_json(source), symbolize_names: true)
-      # Keep the 0.1.x spelling while exposing the shared cross-language key.
-      result[:report][:source_format] = result[:report][:sourceFormat]
+    def from_markdown(_source)
+      raise ArgumentError, "Markdown import is not part of Carve 0.2 (C2-T-003)"
+    end
+
+    def select_include_region(_source, _name, mode:)
+      raise IncludeRegionError, "standalone region selection is not part of Carve 0.2; use an include directive (#{mode})"
+    end
+
+    def decision_trace(_source)
+      raise ArgumentError, "decision_trace is a 0.1 debugging API, absent in Carve 0.2"
+    end
+
+    def read_stamp(_source)
+      raise ArgumentError, "0.1 provenance stamps are handled by the 0.2 upgrade tool"
+    end
+
+    def needs_review?(_source, _version = nil)
+      raise ArgumentError, "0.1 provenance stamps are handled by the 0.2 upgrade tool"
+    end
+
+    def register_extension(_definition)
+      raise ExtensionUnavailable, "extension registration not available yet in carve2 (carve-rs#4329)"
+    end
+
+    private
+
+    def require_extensions!(extensions, renderers = nil)
+      return if Array(extensions).empty? && (renderers.nil? || renderers.empty?)
+      raise ExtensionUnavailable, "extension registration not available yet in carve2 (carve-rs#4329)"
+    end
+
+    def include_options(root, source_path, max_depth, max_bytes)
+      raise ArgumentError, "include root and source path must be absolute" unless
+        Pathname.new(root.to_s).absolute? && Pathname.new(source_path.to_s).absolute?
+      file_id = Pathname.new(source_path.to_s).relative_path_from(Pathname.new(root.to_s)).to_s
+      raise ArgumentError, "include source path must be inside root" if file_id == ".." || file_id.start_with?("../")
+      result = { root: root.to_s, file: file_id }
+      result[:depth] = max_depth unless max_depth.nil?
+      result[:bytes] = max_bytes unless max_bytes.nil?
       result
     end
 
-    # Render Carve +source+ to an HTML string.
-    #
-    # With no extensions:
-    #   Carve.to_html("# Hello")             # => "<section ...>\n  <h1>Hello</h1>..."
-    #
-    # With extensions (Array of names as Symbols or Strings):
-    #   Carve.to_html(src, extensions: [:math_block])
-    #   Carve.to_html(src, extensions: %w[math-block list-table])
-    #
-    # Recognized extension names: see Carve::EXTENSIONS. Names may be given
-    # snake_case (:math_block) or hyphenated ("math-block").
-    #
-    # An unknown extension name raises ArgumentError (from the native layer).
-    #
-    # ==== Static render mode
-    #
-    # Pass +mode: :static+ (or "static") to emit self-contained HTML for print /
-    # PDF / archival. In static mode disclosure is forced (`<details open>`) and
-    # client-script constructs are pre-rendered through the +renderers:+ Hash:
-    #
-    #   Carve.to_html(src, extensions: [:fenced_render], mode: :static,
-    #                 renderers: { mermaid: ->(s) { "<svg>#{s}</svg>" } })
-    #
-    # Renderer callables (Symbol or String keys, see Carve::RENDERER_KEYS):
-    #   * +:mermaid+ / +:chart+ / +:graphviz+ -> callable `(String) -> String`
-    #   * +:math+                             -> callable `(String, display) -> String`
-    #
-    # When a needed renderer is absent, or a renderer raises / returns a
-    # non-String, the construct degrades to its HTML-ESCAPED source (never blank,
-    # never raw HTML). Omitting +mode:+ defaults to interactive (non-breaking).
-    #
-    # An unknown mode or renderer key raises ArgumentError (from the native
-    # layer).
-    #
-    # ==== Symbols
-    #
-    # A +:name:+ symbol renders its literal +:name:+ source unless the name is
-    # in the +symbols:+ Hash (String or Symbol keys, String values):
-    #
-    #   Carve.to_html("Ship it :rocket: :shrug:", symbols: { "rocket" => "🚀" })
-    #   # => "<p>Ship it 🚀 :shrug:</p>"   (an unmapped name stays literal)
-    #
-    # The leading word-boundary guard is unaffected by an active map: +a:b:c+,
-    # +10:30:+ and +me@example.com+ never become symbols. A non-String value
-    # raises TypeError (from the native layer).
-    #
-    # SECURITY: a mapped symbol value is inserted as TRUSTED RAW output in the
-    # target format - it is NOT escaped, the same trust class as a +renderers:+
-    # callable. <tt>{ "b" => "<b>x</b>" }</tt> emits a real +<b>+ element, not
-    # escaped text. This is deliberate: processor configuration is trusted.
-    # NEVER build a symbols map out of untrusted / user-supplied input.
-    #
-    # ==== Section wrappers
-    #
-    # A top-level heading is wrapped, along with the content following it up to
-    # the next same-or-shallower heading, in a +<section>+ carrying the heading's
-    # id (spec PART 9 §13). Only the id moves - +{#install .featured}+ gives
-    # <tt><section id="install"><h2 class="featured"></tt> - and a heading inside
-    # a blockquote, div or list item is not wrapped at all.
-    #
-    # Pass +sections: false+ to render headings flat, with the id back on the
-    # +<h*>+:
-    #
-    #   Carve.to_html("# A\n\np\n")
-    #   # => "<section id=\"A\">\n  <h1>A</h1>\n  <p>p</p>\n</section>"
-    #   Carve.to_html("# A\n\np\n", sections: false)
-    #   # => "<h1 id=\"A\">A</h1>\n<p>p</p>"
-    #
-    # This is for a host whose CSS or JS assumes rendered blocks are direct
-    # children of the content container - the <tt>.stack > * + *</tt> spacing
-    # idiom, +:first-child+, +nth-child()+ counting, DOM child walks - all of
-    # which stop matching once a wrapper sits in between. It is the one output
-    # change that breaks a document whose *source* migrated cleanly.
-    #
-    # Nothing else changes: ids, collision dedup, <tt></#id></tt>
-    # cross-references, implicit +[Heading][]+ references and heading numbering
-    # all resolve against the slug rather than the element carrying it. The
-    # endnotes <tt><section role="doc-endnotes"></tt> is a separate construct and
-    # is still emitted.
-    #
-    # ==== Untrusted input
-    #
-    # Carve's normative hardening is always on and needs no argument here:
-    # dangerous URL schemes are blanked, event-handler attributes such as
-    # +onclick+ are dropped, and the bidi override / isolate characters behind
-    # Trojan Source are removed from rendered text.
-    #
-    # Raw passthrough is the deliberate exception - a <tt>```=html</tt> block or
-    # a <tt>`...`{=html}</tt> span renders VERBATIM by design - so it is the one
-    # thing input you did not author has to switch off:
-    #
-    #   Carve.to_html(user_input, safe: true, profile: :comment)
-    #
-    # +safe:+ escapes those raw blocks and spans instead of emitting them.
-    # +profile:+ restricts which constructs are allowed at all and caps input
-    # length: +:full+, +:article+, +:comment+ or +:minimal+ (String or Symbol),
-    # +nil+ for no profile. An unknown profile name raises ArgumentError (from
-    # the native layer) rather than being ignored.
-    #
-    # A profile REJECTION also raises ArgumentError - input past the profile's
-    # +max_length+, or a denied construct when the profile's action is error:
-    #
-    #   Carve.to_html("x" * 20_000, profile: :minimal)
-    #   # ArgumentError: Profile violations: 'document' is not allowed:
-    #   #   max_length_exceeded (...)
-    #
-    # It is an exception rather than a return value because the engine's
-    # infallible entry point answers a rejection with an empty String, which a
-    # caller cannot tell from a document that legitimately rendered to nothing.
-    def to_html(source, extensions: nil, mode: nil, renderers: nil, symbols: nil,
-                safe: false, profile: nil, sections: true)
-      list = Array(extensions)
+    def source_text(source)
+      source.to_s.encode("UTF-8", invalid: :replace, undef: :replace, replace: "\uFFFD")
+    end
 
-      # Fast path: interactive (default), no extensions, no renderers, no
-      # symbols, neither safe-render control in play, and section wrapping left
-      # on. `sections: false` MUST fall through -- `_to_html` takes no options,
-      # so short-circuiting to it would drop the flag and return wrapped output
-      # with no error, which is the failure mode a caller cannot see.
-      if list.empty? && (mode.nil? || mode.to_s == "interactive") &&
-         (renderers.nil? || renderers.empty?) && (symbols.nil? || symbols.empty?) &&
-         !safe && profile.nil? && sections
-        return _to_html(source.to_s)
+    def camel(key)
+      key.to_s.gsub(/_([a-z])/) { Regexp.last_match(1).upcase }
+    end
+
+    def stringify(value)
+      case value
+      when Hash then value.each_with_object({}) { |(k, v), out| out[camel(k)] = stringify(v) }
+      when Array then value.map { |entry| stringify(entry) }
+      when Symbol then value.to_s
+      else value
       end
-
-      _to_html_safe(
-        source.to_s,
-        list.map(&:to_s),
-        (mode || :interactive).to_s,
-        renderers || {},
-        symbols || {},
-        !!safe,
-        profile&.to_s,
-        !!sections,
-      )
     end
 
-
-    # Read a document's provenance marker, as written by +carve fmt --stamp+.
-    #
-    #   Carve.read_stamp(source)
-    #   # => {version: "0.1", generated_by: "carve-php 0.1.0"}
-    #   Carve.read_stamp("# Hi\n")
-    #   # => nil
-    #
-    # Returns +nil+ when the document carries no marker. That is the normal case
-    # for a hand-written document and means "unknown", not "current".
-    #
-    # Both documented marker forms are read - the trailing +%%+ line and the
-    # +%%%+ block - and a marker written by any Carve engine reads the same,
-    # which is the point of recording it.
-    def read_stamp(source)
-      _read_stamp(source.to_s)
+    def symbolize(value)
+      case value
+      when Hash then value.each_with_object({}) { |(k, v), out| out[k.to_sym] = symbolize(v) }
+      when Array then value.map { |entry| symbolize(entry) }
+      else value
+      end
     end
 
-    # Whether a document was last processed under an older spec version than
-    # this engine targets, so the +[behavior]+ changelog entries between the two
-    # are worth reviewing.
-    #
-    #   Carve.needs_review?(stored_document)
-    #
-    # An UNSTAMPED document answers true: its provenance is unknown, and
-    # assuming it is current is the unsafe direction. Pass +current_version+ to
-    # compare against something other than this engine's spec version.
-    #
-    # See https://markup-carve.github.io/carve/versioning for what a version
-    # difference means for a stored document.
-    def needs_review?(source, current_version = nil)
-      _stamp_needs_review(source.to_s, current_version&.to_s)
-    end
-
-    # Parse Carve +source+ into an AST: a tree of Ruby Hashes and Arrays.
-    #
-    #   Carve.parse("# Hi")
-    #   # => {type: "document",
-    #   #     children: [{type: "heading", level: 1,
-    #   #                 children: [{type: "text", value: "Hi"}], attrs: nil}],
-    #   #     srcByteLength: 4, astVersion: "1.2"}
-    #
-    # The root carries exactly +:type+, +:children+, +:srcByteLength+ and
-    # +:astVersion+ (spec
-    # PART 12 §7). Frontmatter and footnote definitions are block nodes in
-    # +:children+, not root fields: a root field cannot carry the position §4
-    # requires of every node, and both are source an editor navigates to.
-    # Frontmatter is the first child, carrying +:format+ and RAW +:content+.
-    #
-    # Every node is a Hash with a +:type+ key plus its fields; child collections
-    # are Arrays; +:attrs+ is +nil+ or a Hash holding whichever of +:id+,
-    # +:classes+, +:keyValues+ and +:order+ the source wrote. Keys are symbols. This is the raw parse tree (default profile, no
-    # extensions), suitable for a custom renderer (e.g. Carve -> PDF).
-    def parse(source)
-      # max_nesting: false - the engine already bounds nesting (its own
-      # MAX_NESTING_DEPTH cap), and that cap exceeds Ruby JSON's default
-      # max_nesting of 100. Without this, deeply-nested-but-valid documents
-      # that Carve.to_html renders fine would raise JSON::NestingError here.
-      JSON.parse(_to_ast_json(source.to_s), symbolize_names: true, max_nesting: false)
+    def error_row(error)
+      { "name" => error.name, "category" => error.category,
+        "status" => error.status, "message" => error.message }
     end
   end
 end
