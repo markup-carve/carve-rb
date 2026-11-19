@@ -52,11 +52,15 @@ module Carve
     end
 
     def parse(source, **options)
-      symbolize(call("parse", source: source, options: options).fetch("tree"))
+      positions = options.delete(:positions)
+      fields = positions.nil? ? {} : { positions: positions }
+      symbolize(call("parse", source: source, options: options, **fields).fetch("tree"))
     end
 
     def parse_with_diagnostics(source, **options)
-      symbolize(call("parseWithDiagnostics", source: source, options: options))
+      positions = options.delete(:positions)
+      fields = positions.nil? ? {} : { positions: positions }
+      symbolize(call("parseWithDiagnostics", source: source, options: options, **fields))
     end
 
     def to_html(source, extensions: nil, mode: nil, renderers: nil, symbols: nil,
@@ -151,7 +155,7 @@ module Carve
       value = case target.to_s
               when "html" then call("render", source: source, options: config).fetch("html")
               when "ast" then symbolize(tree)
-              else call("write", options: config, tree: tree, target: target.to_s).fetch("output")
+              else call("write", tree: tree, target: target.to_s).fetch("output")
               end
       file_id = Pathname.new(source_path.to_s).relative_path_from(Pathname.new(root.to_s)).to_s
       dependencies = call("includeDependencies", tree: tree, file: file_id).fetch("dependencies")
@@ -170,7 +174,8 @@ module Carve
     end
 
     def from_html(source, mode: :safe)
-      call("importDocument", source: source, options: { mode: mode.to_s })
+      raise ArgumentError, "HTML import modes were removed in Carve 0.2 (C2-M-008)" unless mode.to_s == "safe"
+      call("importDocument", source: source)
     end
 
     def from_markdown(_source)

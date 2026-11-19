@@ -23,6 +23,9 @@ class CarveV2Test < Minitest::Test
     assert_equal tree, Carve.parse_with_diagnostics("# Title").fetch(:tree)
     json = Carve.call("encodeTree", tree: Carve.call("parse", source: "# Title").fetch("tree")).fetch("json")
     assert_kind_of Hash, Carve.call("decodeTree", json: json).fetch("tree")
+    refute Carve.parse("# Title", positions: false).fetch(:children).first.key?(:pos)
+    refute Carve.parse_with_diagnostics("# Title", positions: false).fetch(:tree)
+               .fetch(:children).first.key?(:pos)
   end
 
   def test_lint_returns_v2_diagnostics_c2_t_020
@@ -51,6 +54,19 @@ class CarveV2Test < Minitest::Test
     error = assert_raises(Carve::WriterUnavailable) { Carve.to_carve("Hi") }
     assert_match(/carve writer not available yet/, error.message)
     skip "carve-rs#4327: source writer registration pending"
+  end
+
+  def test_include_writer_reaches_the_writer_registry_carve_rs_4327
+    Dir.mktmpdir("carve-rb-v2-") do |root|
+      page = File.join(root, "page.crv")
+      File.write(page, "Text")
+      error = assert_raises(Carve::WriterUnavailable) do
+        Carve.render_with_includes("Text", root: root, source_path: page,
+                                   target: "markdown")
+      end
+      assert_match(/markdown writer not available yet/, error.message)
+    end
+    skip "carve-rs#4327: include writer targets pending"
   end
 
   def test_markdown_plain_and_ansi_writers_are_reserved_carve_rs_4327
