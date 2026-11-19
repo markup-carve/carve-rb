@@ -2,7 +2,10 @@
 //!
 //! Keeping one boundary lets the engine validate options, errors, and tree
 //! shapes in the same place as its CLI and other language bindings.
-use magnus::{function, prelude::*, Error, Ruby};
+mod host;
+mod host_options;
+
+use magnus::{function, prelude::*, Error, RArray, Ruby};
 use std::any::Any;
 use std::cell::RefCell;
 use std::panic::{self, AssertUnwindSafe};
@@ -64,6 +67,26 @@ fn g_panic_probe() -> Result<String, Error> {
     guard(|| panic!("deliberate panic from the Carve extension panic probe"))
 }
 
+fn g_render_host(
+    source: String,
+    tree_json: Option<String>,
+    options_json: String,
+    renderer_names: RArray,
+    renderer_callbacks: RArray,
+    transform_callbacks: RArray,
+) -> Result<String, Error> {
+    guard(|| {
+        host::render_host(
+            source,
+            tree_json,
+            options_json,
+            renderer_names,
+            renderer_callbacks,
+            transform_callbacks,
+        )
+    })?
+}
+
 #[magnus::init(name = "carve")]
 fn init(ruby: &Ruby) -> Result<(), Error> {
     install_panic_hook();
@@ -71,6 +94,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     module.define_error("EnginePanic", ruby.exception_standard_error())?;
     module.define_singleton_method("_call_json", function!(g_call_json, 1))?;
     module.define_singleton_method("_parse_json", function!(g_parse_json, 1))?;
+    module.define_singleton_method("_render_host", function!(g_render_host, 6))?;
     module.define_singleton_method("_panic_probe", function!(g_panic_probe, 0))?;
     Ok(())
 }
