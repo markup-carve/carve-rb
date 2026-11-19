@@ -169,8 +169,9 @@ module Carve
       config[:symbols] = stringify(symbols) if symbols
       config[:profile] = profile.to_s if profile
       config[:urlPolicy] = stringify(url_policy) if url_policy
-      parsed = call("parseWithDiagnostics", source: source,
-                    options: { includes: config.fetch(:includes) })
+      parse_config = { includes: config.fetch(:includes) }
+      parse_config[:extensions] = config[:extensions] if config[:extensions]
+      parsed = call("parseWithDiagnostics", source: source, options: parse_config)
       tree = parsed.fetch("tree")
       if target.to_s == "html"
         rendered = call("renderWithDiagnostics", source: source, options: config)
