@@ -160,7 +160,6 @@ module Carve
     end
 
     def write(source, target:, **options)
-      reserved_writer!(target)
       tree = call("parse", source: source).fetch("tree")
       call("write", options: options, tree: tree, target: target.to_s).fetch("output")
     end
@@ -230,7 +229,6 @@ module Carve
         diagnostics = parsed.fetch("diagnostics")
         suppressed = parsed.fetch("suppressedDiagnostics")
       else
-        reserved_writer!(target)
         written = call("write", tree: tree, target: target.to_s)
         value = written.fetch("output")
         diagnostics = written.fetch("diagnostics")
@@ -286,12 +284,6 @@ module Carve
 
     # Standard extensions and their standard renderers travel as options;
     # a Ruby callable has no JSON form (C2-T-010).
-    def reserved_writer!(target)
-      return unless %w[markdown plain ansi].include?(target.to_s)
-      raise WriterUnavailable.new("name" => "CarveWriteError", "category" => "writer-refused",
-                                  "status" => 1, "message" => "#{target} writer not available yet through this binding")
-    end
-
     def extension_options(extensions, renderers)
       config = {}
       names = Array(extensions).map(&:to_s)

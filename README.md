@@ -12,7 +12,7 @@ Carve.lint("Text")
 
 Raw HTML is escaped by default. To enable it for trusted source, pass `raw_html: true`; `safe: true` keeps it escaped. URL policy stays with the engine.
 
-The source writer, HTML importer, and native extension host are available on this branch. Markdown, plain-text, and ANSI writers still depend on upstream engine work. See [the API reference](docs/reference.md) and [migration guide](docs/guide.md).
+The source writer, HTML importer, Markdown, plain-text, and ANSI writers, and native extension host are available on this branch. See [the API reference](docs/reference.md) and [migration guide](docs/guide.md).
 
 This branch is for integration testing. No 0.2 gem has been released.
 
