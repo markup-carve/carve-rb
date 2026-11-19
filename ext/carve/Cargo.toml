@@ -17,5 +17,6 @@ crate-type = ["cdylib"]
 # interop handles so this builds cleanly under rb_sys/mkmf for Ruby 3.2.
 magnus = { version = "0.8", features = ["rb-sys"] }
 rb-sys = "0.9"
-# The unreleased Carve 0.2 engine is pinned to one Git commit.
-carve2 = { git = "https://github.com/markup-carve/carve-rs", rev = "dd5f0e7ac90856c220c6a6afdc6b56dba8817844", package = "carve2" }
+# The unreleased Carve 0.2 engine (carve-lang, library `carve`) is pinned to
+# one Git commit; src/lib.rs names it `::carve` because this crate is also `carve`.
+carve = { git = "https://github.com/markup-carve/carve-rs", rev = "7fb7c24956298e78bc4716ff7e0e1fb96e60ecdf", package = "carve-lang" }

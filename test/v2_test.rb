@@ -5,7 +5,7 @@ require "carve"
 require "tmpdir"
 
 class CarveV2Test < Minitest::Test
-  def test_render_uses_carve2_json_boundary_c2_t_010
+  def test_render_uses_the_json_boundary_c2_t_010
     assert_equal "<p>Hi <strong>there</strong></p>", Carve.to_html("Hi *there*")
     assert_equal Carve.to_html("Hi"), Carve.call("render", source: "Hi").fetch("html")
   end
@@ -137,10 +137,15 @@ class CarveV2Test < Minitest::Test
     end
   end
 
-  def test_source_writer_is_reserved_carve_rs_4327
-    error = assert_raises(Carve::WriterUnavailable) { Carve.to_carve("Hi") }
-    assert_match(/carve writer not available yet/, error.message)
-    skip "carve-rs#4327: source writer registration pending"
+  def test_source_writer_c2_w_035
+    assert_equal "= Hi\n", Carve.to_carve("# Hi")
+    assert_equal "= Hi\n", Carve.call("format", source: "# Hi").fetch("source")
+  end
+
+  def test_source_writer_aligns_tables_on_request
+    source = "| a | longer |\n| b | c |\n"
+    assert_equal source, Carve.to_carve(source)
+    assert_equal "| a | longer |\n| b | c      |\n", Carve.to_carve(source, align_tables: true)
   end
 
   def test_include_writer_reaches_the_writer_registry_carve_rs_4327
@@ -153,7 +158,7 @@ class CarveV2Test < Minitest::Test
       end
       assert_match(/markdown writer not available yet/, error.message)
     end
-    skip "carve-rs#4327: include writer targets pending"
+    skip "carve-rs#4327, carve-rs#4349: Markdown include writer target pending"
   end
 
   def test_markdown_plain_and_ansi_writers_are_reserved_carve_rs_4327
@@ -161,20 +166,43 @@ class CarveV2Test < Minitest::Test
       error = assert_raises(Carve::WriterUnavailable) { Carve.public_send(name, "Hi") }
       assert_match(/writer not available yet/, error.message)
     end
-    skip "carve-rs#4327: Markdown, plain, and ANSI writer registrations pending"
+    skip "carve-rs#4327, carve-rs#4349: Markdown, plain, and ANSI writer registrations pending"
   end
 
-  def test_html_import_is_reserved_carve_rs_4328
-    assert_raises(Carve::EngineError) { Carve.from_html("<p>Hi</p>") }
-    skip "carve-rs#4328: HTML importDocument pending"
+  def test_html_import_c2_t_005
+    result = Carve.from_html("<p>Hello <strong>world</strong></p>")
+    assert_equal "Hello *world*\n", result.fetch("source")
+    assert_equal "document", result.fetch("tree").fetch("type")
+    assert_equal [], result.fetch("diagnostics")
   end
 
-  def test_extensions_are_reserved_carve_rs_4329
-    assert_raises(Carve::ExtensionUnavailable) { Carve.to_html("Hi", extensions: [:math_block]) }
+  def test_standard_extensions_c2_x_039
+    assert_includes Carve::EXTENSIONS, "carve.tabs"
+    source = "::: tabs\n::: tab {title=A}\nx\n:::\n:::\n"
+    expected = Carve.call("render", source: source,
+                          options: { extensions: ["carve.tabs"], renderers: { "carve.tabs" => "standard" } }).fetch("html")
+    assert_equal expected, Carve.to_html(source, extensions: ["carve.tabs"], renderers: { "carve.tabs" => :standard })
+    assert_equal "<p>Page</p>", Carve.to_html_with_extensions(":wiki[Page]", ["carve.wiki"])
+  end
+
+  def test_extension_refusals_c2_t_010
+    error = assert_raises(Carve::EngineError) { Carve.to_html("Hi", extensions: [:math_block]) }
+    assert_equal "CarveOptionError", error.name
     assert_raises(Carve::ExtensionUnavailable) do
-      Carve.to_html_full("Hi", [:math_block], :static, {})
+      Carve.to_html("Hi", extensions: ["carve.tabs"], renderers: { "carve.tabs" => ->(node) { node } })
     end
     assert_raises(Carve::ExtensionUnavailable) { Carve.register_extension({}) }
-    skip "carve-rs#4329: extension registration pending"
+    assert_raises(Carve::ExtensionUnavailable) { Carve.lint("Hi", extensions: ["carve.tabs"]) }
+  end
+
+  def test_unresolved_include_loss_names_its_file
+    Dir.mktmpdir("carve-rb-v2-") do |root|
+      page = File.join(root, "page.crv")
+      File.write(page, "{{ missing.crv }}")
+      result = Carve.to_html_with_includes("{{ missing.crv }}", root: root, source_path: page)
+      loss = result.fetch(:warnings).find { |row| row.fetch(:code) == "include-unresolved" }
+      skip "carve-rs#4351: include-unresolved names an empty path" if loss.fetch(:message) == 'Include "" could not be resolved.'
+      assert_equal 'Include "missing.crv" could not be resolved.', loss.fetch(:message)
+    end
   end
 end

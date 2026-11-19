@@ -1,6 +1,6 @@
 # Carve for Ruby
 
-The `next2` branch binds Ruby to the unreleased Carve 0.2 Rust engine. It pins a specific commit of `carve2` from `markup-carve/carve-rs`; it does not use a registry engine release.
+The `next2` branch binds Ruby to the unreleased Carve 0.2 Rust engine. It pins a specific commit of the `carve-lang` crate from the `next2` branch of `markup-carve/carve-rs`; it does not use a registry engine release.
 
 ```ruby
 require "carve"

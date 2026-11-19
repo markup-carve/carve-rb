@@ -28,8 +28,8 @@ module Carve
   class ExtensionUnavailable < ArgumentError; end
   class IncludeRegionError < ArgumentError; end
 
-  # The 0.2 extension host is provisional and has no registered entries yet.
-  EXTENSIONS = [].freeze
+  # The standard extensions the engine enables by name over JSON (C2-X-039).
+  EXTENSIONS = %w[carve.cite carve.imgFence.image carve.imgFence.img carve.tabs carve.wiki].freeze
   MODES = %i[interactive static].freeze
   RENDERER_KEYS = %i[mermaid chart graphviz math].freeze
 
@@ -84,8 +84,8 @@ module Carve
     def to_html(source, extensions: nil, mode: nil, renderers: nil, symbols: nil,
                 safe: nil, raw_html: false, url_policy: nil, profile: nil,
                 sections: true, **options)
-      require_extensions!(extensions, renderers)
       config = options.merge(rawHtml: raw_html && safe != true, sections: sections)
+      config.merge!(extension_options(extensions, renderers))
       config[:mode] = mode.to_s if mode
       config[:profile] = profile.to_s if profile
       config[:symbols] = stringify(symbols) if symbols
@@ -142,7 +142,9 @@ module Carve
     def lint(source, extensions: nil, root: nil, source_path: nil, rules: nil,
              platforms: nil, max_depth: nil, max_bytes: nil,
              max_resolver_calls: nil, max_warnings: nil, caption_hints: false)
-      require_extensions!(extensions)
+      unless Array(extensions).empty?
+        raise ExtensionUnavailable, "0.2 lint takes no extensions; its options are rules, platforms and includes (C2-W-109)"
+      end
       unsupported = { max_resolver_calls: max_resolver_calls, max_warnings: max_warnings,
                       caption_hints: caption_hints ? true : nil }.compact
       raise ArgumentError, "0.2 lint does not accept #{unsupported.keys.join(', ')}" unless unsupported.empty?
@@ -159,10 +161,10 @@ module Carve
                              url_policy: nil, profile: nil, sections: true,
                              max_depth: nil, max_bytes: nil,
                              max_resolver_calls: nil, max_warnings: nil)
-      require_extensions!(extensions, renderers)
       raise ArgumentError, "0.2 includes does not accept max_resolver_calls or max_warnings" if max_resolver_calls || max_warnings
       config = { includes: include_options(root, source_path, max_depth, max_bytes),
                  rawHtml: raw_html && safe != true, sections: sections }
+      config.merge!(extension_options(extensions, renderers))
       config[:mode] = mode.to_s if mode
       config[:symbols] = stringify(symbols) if symbols
       config[:profile] = profile.to_s if profile
@@ -203,7 +205,7 @@ module Carve
 
     def from_html(source, mode: :safe)
       raise ArgumentError, "HTML import modes were removed in Carve 0.2 (C2-M-008)" unless mode.to_s == "safe"
-      call("importDocument", source: source)
+      call("importDocument", source: source, from: "html")
     end
 
     def from_markdown(_source)
@@ -227,14 +229,26 @@ module Carve
     end
 
     def register_extension(_definition)
-      raise ExtensionUnavailable, "extension registration not available yet in carve2 (carve-rs#4329)"
+      raise ExtensionUnavailable, "host extensions take host code, which the JSON boundary has no form for (C2-T-010); " \
+                                  "select a standard extension with extensions: (#{EXTENSIONS.join(', ')})"
     end
 
     private
 
-    def require_extensions!(extensions, renderers = nil)
-      return if Array(extensions).empty? && (renderers.nil? || renderers.empty?)
-      raise ExtensionUnavailable, "extension registration not available yet in carve2 (carve-rs#4329)"
+    # Standard extensions and their standard renderers travel as options;
+    # a Ruby callable has no JSON form (C2-T-010).
+    def extension_options(extensions, renderers)
+      config = {}
+      names = Array(extensions).map(&:to_s)
+      config[:extensions] = names unless names.empty?
+      unless renderers.nil? || renderers.empty?
+        renderers.each do |name, renderer|
+          next if renderer.to_s == "standard" && (renderer.is_a?(String) || renderer.is_a?(Symbol))
+          raise ExtensionUnavailable, "renderers: #{name}: host renderers have no JSON form (C2-T-010); use \"standard\""
+        end
+        config[:renderers] = renderers.to_h { |name, renderer| [name.to_s, renderer.to_s] }
+      end
+      config
     end
 
     def include_options(root, source_path, max_depth, max_bytes)
