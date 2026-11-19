@@ -54,6 +54,12 @@ fn g_call_json(request: String) -> Result<String, Error> {
     guard(|| carve2::api::json::call(&request))
 }
 
+// The default parse response is already a JSON tree. Returning it directly
+// avoids the public JSON boundary's Tree::read and re-encoding passes.
+fn g_parse_json(source: String) -> Result<String, Error> {
+    guard(|| carve2::tree_json(&source, &carve2::Options::default()))
+}
+
 fn g_panic_probe() -> Result<String, Error> {
     guard(|| panic!("deliberate panic from the Carve extension panic probe"))
 }
@@ -64,6 +70,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     let module = ruby.define_module("Carve")?;
     module.define_error("EnginePanic", ruby.exception_standard_error())?;
     module.define_singleton_method("_call_json", function!(g_call_json, 1))?;
+    module.define_singleton_method("_parse_json", function!(g_parse_json, 1))?;
     module.define_singleton_method("_panic_probe", function!(g_panic_probe, 0))?;
     Ok(())
 }

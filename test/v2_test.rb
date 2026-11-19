@@ -40,6 +40,33 @@ class CarveV2Test < Minitest::Test
                .fetch(:children).first.key?(:pos)
   end
 
+  def test_parse_keeps_symbol_keys_and_engine_errors
+    tree = Carve.parse("# Title")
+    assert_equal "document", tree.fetch(:type)
+    assert_equal "heading", tree.fetch(:children).first.fetch(:type)
+    assert_equal "document", Carve.call("parse", source: "# Title").fetch("tree").fetch("type")
+
+    error = assert_raises(Carve::EngineError) { Carve.parse("Hi", unknown_option: true) }
+    assert_equal "CarveOptionError", error.name
+    assert_equal "usage", error.category
+    assert_equal 2, error.status
+  end
+
+  def test_default_parse_matches_the_public_tree_for_different_constructs
+    sources = [
+      "# Title\n\nA /paragraph/ with [link](/path).\n",
+      "- one\n- two\n",
+      "|= Name |= Qty |\n| Apple | 2 |\n",
+      "```ruby\nputs 1\n```\n",
+      "> A quote\n> with two lines\n",
+      "Text[^note]\n\n[^note]: A note\n"
+    ]
+    sources.each do |source|
+      public_tree = Carve.call("parse", source: source).fetch("tree")
+      assert_equal Carve.send(:symbolize, public_tree), Carve.parse(source)
+    end
+  end
+
   def test_html_target_uses_the_writer_registry_c2_t_005
     assert_equal "<p>Hi</p>", Carve.write("Hi", target: "html")
   end
