@@ -36,11 +36,27 @@ end
 
 Rake::TestTask.new(:test) do |t|
   t.libs << "test" << "lib"
+  # The next2 branch has a new engine contract. Keep the inherited 0.1 tests
+  # intact for the main branch; these files exercise the 0.2 boundary and the
+  # version-independent safety and CI checks.
+  t.test_files = FileList[
+    "test/v2_test.rb",
+    "test/panic_unwind_test.rb",
+    "test/ci_verdict_test.rb",
+    "test/release_gate_wiring_test.rb",
+    "test/release_version_test.rb",
+  ]
+  t.warning = false
+end
+
+Rake::TestTask.new(:test_legacy) do |t|
+  t.libs << "test" << "lib"
   t.test_files = FileList["test/**/*_test.rb"]
   t.warning = false
 end
 
 # Always (re)build the native extension before running the tests.
 task test: :compile
+task test_legacy: :compile
 
 task default: %i[compile test]

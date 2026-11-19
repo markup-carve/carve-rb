@@ -6,7 +6,7 @@ The `next2` branch binds Ruby to the unreleased Carve 0.2 Rust engine. It pins a
 require "carve"
 
 Carve.to_html("Hello *world*.")
-Carve.parse("# Title")
+Carve.parse("= Title")
 Carve.lint("Text")
 ```
 

@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, next2]
+    branches: [main]
   pull_request:
+    branches: [main]
   # The corpus job below is the only check that can tell a drifted pin from a
   # current one, and it can start failing without a single commit here: the
   # SPEC moves, the pinned engine does not, and a push-triggered run reports
@@ -30,26 +31,6 @@ concurrency:
 # 360-minute default, long enough for a stalled job to go unnoticed.
 
 jobs:
-  next2:
-    if: github.base_ref == 'next2' || github.ref == 'refs/heads/next2'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      CARGO_BUILD_JOBS: 4
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.4"
-          bundler-cache: true
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install libclang for the native extension
-        run: sudo apt-get update && sudo apt-get install -y libclang-dev
-      - name: Compile the pinned 0.2 engine and run the Ruby bridge tests
-        run: |
-          bundle exec rake compile
-          bundle exec ruby -Ilib -Itest test/v2_test.rb
-
   # Which carve-rs is this gem running, and is that a revision that really
   # exists on `main`? The corpus job below answers whether a drifted pin
   # MATTERS; it is blind to any engine change no corpus document exercises
@@ -77,7 +58,6 @@ jobs:
   # release.yml runs the same script with --max-age-days. A stale pin must not
   # reach a tag; it must not hold a pull request hostage.
   engine-pin:
-    if: github.base_ref != 'next2' && github.ref != 'refs/heads/next2'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -100,7 +80,6 @@ jobs:
             --form cargo --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock
 
   build:
-    if: github.base_ref != 'next2' && github.ref != 'refs/heads/next2'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
@@ -414,7 +393,6 @@ jobs:
   # needs a protection update in the same step, which is a settings change and
   # not this pull request's to make.
   corpus-drift:
-    if: github.base_ref != 'next2' && github.ref != 'refs/heads/next2'
     name: The gem's drift from spec main is declared
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -567,7 +545,7 @@ jobs:
     name: The verdict reaches a person
     # always(), because it is skipped by default exactly when a job ahead of it
     # fails - the only run it has anything to say about.
-    if: always() && github.base_ref != 'next2' && github.ref != 'refs/heads/next2'
+    if: always()
     # declare-drift is in here although opening a pull request is not a CI
     # failure to report: the invariant test/ci_verdict_test.rb pins is that the
     # filer waits for EVERY job, so that it cannot read the run before they

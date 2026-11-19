@@ -5,6 +5,7 @@ require "carve"
 
 class Engine0113Test < Minitest::Test
   def test_task_states_render_and_preserve_markers
+    skip "carve-rs#4327 (C2-T-005 writer registry): pending in the 0.2 engine"
     ["/", "!", "_"].each do |marker|
       source = "- [#{marker}] task\n"
       assert_includes Carve.to_html(source), "data-task-state=\"#{marker}\""

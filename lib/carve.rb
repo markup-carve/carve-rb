@@ -152,16 +152,26 @@ module Carve
       parsed = call("parseWithDiagnostics", source: source,
                     options: { includes: config.fetch(:includes) })
       tree = parsed.fetch("tree")
-      value = case target.to_s
-              when "html" then call("render", source: source, options: config).fetch("html")
-              when "ast" then symbolize(tree)
-              else call("write", tree: tree, target: target.to_s).fetch("output")
-              end
+      if target.to_s == "html"
+        rendered = call("renderWithDiagnostics", source: source, options: config)
+        value = rendered.fetch("html")
+        diagnostics = rendered.fetch("diagnostics")
+        suppressed = rendered.fetch("suppressedDiagnostics")
+      elsif target.to_s == "ast"
+        value = symbolize(tree)
+        diagnostics = parsed.fetch("diagnostics")
+        suppressed = parsed.fetch("suppressedDiagnostics")
+      else
+        written = call("write", tree: tree, target: target.to_s)
+        value = written.fetch("output")
+        diagnostics = written.fetch("diagnostics")
+        suppressed = 0
+      end
       file_id = Pathname.new(source_path.to_s).relative_path_from(Pathname.new(root.to_s)).to_s
       dependencies = call("includeDependencies", tree: tree, file: file_id).fetch("dependencies")
-      { value: value, warnings: symbolize(parsed.fetch("diagnostics")),
+      { value: value, warnings: symbolize(diagnostics),
         dependencies: symbolize(dependencies),
-        suppressedWarnings: parsed.fetch("suppressedDiagnostics") }
+        suppressedWarnings: suppressed }
     end
 
     def to_html_with_includes(source, root:, source_path:, **options)

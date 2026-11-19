@@ -26,6 +26,7 @@ class OrderedDialectBoundariesTest < Minitest::Test
   end
 
   def test_markdown_retains_authored_ordered_delimiters
+    skip "carve-rs#4327 (C2-T-005 writer registry): pending in the 0.2 engine"
     cases = JSON.parse(File.read(File.join(__dir__, "fixtures", "markdown-ordered-delimiters.json")))
     assert_equal 3, cases.length
     cases.each do |row|

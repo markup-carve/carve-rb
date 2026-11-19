@@ -18,9 +18,9 @@ fn install_panic_hook() {
         let previous = panic::take_hook();
         panic::set_hook(Box::new(move |info| {
             PANIC_LOCATION.with(|slot| {
-                *slot.borrow_mut() = info.location().map(|loc| {
-                    format!("{}:{}:{}", loc.file(), loc.line(), loc.column())
-                });
+                *slot.borrow_mut() = info
+                    .location()
+                    .map(|loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()));
             });
             previous(info);
         }));
@@ -50,11 +50,11 @@ fn guard<T>(f: impl FnOnce() -> T) -> Result<T, Error> {
     panic::catch_unwind(AssertUnwindSafe(f)).map_err(panic_error)
 }
 
-fn call_json(request: String) -> Result<String, Error> {
+fn g_call_json(request: String) -> Result<String, Error> {
     guard(|| carve2::api::json::call(&request))
 }
 
-fn panic_probe() -> Result<String, Error> {
+fn g_panic_probe() -> Result<String, Error> {
     guard(|| panic!("deliberate panic from the Carve extension panic probe"))
 }
 
@@ -63,7 +63,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     install_panic_hook();
     let module = ruby.define_module("Carve")?;
     module.define_error("EnginePanic", ruby.exception_standard_error())?;
-    module.define_singleton_method("_call_json", function!(call_json, 1))?;
-    module.define_singleton_method("_panic_probe", function!(panic_probe, 0))?;
+    module.define_singleton_method("_call_json", function!(g_call_json, 1))?;
+    module.define_singleton_method("_panic_probe", function!(g_panic_probe, 0))?;
     Ok(())
 }

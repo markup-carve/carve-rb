@@ -4,7 +4,7 @@ The native extension calls `carve2::api::json::call`. `Carve.call(name, source:,
 
 ```ruby
 Carve.call("render", source: "Hi *there*")
-Carve.call("parseWithDiagnostics", source: "# Title", positions: true)
+Carve.call("parseWithDiagnostics", source: "= Title", positions: true)
 Carve.call("encodeTree", tree: Carve.call("parse", source: "Text").fetch("tree"))
 ```
 
