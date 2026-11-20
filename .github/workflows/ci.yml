@@ -311,6 +311,7 @@ jobs:
           cat drift.log
 
       - uses: actions/upload-artifact@v7
+        if: ${{ github.head_ref != 'next2' && github.base_ref != 'next2' && github.ref_name != 'next2' }}
         with:
           name: drift-log
           path: drift.log
