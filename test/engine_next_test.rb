@@ -6,9 +6,9 @@ require "carve"
 
 # What the engine after 0.1.13 adds or changes, pinned through the binding.
 class EngineNextTest < Minitest::Test
-  def test_the_writer_moves_alignment_into_braces
-    skip "Carve 0.1 assertion uses a retired 0.2 API; see carve-rb#271"
-    assert_equal "|={>} A |= B |\n| x | y |\n", Carve.to_carve("|=> A |= B |\n| x | y |\n")
+  def test_writer_uses_02_cell_alignment_spelling
+    # C2-W-035 writes the 0.2 cell marker spelling.
+    assert_equal "|= > A |= B |\n| x | y |\n", Carve.to_carve("|=> A |= B |\n| x | y |\n")
   end
 
   def test_braced_alignment_renders
@@ -17,9 +17,9 @@ class EngineNextTest < Minitest::Test
     assert_includes html, "<td style=\"text-align: right;\">x</td>"
   end
 
-  def test_the_writer_spells_every_thematic_break_as_stars
-    skip "Carve 0.1 assertion uses a retired 0.2 API; see carve-rb#271"
-    assert_equal "a\n\n***\n\nb\n", Carve.to_carve("a\n\n---\n\nb\n")
+  def test_writer_keeps_02_thematic_break_spelling
+    # C2-W-035 keeps the 0.2 canonical thematic-break spelling.
+    assert_equal "a\n\n---\n\nb\n", Carve.to_carve("a\n\n---\n\nb\n")
   end
 
   def test_lint_reports_the_deprecated_spellings

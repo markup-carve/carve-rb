@@ -42,14 +42,13 @@ class IncludesTest < Minitest::Test
   end
 
   def test_an_extension_reaches_an_included_child
-    skip "Carve 0.1 assertion uses a retired 0.2 API; see carve-rb#271"
     with_book do |root, book|
-      write(root, "chapters/one.crv", "See [[Target]].")
+      write(root, "chapters/one.crv", "See :wiki[Target].")
       result = Carve.to_html_with_includes(
         "{{ chapters/one.crv }}", root: root, source_path: book,
-        extensions: [:wikilinks]
+        extensions: ["carve.wiki"]
       )
-      assert_includes result[:value], "<a "
+      assert_includes result[:value], "See Target."
     end
   end
 
@@ -103,13 +102,10 @@ class IncludesTest < Minitest::Test
     end
   end
 
-  def test_the_carve_target_is_refused
-    skip "Carve 0.1 assertion uses a retired 0.2 API; see carve-rb#271"
+  def test_the_carve_target_writes_source
     with_book do |root, book|
-      error = assert_raises(ArgumentError) do
-        Carve.render_with_includes("Text.", root: root, source_path: book, target: "carve")
-      end
-      assert_includes error.message, "Unknown Carve include target"
+      result = Carve.render_with_includes("Text.", root: root, source_path: book, target: "carve")
+      assert_equal "Text.\n", result[:value]
     end
   end
 
