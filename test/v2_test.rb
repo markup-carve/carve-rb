@@ -181,6 +181,16 @@ class CarveV2Test < Minitest::Test
     assert_equal "<p>Page</p>", Carve.to_html_with_extensions(":wiki[Page]", ["carve.wiki"])
   end
 
+  def test_every_listed_standard_extension_enables
+    Carve::EXTENSIONS.each { |name| Carve.to_html("Hi", extensions: [name]) }
+    html = Carve.to_html("::: details\nBody\n:::\n", extensions: ["carve.details"],
+                                                     renderers: { "carve.details" => :standard })
+    assert_includes html, "<details>"
+    assert_raises(Carve::ExtensionUnavailable) do
+      Carve.to_html("Hi", extensions: ["carve.mathBlock"], renderers: { "carve.mathBlock" => ->(node) { node } })
+    end
+  end
+
   def test_include_parse_reads_the_selected_extensions
     Dir.mktmpdir("carve-rb-v2-") do |root|
       page = File.join(root, "page.crv")
