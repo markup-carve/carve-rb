@@ -2,7 +2,7 @@
 name = "carve-rb"
 version = "0.1.14"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.88"
 publish = false
 license = "MIT"
 description = "Native Ruby binding (magnus + rb-sys) for the Carve markup language, over the carve-rs engine."
@@ -19,6 +19,6 @@ magnus = { version = "0.8", features = ["rb-sys"] }
 rb-sys = "0.9"
 # The unreleased Carve 0.2 engine (carve-lang, library `carve`) is pinned to
 # one Git commit; src/lib.rs names it `::carve` because this crate is also `carve`.
-carve = { git = "https://github.com/markup-carve/carve-rs", rev = "e757891ff1613d046bb693d78286ce44dbc566b4", package = "carve-lang" }
+carve = { git = "https://github.com/markup-carve/carve-rs", rev = "e2aaf1d212efecb2940703a59055a54c2e28f591", package = "carve-lang" }
 
 serde_json = "1"

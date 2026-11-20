@@ -7,6 +7,28 @@ on:
     branches: [next2]
 
 jobs:
+  msrv:
+    name: Build on Rust 1.88
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.88.0
+      - name: Install libclang for the native extension
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ext/carve
+      - name: Check on the declared MSRV
+        run: cargo +1.88.0 check --locked --manifest-path ext/carve/Cargo.toml
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
