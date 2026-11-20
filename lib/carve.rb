@@ -30,6 +30,7 @@ module Carve
 
   # The standard extensions the engine enables by name over JSON (C2-X-039).
   EXTENSIONS = %w[
+    carve.autolink carve.externalLinks carve.headingLevelShift carve.headingNumbers carve.headingPermalinks carve.headingReference carve.linkPolicy carve.toc carve.tocPlacement
     carve.cite carve.codeCallouts carve.codeGroup carve.colorSwatch carve.details
     carve.fencedRender.abc carve.fencedRender.chart carve.fencedRender.d2 carve.fencedRender.graphviz
     carve.fencedRender.mermaid carve.fencedRender.plantuml carve.fencedRender.vega-lite carve.fencedRender.wavedrom
