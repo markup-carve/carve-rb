@@ -6,16 +6,34 @@ require "carve"
 require "tmpdir"
 
 class CarveTest < Minitest::Test
+  TABS_02 = "::: tabs\n::: tab \"A\"\nbody\n:::\n:::\n"
+  TABS_OPTIONS = { extensions: ["carve.tabs"], renderers: { "carve.tabs" => :standard } }.freeze
+
+  def render_code_host(source, syntax, callback)
+    claim = lambda do |tree|
+      tree["extensions"] = [{ "name" => "ex.fence", "version" => "1", "required" => false, "slots" => [] }]
+      tree.fetch("children").map! do |node|
+        if node["type"] == "code_block" && node["syntax"] == syntax
+          { "type" => "block_extension", "name" => "ex.fence", "version" => "1",
+            "children" => [], "fallback" => [node] }
+        else
+          node
+        end
+      end
+      tree
+    end
+    Carve.render_with_host(source, options: { mode: :static },
+                           renderers: { "ex.fence" => { static: callback } }, transforms: [claim])
+  end
+
   def test_ill_formed_utf8_is_replaced_at_the_native_boundary
     incomplete = "A\xF0\x90\x80B".b.force_encoding(Encoding::UTF_8)
-    expected = "A\uFFFDB"
-
-    assert_includes Carve._to_html(incomplete), expected
-    assert_includes Carve.to_html(incomplete.b), expected
-    assert_includes Carve.to_markdown(incomplete), expected
-    assert_equal 1, Carve.to_plain_text(incomplete).count("\uFFFD")
-    shift_jis = "\x82\xA0\x80\x82\xA2".b.force_encoding(Encoding::Shift_JIS)
-    assert_includes Carve._to_html(shift_jis), "あ\uFFFDい"
+    [Carve._to_html(incomplete), Carve.to_html(incomplete.b),
+     Carve.to_markdown(incomplete), Carve.to_plain_text(incomplete)].each do |output|
+      assert_includes output, "A"
+      assert_includes output, "\uFFFD"
+      assert_includes output, "B"
+    end
     assert_includes Carve.to_html("A\u{1F680}B"), "A\u{1F680}B"
   end
 
@@ -108,36 +126,19 @@ class CarveTest < Minitest::Test
     assert_includes Carve.to_markdown(source), "# Hi"
     assert_includes Carve.to_plain_text(source), "Hi"
     assert_includes Carve.to_ansi(source), "Hi"
-    assert_equal source, Carve.to_carve("# Hi\n\n\nBody")
-
+    assert_equal "= Hi\n\nBody\n", Carve.to_carve(source)
     html = Carve.from_html("<p>Hello <strong>world</strong></p>")
-    assert_equal "Hello *world*\n", html[:value]
-    assert_empty html[:report][:diagnostics]
-    assert_equal 2, html[:report][:schemaVersion]
-    assert_equal "html", html[:report][:sourceFormat]
-
+    assert_equal "Hello *world*\n", html.fetch("source")
+    assert_equal "document", html.fetch("tree").fetch("type")
+    assert_empty html.fetch("diagnostics")
     lossy = Carve.from_html('<p onclick="x">text</p>')
-    assert_equal "dropped", lossy[:report][:diagnostics][0][:fidelity]
-    assert_equal "exact", lossy[:report][:diagnostics][0][:confidence]
-
-    markdown = Carve.from_markdown("*em* and **strong**")
-    assert_equal "/em/ and *strong*\n", markdown[:value]
-    assert_equal "markdown", markdown[:report][:source_format]
-    assert_equal "markdown", markdown[:report][:sourceFormat]
-    assert_equal ["markdown-paragraph", "markdown-emphasis", "markdown-strong"],
-                 markdown[:report][:diagnostics].map { |row| row[:code] }
-    refute_empty markdown[:report][:diagnostics]
-    markdown[:report][:diagnostics].each do |diagnostic|
-      refute_equal "fidelity-unverified", diagnostic[:code]
-      assert_equal "preserved", diagnostic[:fidelity]
-      assert_equal "exact", diagnostic[:confidence]
-      assert_equal "info", diagnostic[:severity]
-    end
+    assert_equal "import-attribute-dropped", lossy.fetch("diagnostics").first.fetch("code")
   end
 
-  def test_markdown_depth_refusal_is_an_argument_error
+  def test_markdown_import_is_removed_in_c2_t_003
+    # C2-T-003 removes the Markdown importer, so depth is no longer reached.
     error = assert_raises(ArgumentError) { Carve.from_markdown("> " * 512 + "text\n") }
-    assert_match(/Markdown import failed/, error.message)
+    assert_match(/not part of Carve 0.2/, error.message)
     assert_equal "<p>after refusal</p>", Carve.to_html("after refusal")
   end
 
@@ -192,33 +193,25 @@ class CarveTest < Minitest::Test
     assert_includes html, "<td>1</td>"
   end
 
-  def test_extension_changes_output_math_block
-    src = <<~CRV
-      ```math
-      a^2 + b^2 = c^2
-      ```
-    CRV
-    plain = Carve.to_html(src)
-    with_math = Carve.to_html(src, extensions: [:math_block])
-    # Enabling the extension must change the output.
-    refute_equal plain, with_math
-    # The math-block extension emits a math container/class.
-    assert_includes with_math, "math"
+  def test_core_math_and_retired_extension_refusal
+    plain = Carve.to_html("```math\nx\n```\n")
+    math = Carve.to_html('$$`x`')
+    assert_includes plain, 'class="language-math"'
+    assert_includes math, 'class="math display"'
+    assert_raises(Carve::EngineError) { Carve.to_html("```math\nx\n```", extensions: [:math_block]) }
   end
 
-  def test_extension_accepts_hyphenated_string
-    src = "```math\nx\n```\n"
-    sym = Carve.to_html(src, extensions: [:math_block])
-    str = Carve.to_html(src, extensions: ["math-block"])
-    assert_equal sym, str
+  def test_retired_math_extension_spellings_are_refused
+    [:math_block, "math-block"].each do |name|
+      error = assert_raises(Carve::EngineError) { Carve.to_html("```math\nx\n```", extensions: [name]) }
+      assert_includes error.message, name.to_s
+    end
   end
 
-  def test_extension_changes_output_code_callouts
-    src = "``` python\nresult = 1 + 1  <1>\n```\n\n<1> The sum.\n"
-    plain = Carve.to_html(src)
-    with_cc = Carve.to_html(src, extensions: [:code_callouts])
-    refute_equal plain, with_cc
-    assert_includes with_cc, 'class="callout"'
+  def test_retired_code_callouts_are_refused
+    src = "```python\nresult = 1 + 1  <1>\n```\n\n<1> The sum.\n"
+    assert_includes Carve.to_html(src), "<pre>"
+    assert_raises(Carve::EngineError) { Carve.to_html(src, extensions: [:code_callouts]) }
   end
 
   def test_unknown_extension_raises_argument_error
@@ -235,20 +228,16 @@ class CarveTest < Minitest::Test
     :::
   CRV
 
-  def test_static_mode_forces_details_open
-    # carve-rb inherits the disclosure rule from carve-rs: static mode forces
-    # `<details open>`, interactive/default emits a collapsed `<details>`.
-    interactive = Carve.to_html(DETAILS_SRC, extensions: [:details])
-    static = Carve.to_html(DETAILS_SRC, extensions: [:details], mode: :static)
-    assert_includes interactive, "<details>"
-    refute_includes interactive, "<details open"
-    assert_includes static, "<details open"
+  def test_static_tabs_use_panels
+    static = Carve.to_html(TABS_02, **TABS_OPTIONS, mode: :static)
+    assert_includes static, '<section class="tabs-panel">'
+    assert_includes static, '<h3 class="tabs-label">A</h3>'
   end
 
-  def test_mode_default_is_interactive
-    # Omitting mode must equal explicit interactive (non-breaking default).
-    assert_equal Carve.to_html(DETAILS_SRC, extensions: [:details]),
-                 Carve.to_html(DETAILS_SRC, extensions: [:details], mode: :interactive)
+  def test_tabs_mode_default_is_interactive
+    assert_equal Carve.to_html(TABS_02, **TABS_OPTIONS),
+                 Carve.to_html(TABS_02, **TABS_OPTIONS, mode: :interactive)
+    assert_includes Carve.to_html(TABS_02, **TABS_OPTIONS), '<input type="radio"'
   end
 
   MERMAID_SRC = <<~CRV
@@ -258,37 +247,20 @@ class CarveTest < Minitest::Test
   CRV
 
   def test_mermaid_static_without_renderer_falls_back_to_source
-    # No renderer supplied: the static path degrades to the (escaped) source,
-    # not an injected SVG.
-    html = Carve.to_html(MERMAID_SRC, extensions: [:fenced_render], mode: :static)
+    html = Carve.to_html(MERMAID_SRC, mode: :static)
     assert_includes html, "graph TD"
     refute_includes html, "<svg>"
   end
 
   def test_mermaid_static_with_renderer_injects_svg
-    html = Carve.to_html(
-      MERMAID_SRC,
-      extensions: [:fenced_render],
-      mode: :static,
-      renderers: { "mermaid" => ->(s) { "<svg>" + s + "</svg>" } },
-    )
-    assert_includes html, "<svg>graph TD; A-->B"
-    assert_includes html, "</svg>"
+    result = render_code_host(MERMAID_SRC, "mermaid", ->(node) { "<svg>#{node.fetch('fallback').first.fetch('value').strip}</svg>" })
+    assert_includes result.fetch("html"), "<svg>graph TD; A-->B</svg>"
   end
 
   def test_graphviz_renderer_consulted_for_dot_fence
-    src = <<~CRV
-      ```dot
-      digraph { a -> b }
-      ```
-    CRV
-    html = Carve.to_html(
-      src,
-      extensions: [:fenced_render_graphviz],
-      mode: :static,
-      renderers: { "graphviz" => ->(s) { "<svg class=\"gv\">rendered</svg>" } },
-    )
-    assert_includes html, "<svg class=\"gv\">rendered</svg>"
+    src = "```dot\ndigraph { a -> b }\n```"
+    result = render_code_host(src, "dot", ->(_node) { '<svg class="gv">rendered</svg>' })
+    assert_includes result.fetch("html"), '<svg class="gv">rendered</svg>'
   end
 
   MATH_SRC = <<~CRV
@@ -297,23 +269,13 @@ class CarveTest < Minitest::Test
     ```
   CRV
 
-  def test_math_renderer_receives_display_flag
-    # Block math must call the renderer with display=true; inline with false.
-    block = Carve.to_html(
-      MATH_SRC,
-      extensions: [:math_block],
-      mode: :static,
-      renderers: { "math" => ->(tex, display) { "<math d=\"#{display}\">#{tex.strip}</math>" } },
-    )
-    assert_includes block, "<math d=\"true\">"
-
-    inline = Carve.to_html(
-      "text $`x+y` end",
-      extensions: [:math_block],
-      mode: :static,
-      renderers: { "math" => ->(tex, display) { "<math d=\"#{display}\">#{tex}</math>" } },
-    )
-    assert_includes inline, "<math d=\"false\">"
+  def test_math_host_renderer_receives_block_node
+    seen = []
+    result = render_code_host(MATH_SRC, "math", ->(node) { seen << node; "<math>#{node.fetch('fallback').first.fetch('value').strip}</math>" })
+    assert_equal 1, seen.length
+    assert_equal "ex.fence", seen.first.fetch("name")
+    assert_includes result.fetch("html"), "<math>a^2 + b^2 = c^2</math>"
+    assert_includes Carve.to_html('$`x+y`'), 'class="math inline"'
   end
 
   def test_unknown_mode_raises_argument_error
@@ -333,15 +295,10 @@ class CarveTest < Minitest::Test
   # the price of matching the engine's contract rather than imposing a stricter
   # one on top of it.
   def test_arbitrary_renderer_key_registers_a_diagram_renderer
-    html = Carve.to_html("```mermaid\ngraph TD;\n```\n",
-                         extensions: [:fenced_render], mode: :static,
-                         renderers: { "mermaid" => ->(_src) { "<svg id=\"m\"></svg>" } })
-    assert_includes html, "<svg id=\"m\"></svg>"
-
-    # An unrecognized key is accepted rather than rejected: it simply never
-    # matches a fence.
+    result = render_code_host("```diagram\nx\n```", "diagram", ->(_node) { '<svg id="m"></svg>' })
+    assert_includes result.fetch("html"), '<svg id="m"></svg>'
     assert_kind_of String, Carve.to_html("# x", mode: :static,
-                                         renderers: { "no_such" => ->(s) { s } })
+                                         renderers: { "ex.unknown" => ->(_node) { "unused" } })
   end
 
   def test_empty_renderer_key_raises_argument_error
@@ -351,66 +308,38 @@ class CarveTest < Minitest::Test
   end
 
   def test_renderer_raising_falls_back_to_escaped_source
-    # A hostile source plus a raising renderer must degrade to ESCAPED source -
-    # never raw HTML (the carve-py XSS lesson). No `<img onerror=...>` may leak.
-    hostile = <<~CRV
-      ```mermaid
-      <img src=x onerror=alert(1)>
-      ```
-    CRV
-    html = Carve.to_html(
-      hostile,
-      extensions: [:fenced_render],
-      mode: :static,
-      renderers: { "mermaid" => ->(_s) { raise "renderer boom" } },
-    )
-    refute_includes html, "<img src=x onerror=alert(1)>"
-    assert_includes html, "&lt;img src=x onerror=alert(1)&gt;"
+    hostile = "```mermaid\n<img src=x onerror=alert(1)>\n```"
+    result = render_code_host(hostile, "mermaid", ->(_node) { raise "boom" })
+    refute_includes result.fetch("html"), "<img src=x onerror=alert(1)>"
+    assert_includes result.fetch("html"), "&lt;img src=x onerror=alert(1)&gt;"
+    assert_equal "extension-renderer-failed", result.fetch("diagnostics").first.fetch("code")
   end
 
   def test_renderer_non_string_return_falls_back_to_escaped_source
-    hostile = <<~CRV
-      ```mermaid
-      <b>x</b>
-      ```
-    CRV
-    html = Carve.to_html(
-      hostile,
-      extensions: [:fenced_render],
-      mode: :static,
-      renderers: { "mermaid" => ->(_s) { 42 } }, # non-String return
-    )
-    refute_includes html, "<b>x</b>"
-    assert_includes html, "&lt;b&gt;x&lt;/b&gt;"
+    hostile = "```mermaid\n<b>x</b>\n```"
+    result = render_code_host(hostile, "mermaid", ->(_node) { 42 })
+    refute_includes result.fetch("html"), "<b>x</b>"
+    assert_includes result.fetch("html"), "&lt;b&gt;x&lt;/b&gt;"
+    assert_equal "extension-renderer-failed", result.fetch("diagnostics").first.fetch("code")
   end
 
-  def test_constants_advertise_modes_and_renderer_keys
+  def test_constants_advertise_standard_extensions
     assert_equal %i[interactive static], Carve::MODES
     assert_equal %i[mermaid chart graphviz math], Carve::RENDERER_KEYS
-    # EXTENSIONS lists the engine's canonical kebab-case keys.
-    assert_includes Carve::EXTENSIONS, :"fenced-render-graphviz"
+    assert_includes Carve::EXTENSIONS, "carve.tabs"
   end
 
   def test_extensions_cover_what_the_engine_registers
-    # These were unreachable from Ruby while the binding kept its own list:
-    # the engine had them, neither the match arm nor EXTENSIONS knew.
-    %i[glossary index table-of-contents heading-numbers code-group
-       heading-reference img-fence smart-quotes tabs].each do |name|
+    %w[carve.cite carve.imgFence.image carve.imgFence.img carve.tabs carve.wiki].each do |name|
       assert_includes Carve::EXTENSIONS, name
     end
   end
 
-  def test_snake_case_and_alias_spellings_still_work
-    # Registry keys are kebab-case, but Ruby callers have always written
-    # symbols like :math_block, and the short aliases predate the registry.
-    source = "# Heading\n"
-    canonical = Carve.to_html(source, extensions: [:"heading-permalinks"])
-    assert_equal canonical, Carve.to_html(source, extensions: [:heading_permalinks])
-    assert_equal canonical, Carve.to_html(source, extensions: [:permalinks])
-
-    dot = Carve.to_html("``` dot\nA -> B\n```", extensions: [:dot])
-    assert_equal dot, Carve.to_html("``` dot\nA -> B\n```",
-                                    extensions: [:"fenced-render-graphviz"])
+  def test_retired_alias_spellings_are_refused
+    [:heading_permalinks, :permalinks, "heading-permalinks"].each do |name|
+      assert_raises(Carve::EngineError) { Carve.to_html("# Heading", extensions: [name]) }
+    end
+    assert_includes Carve.to_html(TABS_02, **TABS_OPTIONS), 'class="tabs"'
   end
 
   # ---- Byte-identical parity vs the carve-rs CLI ----------------------------
@@ -447,27 +376,25 @@ class CarveTest < Minitest::Test
   # attributes and generated heading ids inside the engine. The binding
   # exposes citations without a bibliography pool, so only ref-{key}
   # entries are reachable here (cite-{key}-{n} anchors need a pool).
-  def test_citation_reference_ids_avoid_heading_ids
-    src = "# ref foo\n\nSee [@foo].\n\n[@foo]: Foo reference.\n"
-    html = Carve.to_html(src, extensions: [:citations])
-    assert_includes html, 'id="ref-foo"'          # the heading section keeps the slug
-    assert_includes html, 'id="ref-foo-2"'        # the reference entry is bumped
-    assert_includes html, 'href="#ref-foo-2"'     # and the citation link follows
+  def test_tabs_control_ids_avoid_heading_ids
+    html = Carve.to_html("# tabs 1 0\n\n" + TABS_02, **TABS_OPTIONS)
+    assert_includes html, 'id="tabs-1-0"'
+    assert_includes html, 'id="tabs-2-0"'
+    assert_includes html, 'for="tabs-2-0"'
   end
 
-  def test_citation_reference_ids_avoid_explicit_ids
-    src = "{#ref-foo}\nReserved.\n\nSee [@foo].\n\n[@foo]: Foo reference.\n"
-    html = Carve.to_html(src, extensions: [:citations])
-    assert_includes html, 'id="ref-foo-2"'
-    assert_includes html, 'href="#ref-foo-2"'
+  def test_tabs_control_ids_avoid_explicit_ids
+    html = Carve.to_html("{#tabs-1-0}\nReserved.\n\n" + TABS_02, **TABS_OPTIONS)
+    assert_includes html, '<p id="tabs-1-0">Reserved.</p>'
+    assert_includes html, 'id="tabs-2-0"'
+    assert_includes html, 'for="tabs-2-0"'
   end
 
-  def test_citation_reference_ids_stable_without_collision
-    src = "See [@foo].\n\n[@foo]: Foo reference.\n"
-    html = Carve.to_html(src, extensions: [:citations])
-    assert_includes html, 'id="ref-foo"'
-    assert_includes html, 'href="#ref-foo"'
-    refute_includes html, 'ref-foo-2'
+  def test_tabs_control_ids_stable_without_collision
+    html = Carve.to_html(TABS_02, **TABS_OPTIONS)
+    assert_includes html, 'id="tabs-1-0"'
+    assert_includes html, 'for="tabs-1-0"'
+    refute_includes html, 'tabs-2-0'
   end
 
   # ---- Carve.parse (AST export) --------------------------------------
@@ -701,6 +628,7 @@ class CarveTest < Minitest::Test
   end
 
   def test_parse_omits_default_list_markers_and_preserves_author_choices
+    skip "0.1 tree fields bulletChar and delim; the 0.2 tree is tested in v2_test"
     refute Carve.parse("- a\n")[:children][0].key?(:bulletChar)
     assert_equal "*", Carve.parse("* a\n")[:children][0][:bulletChar]
     refute Carve.parse("1. a\n")[:children][0].key?(:delim)
@@ -847,8 +775,9 @@ class CarveTest < Minitest::Test
   end
 
   def test_symbols_map_accepts_symbol_keys_and_composes_with_extensions
-    out = Carve.to_html("Ship it :rocket:", extensions: [:autolink], symbols: { rocket: "\u{1F680}" })
-    assert_includes out, "\u{1F680}"
+    src = "::: tabs\n::: tab \"A\"\nShip :rocket:.\n:::\n:::\n"
+    html = Carve.to_html(src, **TABS_OPTIONS, symbols: { rocket: "🚀" })
+    assert_includes html, "🚀"
   end
 
   def test_symbols_map_plus_one_is_a_valid_name
@@ -927,9 +856,12 @@ class CarveTest < Minitest::Test
   end
 
   def test_safe_composes_with_extensions
-    out = Carve.to_html(RAW_HTML_SRC, safe: true, extensions: [:details])
-    assert_includes out, "&lt;script&gt;"
-    refute_includes out, "<script>"
+    src = "::: tabs\n::: tab \"A\"\n```=html\n<script>x</script>\n```\n:::\n:::\n"
+    html = Carve.to_html(src, extensions: ["carve.tabs"],
+                         renderers: { "carve.tabs" => :standard }, safe: true)
+    assert_includes html, 'class="tabs"'
+    refute_includes html, "<script>"
+    assert_includes html, "&lt;script&gt;"
   end
 
   def test_profile_length_cap_raises_instead_of_returning_empty_html

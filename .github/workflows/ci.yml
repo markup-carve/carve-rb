@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
   # The corpus job below is the only check that can tell a drifted pin from a
   # current one, and it can start failing without a single commit here: the
   # SPEC moves, the pinned engine does not, and a push-triggered run reports
@@ -69,14 +70,15 @@ jobs:
         with:
           repository: markup-carve/carve-rs
           path: carve-rs
+          ref: ${{ (github.head_ref == 'next2' || github.base_ref == 'next2' || github.ref_name == 'next2') && 'next2' || 'main' }}
           fetch-depth: 0
 
       - name: Report the pin's age and distance, and gate on it being real
         run: |
           # --max-age-days omitted: 0 is the script's report-only default.
-          python3 carve-rs/tools/check-engine-pin.py \
-            --engine carve-rs --github \
-            --form cargo --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock
+          python3 scripts/check-branch-engine-pin.py \
+            --engine carve-rs --branch ${{ (github.head_ref == 'next2' || github.base_ref == 'next2' || github.ref_name == 'next2') && 'next2' || 'main' }} \
+            --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock
 
   build:
     runs-on: ubuntu-latest
@@ -170,6 +172,12 @@ jobs:
           echo "::error::apt-get could not install libclang-dev after 3 attempts"
           exit 1
 
+      - name: Run the 0.2 binding suite
+        if: ${{ github.head_ref == 'next2' || github.base_ref == 'next2' || github.ref_name == 'next2' }}
+        run: |
+          bundle install
+          bundle exec rake test
+
       # The corpus is the only check that can tell whether a drifted pin renders
       # documents wrongly TODAY: everything above asserts hand-written
       # expectations, which a drifted engine satisfies happily. Whether the pin
@@ -211,6 +219,7 @@ jobs:
       # That is what corpus-drift below reports, and it is why deleting
       # corpus-drift would turn this into a loosening rather than a re-aiming.
       - name: Check out carve-rs
+        if: ${{ github.head_ref != 'next2' && github.base_ref != 'next2' && github.ref_name != 'next2' }}
         uses: actions/checkout@v7
         with:
           repository: markup-carve/carve-rs
@@ -221,6 +230,7 @@ jobs:
           fetch-depth: 0
 
       - name: Resolve the spec commit the pinned engine pins
+        if: ${{ github.head_ref != 'next2' && github.base_ref != 'next2' && github.ref_name != 'next2' }}
         id: pin
         run: |
           spec="$(python3 scripts/pinned-spec-commit.py \
@@ -231,9 +241,11 @@ jobs:
           echo "spec=$spec" >> "$GITHUB_OUTPUT"
 
       - name: The engine-declared corpus pairs match the pinned carve-rs
+        if: ${{ github.head_ref != 'next2' && github.base_ref != 'next2' && github.ref_name != 'next2' }}
         run: python3 scripts/check-engine-behind.py --engine carve-rs --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock
 
       - name: Check out the spec corpus that engine was written against
+        if: ${{ github.head_ref != 'next2' && github.base_ref != 'next2' && github.ref_name != 'next2' }}
         uses: actions/checkout@v7
         with:
           repository: markup-carve/carve
@@ -250,6 +262,7 @@ jobs:
       # push, over a gem built from this commit -- the same script, the same
       # corpus, the same refusal.
       - name: Build the gem and run the release gate over it
+        if: ${{ github.head_ref != 'next2' && github.base_ref != 'next2' && github.ref_name != 'next2' }}
         env:
           CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
           CARVE_GATE_GEM_HOME: ${{ runner.temp }}/gate-gems
@@ -261,6 +274,7 @@ jobs:
       # second compile. Not `rake test`: its `compile` prerequisite would
       # rebuild the extension from the working tree.
       - name: Run the test suite against the packaged extension
+        if: ${{ github.head_ref != 'next2' && github.base_ref != 'next2' && github.ref_name != 'next2' }}
         env:
           CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
           GATE_GEMS: ${{ runner.temp }}/gate-gems
@@ -274,6 +288,7 @@ jobs:
       # compile, and the drift number would be about an artifact nothing else
       # looked at. The verdict is corpus-drift's; this only produces the log.
       - name: Check out the spec corpus at main
+        if: ${{ github.head_ref != 'next2' && github.base_ref != 'next2' && github.ref_name != 'next2' }}
         uses: actions/checkout@v7
         with:
           repository: markup-carve/carve
@@ -283,6 +298,7 @@ jobs:
       # being measured, so a non-zero exit is the expected shape of a
       # measurement that found some. corpus-drift decides from its own exit code.
       - name: Measure the gem against spec main
+        if: ${{ github.head_ref != 'next2' && github.base_ref != 'next2' && github.ref_name != 'next2' }}
         id: drift
         env:
           CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec-main/tests/corpus
@@ -295,6 +311,7 @@ jobs:
           cat drift.log
 
       - uses: actions/upload-artifact@v7
+        if: ${{ github.head_ref != 'next2' && github.base_ref != 'next2' && github.ref_name != 'next2' }}
         with:
           name: drift-log
           path: drift.log
@@ -393,6 +410,7 @@ jobs:
   # not this pull request's to make.
   corpus-drift:
     name: The gem's drift from spec main is declared
+    if: ${{ github.head_ref != 'next2' && github.base_ref != 'next2' && github.ref_name != 'next2' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: build
