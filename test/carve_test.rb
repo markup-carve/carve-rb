@@ -856,8 +856,10 @@ class CarveTest < Minitest::Test
   end
 
   def test_safe_composes_with_extensions
-    src = "```=html\n<script>x</script>\n```"
-    html = Carve.to_html(src, extensions: ["carve.tabs"], safe: true)
+    src = "::: tabs\n::: tab \"A\"\n```=html\n<script>x</script>\n```\n:::\n:::\n"
+    html = Carve.to_html(src, extensions: ["carve.tabs"],
+                         renderers: { "carve.tabs" => :standard }, safe: true)
+    assert_includes html, 'class="tabs"'
     refute_includes html, "<script>"
     assert_includes html, "&lt;script&gt;"
   end

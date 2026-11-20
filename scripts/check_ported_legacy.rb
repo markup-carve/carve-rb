@@ -49,3 +49,15 @@ names = ported.values.flatten
 abort "expected 30 ported checks" unless names.length == 30
 ARGV.replace(["--name", "/^(?:#{names.join('|')})$/"])
 ported.each_key { |file| require File.expand_path("../#{file}", __dir__) }
+
+classes = {
+  "test/carve_test.rb" => CarveTest,
+  "test/engine_next_test.rb" => EngineNextTest,
+  "test/glossary_ids_test.rb" => GlossaryIdsTest,
+  "test/includes_test.rb" => IncludesTest,
+  "test/ordered_dialect_boundaries_test.rb" => OrderedDialectBoundariesTest,
+}
+ported.each do |file, methods|
+  missing = methods - classes.fetch(file).instance_methods(false).map(&:to_s)
+  abort "ported checks missing from #{file}: #{missing.join(', ')}" unless missing.empty?
+end
