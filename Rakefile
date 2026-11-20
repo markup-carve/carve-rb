@@ -60,4 +60,11 @@ end
 task test: :compile
 task test_legacy: :compile
 
+# The remaining 0.1 fixtures are still outside the 0.2 suite, but the 30
+# assertions migrated to the 0.2 API run on every next2 CI build.
+task :test_ported do
+  sh "ruby -Ilib -Itest scripts/check_ported_legacy.rb"
+end
+task test: :test_ported
+
 task default: %i[compile test]
