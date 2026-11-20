@@ -29,7 +29,14 @@ module Carve
   class IncludeRegionError < ArgumentError; end
 
   # The standard extensions the engine enables by name over JSON (C2-X-039).
-  EXTENSIONS = %w[carve.cite carve.imgFence.image carve.imgFence.img carve.tabs carve.wiki].freeze
+  EXTENSIONS = %w[
+    carve.cite carve.codeCallouts carve.codeGroup carve.colorSwatch carve.details
+    carve.fencedRender.abc carve.fencedRender.chart carve.fencedRender.d2 carve.fencedRender.graphviz
+    carve.fencedRender.mermaid carve.fencedRender.plantuml carve.fencedRender.vega-lite carve.fencedRender.wavedrom
+    carve.glossary carve.imgFence.image carve.imgFence.img carve.index carve.inlineFootnotesToParentheses
+    carve.listTable carve.mathBlock carve.references carve.semanticSpan carve.smartQuotes
+    carve.spoiler carve.spoilerBlock carve.tabNormalize carve.tabs carve.wiki
+  ].freeze
   MODES = %i[interactive static].freeze
   RENDERER_KEYS = %i[mermaid chart graphviz math].freeze
 
