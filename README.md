@@ -2,6 +2,8 @@
 
 The `next2` branch binds Ruby to the unreleased Carve 0.2 Rust engine. It pins a specific commit of the `carve-lang` crate from the `next2` branch of `markup-carve/carve-rs`; it does not use a registry engine release.
 
+Building this branch requires Rust 1.88 or newer.
+
 ```ruby
 require "carve"
 

@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Building the 0.2 binding now requires Rust 1.88 or newer, matching its pinned engine (markup-carve/carve-rs#4444).
 - Port the Ruby binding on `next2` to the unreleased Carve 0.2 Rust JSON API, with a Git SHA pin.
 - Escape raw HTML by default and expose the 0.2 option, diagnostic, tree, and include shapes.
 - Keep the Markdown, plain-text and ANSI writer entry points visible with explicit availability errors until the engine ports them.
