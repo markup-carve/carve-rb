@@ -19,6 +19,6 @@ magnus = { version = "0.8", features = ["rb-sys"] }
 rb-sys = "0.9"
 # The unreleased Carve 0.2 engine (carve-lang, library `carve`) is pinned to
 # one Git commit; src/lib.rs names it `::carve` because this crate is also `carve`.
-carve = { git = "https://github.com/markup-carve/carve-rs", rev = "48f27d02368df9310c2b2a694076653106a8d0ea", package = "carve-lang" }
+carve = { git = "https://github.com/markup-carve/carve-rs", rev = "284c05f30da3a00a0e7a1fd42fea9f5ce430d6dd", package = "carve-lang" }
 
 serde_json = "1"
