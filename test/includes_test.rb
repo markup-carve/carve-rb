@@ -42,7 +42,6 @@ class IncludesTest < Minitest::Test
   end
 
   def test_an_extension_reaches_an_included_child
-    skip "carve-rs#4329 (C2-X-052 extension host): pending in the 0.2 engine"
     with_book do |root, book|
       write(root, "chapters/one.crv", "See [[Target]].")
       result = Carve.to_html_with_includes(
@@ -95,7 +94,6 @@ class IncludesTest < Minitest::Test
   # --- targets -----------------------------------------------------------
 
   def test_the_markdown_target_expands_too
-    skip "carve-rs#4327 (C2-T-005 writer registry): pending in the 0.2 engine"
     with_book do |root, book|
       result = Carve.render_with_includes(
         "{{ chapters/one.crv }}", root: root, source_path: book, target: "markdown"
@@ -105,7 +103,6 @@ class IncludesTest < Minitest::Test
   end
 
   def test_the_carve_target_is_refused
-    skip "carve-rs#4327 (C2-T-005 writer registry): pending in the 0.2 engine"
     with_book do |root, book|
       error = assert_raises(ArgumentError) do
         Carve.render_with_includes("Text.", root: root, source_path: book, target: "carve")
@@ -263,7 +260,6 @@ class IncludesTest < Minitest::Test
   end
 
   def test_the_text_targets_keep_a_link_definition_where_it_was_written
-    skip "carve-rs#4327 (C2-T-005 writer registry): pending in the 0.2 engine"
     with_book do |root, book|
       source = "[bold]: /x\n\nsee [*bold*][]\n"
       { "markdown" => :to_markdown, "plain" => :to_plain_text, "ansi" => :to_ansi }.each do |target, plain|

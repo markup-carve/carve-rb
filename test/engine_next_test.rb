@@ -7,7 +7,6 @@ require "carve"
 # What the engine after 0.1.13 adds or changes, pinned through the binding.
 class EngineNextTest < Minitest::Test
   def test_the_writer_moves_alignment_into_braces
-    skip "carve-rs#4327 (C2-T-005 writer registry): pending in the 0.2 engine"
     assert_equal "|={>} A |= B |\n| x | y |\n", Carve.to_carve("|=> A |= B |\n| x | y |\n")
   end
 
@@ -18,7 +17,6 @@ class EngineNextTest < Minitest::Test
   end
 
   def test_the_writer_spells_every_thematic_break_as_stars
-    skip "carve-rs#4327 (C2-T-005 writer registry): pending in the 0.2 engine"
     assert_equal "a\n\n***\n\nb\n", Carve.to_carve("a\n\n---\n\nb\n")
   end
 
