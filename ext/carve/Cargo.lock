@@ -61,7 +61,7 @@ dependencies = [
 [[package]]
 name = "carve-lang"
 version = "0.1.14"
-source = "git+https://github.com/markup-carve/carve-rs?rev=e2aaf1d212efecb2940703a59055a54c2e28f591#e2aaf1d212efecb2940703a59055a54c2e28f591"
+source = "git+https://github.com/markup-carve/carve-rs?rev=388348a0ffcc54e508a37af1a6952c01cb16e137#388348a0ffcc54e508a37af1a6952c01cb16e137"
 dependencies = [
  "bumpalo",
  "carve-lang 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -80,7 +80,7 @@ dependencies = [
 name = "carve-rb"
 version = "0.1.14"
 dependencies = [
- "carve-lang 0.1.14 (git+https://github.com/markup-carve/carve-rs?rev=e2aaf1d212efecb2940703a59055a54c2e28f591)",
+ "carve-lang 0.1.14 (git+https://github.com/markup-carve/carve-rs?rev=388348a0ffcc54e508a37af1a6952c01cb16e137)",
  "magnus",
  "rb-sys",
  "serde_json",
