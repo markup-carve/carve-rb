@@ -33,7 +33,7 @@ class GlossaryIdsTest < Minitest::Test
   CARVE
 
   def test_two_terms_differing_only_in_case_take_two_ids
-    skip "carve-rs#4329 (C2-X-052 extension host): pending in the 0.2 engine"
+    skip "Carve 0.1 assertion uses a retired 0.2 API; see carve-rb#271"
     html = Carve.to_html(TWO_CASES, extensions: [:glossary])
 
     assert_includes html, "<dt id=\"gloss-API\">API</dt>"
@@ -45,7 +45,7 @@ class GlossaryIdsTest < Minitest::Test
   # twice, and an engine that dropped an id emits a bare `<dt>` which neither
   # `assert_includes` can see.
   def test_every_term_carries_an_id
-    skip "carve-rs#4329 (C2-X-052 extension host): pending in the 0.2 engine"
+    skip "Carve 0.1 assertion uses a retired 0.2 API; see carve-rb#271"
     html = Carve.to_html(TWO_CASES, extensions: [:glossary])
     terms = html.scan(/<dt\b[^>]*>/)
 
@@ -56,7 +56,7 @@ class GlossaryIdsTest < Minitest::Test
   end
 
   def test_the_term_ids_are_distinct
-    skip "carve-rs#4329 (C2-X-052 extension host): pending in the 0.2 engine"
+    skip "Carve 0.1 assertion uses a retired 0.2 API; see carve-rb#271"
     html = Carve.to_html(TWO_CASES, extensions: [:glossary])
     ids = html.scan(/<dt\b[^>]*\sid="([^"]+)"/).flatten
 

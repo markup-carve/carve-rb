@@ -208,7 +208,6 @@ class CarveV2Test < Minitest::Test
       File.write(page, "{{ missing.crv }}")
       result = Carve.to_html_with_includes("{{ missing.crv }}", root: root, source_path: page)
       loss = result.fetch(:warnings).find { |row| row.fetch(:code) == "include-unresolved" }
-      skip "carve-rs#4351: include-unresolved names an empty path" if loss.fetch(:message) == 'Include "" could not be resolved.'
       assert_equal 'Include "missing.crv" could not be resolved.', loss.fetch(:message)
     end
   end
