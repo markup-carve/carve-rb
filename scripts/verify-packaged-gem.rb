@@ -231,23 +231,69 @@ class PackagedGemTest < Minitest::Test
 
         parse_options = options.select { |key, _| parse_keys.include?(key) }
         actual = Carve.call("parse", source: row.fetch("input"), options: parse_options).fetch("tree")
-        [id, "tree"] if actual.fetch("children") != tree.fetch("children")
+        [id, "tree"] if actual != tree
       end
     end
+  end
+
+  # The stated fields of an expected diagnostic, as the spec's
+  # scripts/expected-check.mjs compares them.
+  PLACE = %w[line column endLine endColumn severity channel path].freeze
+
+  # A UTF-8 byte offset as a 1-based line and code point column.
+  def point(source, offset)
+    before = source.byteslice(0, offset).force_encoding(Encoding::UTF_8)
+    last = before.rindex("\n")
+    { "line" => before.count("\n") + 1, "column" => (last ? before[(last + 1)..] : before).length + 1 }
+  end
+
+  def lint_entry(found, source)
+    entry = found.slice("code", "severity", "channel", "path")
+    range = found["range"]
+    return entry unless range
+
+    start = point(source, range.fetch("startOffset"))
+    finish = point(source, range.fetch("endOffset"))
+    entry.merge(start, "endLine" => finish["line"], "endColumn" => finish["column"])
+  end
+
+  def fits?(found, want)
+    found["code"] == want["code"] && PLACE.all? { |key| !want.key?(key) || found[key] == want[key] }
+  end
+
+  # Each expected entry takes its own finding, so two expectations never share one.
+  def all_matched?(found, wanted)
+    owner = Array.new(found.length, -1)
+    assign = lambda do |w, seen|
+      found.each_index.any? do |i|
+        next false if seen.include?(i) || !fits?(found[i], wanted[w])
+
+        seen << i
+        next false unless owner[i] == -1 || assign.call(owner[i], seen)
+
+        owner[i] = w
+        true
+      end
+    end
+    wanted.each_index.all? { |w| assign.call(w, []) }
   end
 
   def lint_failures
     lints.filter_map do |row|
       id = row.fetch("id")
+      source = row.fetch("input")
       engine_failure(id) do
-        actual = Carve.call("lint", source: row.fetch("input")).fetch("diagnostics").map { |entry| entry.fetch("code") }
-        expected = Array(row.dig("expected", "diagnostics")).map { |entry| entry.is_a?(String) ? entry : entry.fetch("code") }
-        if !expected.all? { |code| actual.include?(code) }
-          [id, "lint: missing a reported code"]
-        elsif Array(row.dig("expected", "notReported")).any? { |code| actual.include?(code) }
-          [id, "lint: reports a code it must not"]
-        elsif row.dig("expected", "diagnosticsComplete") && actual.sort != expected.sort
+        found = Carve.call("lint", source: source).fetch("diagnostics").map { |entry| lint_entry(entry, source) }
+        expected = row.fetch("expected")
+        wanted = Array(expected["diagnostics"]).map { |entry| entry.is_a?(String) ? { "code" => entry } : entry }
+        if expected["diagnosticsComplete"] && found.length != wanted.length
           [id, "lint: diagnostics are not the complete list"]
+        elsif expected["diagnosticsOrdered"] && !wanted.each_with_index.all? { |want, i| found[i] && fits?(found[i], want) }
+          [id, "lint: diagnostics are not in the stated order"]
+        elsif !all_matched?(found, wanted)
+          [id, "lint: missing a reported diagnostic"]
+        elsif Array(expected["notReported"]).any? { |code| found.any? { |entry| entry["code"] == code } }
+          [id, "lint: reports a code it must not"]
         end
       end
     end
