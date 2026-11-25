@@ -248,7 +248,7 @@ class PackagedGemTest < Minitest::Test
   end
 
   def lint_entry(found, source)
-    entry = found.slice("code", "severity", "channel", "path")
+    entry = found.slice("code", "severity", "channel", "path", "message")
     range = found["range"]
     return entry unless range
 
@@ -258,7 +258,25 @@ class PackagedGemTest < Minitest::Test
   end
 
   def fits?(found, want)
-    found["code"] == want["code"] && PLACE.all? { |key| !want.key?(key) || found[key] == want[key] }
+    found["code"] == want["code"] && PLACE.all? { |key| !want.key?(key) || found[key] == want[key] } &&
+      (!want.key?("messageWhen") || message_fits?(found, want["messageWhen"]))
+  end
+
+  # `messageWhen` names a message variant of the rule in data/lint-rules.json;
+  # the reported message has to be that variant's text, `${...}` filled in.
+  def message_fits?(found, condition)
+    rule = lint_rules[found["code"]]
+    variant = Array(rule && rule["messages"]).find { |message| message.is_a?(Hash) && message["when"] == condition }
+    return false unless variant
+
+    pattern = variant.fetch("text").split(/\$\{[^}]+\}/, -1).map { |part| Regexp.escape(part) }.join(".*?")
+    message = found["message"].to_s
+    message.match?(/\A#{pattern}\z/m) && !message.include?("${")
+  end
+
+  def lint_rules
+    @lint_rules ||= JSON.parse(File.read(File.join(CONFORMANCE, "..", "data", "lint-rules.json"), encoding: "UTF-8"))
+                        .fetch("rules").to_h { |rule| [rule.fetch("id"), rule] }
   end
 
   # Each expected entry takes its own finding, so two expectations never share one.

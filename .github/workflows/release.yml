@@ -184,6 +184,8 @@ jobs:
       # A row naming the released engine pin ships what that engine release
       # renders; the engine itself shipped with the same difference.
       - name: Every declared drift window is closed or belongs to the released engine
+        # ci.yml lets a pull request carry a declared window; only a release must not.
+        if: github.event_name != 'pull_request'
         run: |
           python3 scripts/check-spec-drift.py \
             --require-empty-ledger --allow-released-engine-rows \
