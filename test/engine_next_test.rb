@@ -44,10 +44,8 @@ class EngineNextTest < Minitest::Test
     assert_equal "<p>a. item</p>", Carve.to_html("a. item\n").chomp
   end
 
-  def test_markdown_import_is_removed_in_c2_t_003
-    # C2-T-003 has no Markdown import entry in the 0.2 tooling surface.
-    error = assert_raises(ArgumentError) { Carve.from_markdown("> [!NOTE]\n> Hi\n") }
-    assert_match(/not part of Carve 0.2/, error.message)
+  def test_markdown_import_reads_gfm_alerts
+    assert_equal "::: note\nHi\n:::\n", Carve.from_markdown("> [!NOTE]\n> Hi\n").fetch("source")
   end
 
   private
