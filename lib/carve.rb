@@ -263,8 +263,14 @@ module Carve
       call("importDocument", source: source, from: "html")
     end
 
-    def from_markdown(_source)
-      raise ArgumentError, "Markdown import is not part of Carve 0.2 (C2-T-003)"
+    # The 0.1 Markdown importer read GFM, so this imports from: "gfm" (UPGRADING).
+    def from_markdown(source)
+      import_document(source, from: "gfm")
+    end
+
+    # Imports html, gfm, markdown (CommonMark only) or djot (C2-T-003).
+    def import_document(source, from: "html", **options)
+      call("importDocument", source: source, options: options, from: from.to_s)
     end
 
     def select_include_region(_source, _name, mode:)

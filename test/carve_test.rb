@@ -135,10 +135,9 @@ class CarveTest < Minitest::Test
     assert_equal "import-attribute-dropped", lossy.fetch("diagnostics").first.fetch("code")
   end
 
-  def test_markdown_import_is_removed_in_c2_t_003
-    # C2-T-003 removes the Markdown importer, so depth is no longer reached.
-    error = assert_raises(ArgumentError) { Carve.from_markdown("> " * 512 + "text\n") }
-    assert_match(/not part of Carve 0.2/, error.message)
+  def test_deep_markdown_import_hits_the_nesting_limit_and_the_engine_stays_usable
+    error = assert_raises(Carve::EngineError) { Carve.from_markdown("> " * 512 + "text\n") }
+    assert_match(/nesting limit/, error.message)
     assert_equal "<p>after refusal</p>", Carve.to_html("after refusal")
   end
 
