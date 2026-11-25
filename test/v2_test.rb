@@ -182,11 +182,26 @@ class CarveV2Test < Minitest::Test
   end
 
   def test_navigation_extensions_are_listed_and_selectable
-    names = %w[carve.autolink carve.externalLinks carve.headingLevelShift carve.headingNumbers carve.headingPermalinks carve.headingReference carve.linkPolicy carve.toc carve.tocPlacement]
+    names = %w[carve.autolink carve.externalLinks carve.headingNumbers carve.headingPermalinks carve.headingReference carve.linkPolicy carve.toc carve.tocPlacement]
     names.each do |name|
       assert_includes Carve::EXTENSIONS, name
       assert_equal "<p>Hi</p>", Carve.to_html("Hi", extensions: [name])
     end
+  end
+
+  def test_heading_shift_is_a_core_render_option
+    # carve#6325 (C2-H-208): headingShift replaced the carve.headingLevelShift extension.
+    refute_includes Carve::EXTENSIONS, "carve.headingLevelShift"
+    begin
+      Carve.to_html("x", heading_shift: 0)
+    rescue Carve::EngineError => error
+      raise unless error.message.include?("unknown option")
+      skip "the pinned engine predates headingShift"
+    end
+    assert_includes Carve.to_html("= Chapter\n", heading_shift: 1), "<h2"
+    assert_includes Carve.to_html("= Chapter\n", headingShift: 2), "<h3"
+    assert_equal Carve.to_html("= Chapter\n"), Carve.to_html("= Chapter\n", heading_shift: 0)
+    assert_raises(Carve::EngineError) { Carve.to_html("= Chapter\n", heading_shift: 6) }
   end
 
   def test_every_listed_standard_extension_enables
