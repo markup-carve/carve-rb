@@ -1,33 +1,25 @@
 # frozen_string_literal: true
 
-# Runs the mandatory spec corpus through the gem that is about to be published.
+# Runs the Carve 0.2 conformance corpus through the gem that is about to be
+# published.
 #
 # The distinction this script exists to make is between "the code in this
 # checkout is correct" and "the artifact this job would push is correct". Every
-# other check in this repository answers the first question. `rake test`
-# compiles the extension into lib/carve/ from the working tree and drives the
-# corpus through that; release.yml then built a .gem out of the same directory
-# and pushed it without asking anything about it. A gem is not its checkout: the
-# gemspec's file globs decide what is packaged, and a packaged source tree
-# builds under `gem install`'s toolchain rather than under `rake compile`. Two
-# separate compiles of two separate file sets were being tested and shipped.
+# other check in this repository answers the first question. A gem is not its
+# checkout: the gemspec's file globs decide what is packaged, and a packaged
+# source tree builds under `gem install`'s toolchain rather than under
+# `rake compile`.
 #
 # So this script refuses to look at the checkout at all. It is pointed at a
 # GEM_HOME into which the built .gem was installed -- the same install path an
-# embedder takes -- and it asserts, before rendering a single document, that the
-# `carve` it just required resolved into that install root and nowhere else. The
-# check has already earned that: on a developer machine carrying an unrelated
-# carve-lang install, the first run of this gate resolved `require "carve"` to
-# THAT gem instead of the packaged one, and said so rather than certifying it.
+# embedder takes -- and it asserts, before rendering a single case, that the
+# `carve` it just required resolved into that install root and nowhere else.
 #
-# The population half is not decoration. Measured on a sibling binding, a corpus
-# cut to 400 pairs rendered "400/400 byte-identical" -- a clean verdict over a
-# third of the corpus. Content and population are two different questions and a
-# release gate has to ask both. The expected population is derived from the
-# spec's own example pages by test/corpus_population.rb, the same helper the
-# ordinary corpus gate uses; a second, hand-written count here would be free to
-# disagree with it, and a release gate that disagrees with CI about how big the
-# corpus is has already failed at its job.
+# The population half is not decoration: a truncated corpus that matches every
+# case it still holds prints a clean verdict. scripts/verify-release-artifact.sh
+# holds the conformance files byte-identical to the copy the pinned carve-rs
+# vendors in `spec-conformance/`, so the population is the engine's, not a count
+# written here.
 
 require "fileutils"
 require "tmpdir"
@@ -48,7 +40,7 @@ def required_env(name, what)
   exit 1
 end
 
-CORPUS = required_env("CARVE_SPEC_CORPUS", "the spec's tests/corpus directory")
+CONFORMANCE = required_env("CARVE_SPEC_CONFORMANCE", "the spec's spec/0.2/conformance directory")
 INSTALL_ROOT = required_env("CARVE_PACKAGED_GEM_ROOT", "the GEM_HOME the built gem was installed into")
 GEM_FILE = required_env("CARVE_PACKAGED_GEM", "the .gem file this job would publish")
 WANT_VERSION = required_env("CARVE_PACKAGED_GEM_VERSION", "the version of that .gem file")
@@ -68,13 +60,10 @@ rescue LoadError, StandardError => e
   exit 1
 end
 
+require "json"
 require "minitest/autorun"
-require "corpus_population"
-require "engine_behind"
 
 class PackagedGemTest < Minitest::Test
-  include CorpusPopulation
-
   DLEXT = RbConfig::CONFIG["DLEXT"]
 
   def install_root
@@ -149,49 +138,38 @@ class PackagedGemTest < Minitest::Test
     end
   end
 
-  def test_the_corpus_is_whole
-    assert File.directory?(CORPUS), "CARVE_SPEC_CORPUS=#{CORPUS} is not a directory"
-    # Equality against what the spec's example pages declare, via the one helper
-    # this repository has for the question. A floor, or a count grepped out of
-    # the pages here, is how a truncated corpus certifies a publish.
-    assert_whole_corpus(CORPUS, pairs.length, "corpus pairs found")
+  def test_the_conformance_corpus_selects_cases
+    assert File.directory?(CONFORMANCE), "CARVE_SPEC_CONFORMANCE=#{CONFORMANCE} is not a directory"
+    refute_empty renders, "the conformance corpus selected no verified render examples"
+    refute_empty lints, "the conformance corpus selected no source-only lint clause cases"
   end
 
-  def test_the_packaged_gem_renders_the_corpus_byte_identically
-    all = pairs
-    assert_whole_corpus(CORPUS, all.length, "corpus pairs rendered")
+  def test_the_packaged_gem_passes_the_conformance_corpus
+    total = renders.length + lints.length
+    failures = render_failures + lint_failures
+    mismatches = failures.map(&:first).uniq
 
-    mismatches = EngineBehind.mismatches(all)
-
-    # PRINTED, one line per document, BEFORE the assertion. The assertion
-    # message truncates at twenty names, and scripts/check-spec-drift.py reads
-    # this list to decide which divergences are declared - a truncated list
-    # would make every document past the twentieth look undeclared. It also has
-    # to be printed rather than only asserted, because the drift job runs this
-    # same script for its measurement and a passing run prints nothing at all.
-    # The leading newline is load-bearing: minitest writes its progress dots
-    # without one, so the first line would arrive as `.corpus mismatch: <name>`
-    # and a reader anchoring at the line start drops it. It dropped one of three
-    # documents on the first run of scripts/check-spec-drift.py.
+    # PRINTED, one line per case, BEFORE the assertion. The assertion message
+    # truncates at twenty, and scripts/check-spec-drift.py reads this list to
+    # decide which divergences are declared. The leading newline keeps the first
+    # line off minitest's progress dots.
     $stdout.puts "" unless mismatches.empty?
-    mismatches.each { |name| $stdout.puts "corpus mismatch: #{name}" }
+    mismatches.each { |id| $stdout.puts "corpus mismatch: #{id}" }
 
-    assert_empty mismatches,
-                 "#{mismatches.length} of #{all.length} corpus documents render differently " \
+    # The wording of this message and of the line below is what
+    # scripts/check-spec-drift.py parses; keep both in step with it.
+    assert_empty failures,
+                 "#{mismatches.length} of #{total} corpus documents render differently " \
                  "from the spec through the gem this release would publish: " \
-                 "#{mismatches.first(20).join(', ')}#{mismatches.length > 20 ? ' ...' : ''}. " \
-                 "The carve-lang version in ext/carve/Cargo.toml is the usual cause; bump it, commit " \
+                 "#{failures.first(20).map { |id, why| "#{id} (#{why})" }.join(', ')}" \
+                 "#{failures.length > 20 ? ' ...' : ''}. " \
+                 "The carve-rs rev in ext/carve/Cargo.toml is the usual cause; bump it, commit " \
                  "the regenerated ext/carve/Cargo.lock, and tag again. Publishing is not " \
                  "reversible, so this refuses rather than warns."
 
-    # Printed, not merely asserted. A reader of a release log should be able to
-    # see the population the verdict covers without taking "0 failures" on
-    # trust; "400/400 byte-identical" is what a truncated corpus looks like when
-    # only the content half gets reported.
-    declared = EngineBehind.active.length
-    $stdout.puts "packaged gem #{File.basename(GEM_FILE)}: #{all.length - declared} of " \
-                 "#{expected_corpus_size(CORPUS)} declared corpus documents byte-identical, " \
-                 "#{declared} rendered as the pinned engine declares (resources/engine-behind.txt)"
+    $stdout.puts "packaged gem #{File.basename(GEM_FILE)}: #{total} of #{total} declared corpus " \
+                 "documents byte-identical (#{renders.length} verified render examples, " \
+                 "#{lints.length} lint clause cases)"
   end
 
   private
@@ -202,10 +180,140 @@ class PackagedGemTest < Minitest::Test
     real.start_with?("#{root}#{File::SEPARATOR}")
   end
 
-  def pairs
-    @pairs ||= Dir.glob(File.join(CORPUS, "*.crv")).sort.filter_map do |crv|
-      html = crv.sub(/\.crv\z/, ".html")
-      [crv, html] if File.exist?(html)
+  def examples
+    @examples ||= JSON.parse(File.read(File.join(CONFORMANCE, "examples.json"), encoding: "UTF-8"), max_nesting: false).fetch("examples")
+  end
+
+  def clause_cases
+    @clause_cases ||= JSON.parse(File.read(File.join(CONFORMANCE, "clause-cases.json"), encoding: "UTF-8"), max_nesting: false).fetch("cases")
+  end
+
+  # The options the parse stage reads; a render example's other options are
+  # render options and do not reach `parse`.
+  def parse_keys
+    @parse_keys ||= begin
+      catalog = JSON.parse(File.read(File.join(CONFORMANCE, "..", "data", "options.json"), encoding: "UTF-8"))
+      catalog.fetch("options").select { |option| (Array(option["read_by"]) & %w[parse resolve]).any? }
+             .map { |option| option.fetch("name") }
+    end
+  end
+
+  def renders
+    @renders ||= examples.select do |row|
+      row["kind"] == "render" && row["status"] == "verified" && row.dig("expected", "html").is_a?(String)
+    end
+  end
+
+  def lints
+    @lints ||= clause_cases.select do |row|
+      row["kind"] == "lint" && row["input"].is_a?(String) &&
+        (row["files"].nil? || row["files"].empty?) && (row["options"].nil? || row["options"].empty?)
+    end
+  end
+
+  # An engine error or panic is one more divergence; aborting would leave the
+  # rest unmeasured.
+  def engine_failure(id)
+    yield
+  rescue Carve::EngineError, Carve::EnginePanic => e
+    [id, "engine #{e.class.name.split('::').last}: #{e.message.lines.first.to_s.strip}"]
+  end
+
+  def render_failures
+    renders.filter_map do |row|
+      id = row.fetch("id")
+      options = row["options"] || {}
+      engine_failure(id) do
+        next [id, "html"] if Carve.call("render", source: row.fetch("input"), options: options).fetch("html") != row.dig("expected", "html")
+
+        tree = row.dig("expected", "tree")
+        next unless tree.is_a?(Hash)
+
+        parse_options = options.select { |key, _| parse_keys.include?(key) }
+        actual = Carve.call("parse", source: row.fetch("input"), options: parse_options).fetch("tree")
+        [id, "tree"] if actual != tree
+      end
+    end
+  end
+
+  # The stated fields of an expected diagnostic, as the spec's
+  # scripts/expected-check.mjs compares them.
+  PLACE = %w[line column endLine endColumn severity channel path].freeze
+
+  # A UTF-8 byte offset as a 1-based line and code point column.
+  def point(source, offset)
+    before = source.byteslice(0, offset).force_encoding(Encoding::UTF_8)
+    last = before.rindex("\n")
+    { "line" => before.count("\n") + 1, "column" => (last ? before[(last + 1)..] : before).length + 1 }
+  end
+
+  def lint_entry(found, source)
+    entry = found.slice("code", "severity", "channel", "path", "message")
+    range = found["range"]
+    return entry unless range
+
+    start = point(source, range.fetch("startOffset"))
+    finish = point(source, range.fetch("endOffset"))
+    entry.merge(start, "endLine" => finish["line"], "endColumn" => finish["column"])
+  end
+
+  def fits?(found, want)
+    found["code"] == want["code"] && PLACE.all? { |key| !want.key?(key) || found[key] == want[key] } &&
+      (!want.key?("messageWhen") || message_fits?(found, want["messageWhen"]))
+  end
+
+  # `messageWhen` names a message variant of the rule in data/lint-rules.json;
+  # the reported message has to be that variant's text, `${...}` filled in.
+  def message_fits?(found, condition)
+    rule = lint_rules[found["code"]]
+    variant = Array(rule && rule["messages"]).find { |message| message.is_a?(Hash) && message["when"] == condition }
+    return false unless variant
+
+    pattern = variant.fetch("text").split(/\$\{[^}]+\}/, -1).map { |part| Regexp.escape(part) }.join(".*?")
+    message = found["message"].to_s
+    message.match?(/\A#{pattern}\z/m) && !message.include?("${")
+  end
+
+  def lint_rules
+    @lint_rules ||= JSON.parse(File.read(File.join(CONFORMANCE, "..", "data", "lint-rules.json"), encoding: "UTF-8"))
+                        .fetch("rules").to_h { |rule| [rule.fetch("id"), rule] }
+  end
+
+  # Each expected entry takes its own finding, so two expectations never share one.
+  def all_matched?(found, wanted)
+    owner = Array.new(found.length, -1)
+    assign = lambda do |w, seen|
+      found.each_index.any? do |i|
+        next false if seen.include?(i) || !fits?(found[i], wanted[w])
+
+        seen << i
+        next false unless owner[i] == -1 || assign.call(owner[i], seen)
+
+        owner[i] = w
+        true
+      end
+    end
+    wanted.each_index.all? { |w| assign.call(w, []) }
+  end
+
+  def lint_failures
+    lints.filter_map do |row|
+      id = row.fetch("id")
+      source = row.fetch("input")
+      engine_failure(id) do
+        found = Carve.call("lint", source: source).fetch("diagnostics").map { |entry| lint_entry(entry, source) }
+        expected = row.fetch("expected")
+        wanted = Array(expected["diagnostics"]).map { |entry| entry.is_a?(String) ? { "code" => entry } : entry }
+        if expected["diagnosticsComplete"] && found.length != wanted.length
+          [id, "lint: diagnostics are not the complete list"]
+        elsif expected["diagnosticsOrdered"] && !wanted.each_with_index.all? { |want, i| found[i] && fits?(found[i], want) }
+          [id, "lint: diagnostics are not in the stated order"]
+        elsif !all_matched?(found, wanted)
+          [id, "lint: missing a reported diagnostic"]
+        elsif Array(expected["notReported"]).any? { |code| found.any? { |entry| entry["code"] == code } }
+          [id, "lint: reports a code it must not"]
+        end
+      end
     end
   end
 end

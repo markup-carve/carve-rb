@@ -79,6 +79,7 @@ FULL_REV_RE = re.compile(r"^[0-9a-f]{40}$")
 LOCK_SOURCE_RE = re.compile(r"^git\+(?P<url>[^?#]+)(\?rev=(?P<rev>[^#]+))?(#(?P<resolved>.+))?$")
 
 SPEC_PATH = "tests/spec"
+SOURCE_COMMIT_PATH = "spec-data/SOURCE_COMMIT"
 
 
 def fail(message: str) -> None:
@@ -206,7 +207,8 @@ def resolve_pin(engine: Path | None, pin: tuple[str, str]) -> str:
 
 
 def spec_gitlink(engine: Path, revision: str) -> str:
-    """The `tests/spec` gitlink at that revision - the spec the engine was written against."""
+    """The spec the engine at that revision was written against: its `tests/spec` gitlink (0.1)
+    or its `spec-data/SOURCE_COMMIT` (0.2)."""
     if not (engine / ".git").exists():
         fail(f"--engine {engine} is not a git checkout of carve-rs.")
     try:
@@ -227,16 +229,26 @@ def spec_gitlink(engine: Path, revision: str) -> str:
         )
     line = completed.stdout.strip()
     if not line:
-        # The 0.2 engine no longer carries the 0.1 corpus as a gitlink. The
-        # binding names that compatibility corpus explicitly instead.
+        # A 0.2 engine vendors its spec data and names the spec commit it came from.
+        source = subprocess.run(
+            ["git", "-C", str(engine), "show", f"{revision}:{SOURCE_COMMIT_PATH}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if source.returncode == 0:
+            spec = source.stdout.strip()
+            if not FULL_REV_RE.match(spec):
+                fail(f"`{SOURCE_COMMIT_PATH}` at carve-rs {revision} is not a full revision: {spec}")
+            return spec
         corpus_pin = Path("spec-corpus-revision.txt")
         if corpus_pin.is_file():
             spec = corpus_pin.read_text().strip()
             if FULL_REV_RE.match(spec):
                 return spec
         fail(
-            f"carve-rs {revision} has no `{SPEC_PATH}` gitlink and this binding "
-            "has no valid spec-corpus-revision.txt."
+            f"carve-rs {revision} has no `{SPEC_PATH}` gitlink, no `{SOURCE_COMMIT_PATH}`, "
+            "and this binding has no valid spec-corpus-revision.txt."
         )
     fields = line.split()
     if len(fields) < 3 or fields[1] != "commit":
