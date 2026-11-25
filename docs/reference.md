@@ -10,7 +10,7 @@ Carve.call("encodeTree", tree: Carve.call("parse", source: "Text").fetch("tree")
 
 ## Convenience calls
 
-- `Carve.to_html(source, mode:, profile:, symbols:, sections:, raw_html:, safe:, url_policy:)` returns HTML. The default is `raw_html: false`; `safe: true` forces it off even when `raw_html: true` is supplied. `url_policy:` is passed as `urlPolicy` to the engine. `mode:` accepts `interactive` or `static`; `profile:` accepts the 0.2 engine profiles.
+- `Carve.to_html(source, mode:, profile:, symbols:, sections:, raw_html:, safe:, url_policy:)` returns HTML. The default is `raw_html: false`; `safe: true` forces it off even when `raw_html: true` is supplied. `url_policy:` is passed as `urlPolicy` to the engine. `mode:` accepts `interactive` or `static`; `profile:` accepts the 0.2 engine profiles. `heading_shift:` (or `headingShift:`) adds 0 to 5 to every heading level (C2-H-208).
 - `Carve.parse(source, **options)` returns the 0.2 tree with symbol keys. `Carve.parse_with_diagnostics(source, **options)` returns the tree and diagnostics. Options use Ruby snake case or the JSON names; they are converted to the 0.2 option names.
 - `Carve.render_with_diagnostics(source, **options)` returns HTML plus diagnostics. `Carve.lint(source, rules:, platforms:)` returns diagnostic entries with the 0.2 fields `code`, `severity`, `channel`, `message`, and byte ranges where applicable (C2-T-020).
 - `Carve.write(source, target:, **options)` writes a resolved tree through the engine writer registry. `to_carve(source, align_tables:)`, `to_markdown`, `to_plain_text`, and `to_ansi` keep their public names. `to_carve` runs the canonical writer. The pinned engine provides Markdown, plain, and ANSI export writers.

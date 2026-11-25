@@ -12,6 +12,8 @@ Carve.parse("= Title")
 Carve.lint("Text")
 ```
 
+`Carve.to_html(source, heading_shift: 1)` renders every heading one level deeper (0 to 5, C2-H-208).
+
 Raw HTML is escaped by default. To enable it for trusted source, pass `raw_html: true`; `safe: true` keeps it escaped. URL policy stays with the engine.
 
 The source writer, HTML importer, Markdown, plain-text, and ANSI writers, and native extension host are available on this branch. See [the API reference](docs/reference.md) and [migration guide](docs/guide.md).
