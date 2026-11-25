@@ -89,9 +89,25 @@ class CarveV2Test < Minitest::Test
     assert_equal "<p>Hi</p>", result.fetch("html")
   end
 
-  def test_markdown_import_is_removed_c2_t_003
-    error = assert_raises(ArgumentError) { Carve.from_markdown("*x*") }
-    assert_match(/not part of Carve 0.2/, error.message)
+  def test_markdown_import_reads_gfm
+    result = Carve.from_markdown("*x*")
+    assert_equal "/x/\n", result.fetch("source")
+    assert_equal "document", result.fetch("tree").fetch("type")
+  end
+
+  def test_from_markdown_keeps_gfm_tables
+    source = "| a |\n|---|\n| b |\n"
+    assert_equal Carve.call("importDocument", source: source, from: "gfm"), Carve.from_markdown(source)
+    assert_includes Carve.from_markdown(source).fetch("source"), "|="
+  end
+
+  def test_import_document_takes_the_engine_formats
+    %w[html markdown gfm djot].each do |format|
+      expected = Carve.call("importDocument", source: "*em*\n", from: format)
+      assert_equal expected, Carve.import_document("*em*\n", from: format)
+    end
+    error = assert_raises(Carve::EngineError) { Carve.import_document("x", from: "rtf") }
+    assert_match(/rtf/, error.message)
   end
 
   def test_legacy_provenance_and_debug_calls_report_the_02_upgrade_boundary
