@@ -130,6 +130,9 @@ jobs:
     needs: native-gems
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # Ruby 3.2's prebuilt headers reach `bool` without stdbool.h under bindgen.
+      BINDGEN_EXTRA_CLANG_ARGS: -include stdbool.h
     steps:
       - uses: actions/checkout@v7
 
