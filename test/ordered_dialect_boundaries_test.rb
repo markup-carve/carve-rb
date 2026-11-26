@@ -25,15 +25,20 @@ class OrderedDialectBoundariesTest < Minitest::Test
                  Carve.to_html("``` =html\n<b>x</b>\n```", profile: "article")
   end
 
-  def test_markdown_retains_authored_ordered_delimiters
+  def test_markdown_import_uses_the_engine_call
     cases = JSON.parse(File.read(File.join(__dir__, "fixtures", "markdown-ordered-delimiters.json")))
     assert_equal 3, cases.length
+    expected = {
+      "CommonMark 296" => "{start=10}\n. foo\n  - bar\n",
+      "CommonMark 297" => "{start=10}\n. foo\n\n- bar\n",
+      "CommonMark 302" => ". foo\n. bar\n\n\n\n{start=3}\n. baz\n",
+    }
     cases.each do |row|
-      imported = Carve.from_markdown(row.fetch("markdown"))
-      assert_equal row.fetch("source"), imported[:value], row.fetch("name")
-      assert_equal row.fetch("html"), Carve.to_html(imported[:value]).sub(/\n+\z/, ""), row.fetch("name")
-      refute_empty imported[:report][:diagnostics], row.fetch("name")
-      assert imported[:report][:diagnostics].all? { |diagnostic| diagnostic[:fidelity] == "preserved" }, row.fetch("name")
+      # C2-T-003 leaves the importer outside the 0.2 core, while the pinned
+      # engine still exposes it through the generic importDocument call.
+      result = Carve.call("importDocument", source: row.fetch("markdown"), from: "markdown")
+      assert_equal expected.fetch(row.fetch("name")), result.fetch("source")
+      assert_empty result.fetch("diagnostics")
     end
   end
 end

@@ -13,6 +13,7 @@ on:
   # `publish` are skipped on pull requests. Limited to the files that decide
   # what goes into a gem, so ordinary PRs do not pay for the native matrix.
   pull_request:
+    branches: [main]
     paths:
       - "ext/**"
       - "carve.gemspec"
@@ -127,9 +128,11 @@ jobs:
   verify:
     name: Build the gem and run the corpus through it
     needs: native-gems
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # Ruby 3.2's prebuilt headers reach `bool` without stdbool.h under bindgen.
+      BINDGEN_EXTRA_CLANG_ARGS: -include stdbool.h
     steps:
       - uses: actions/checkout@v7
 
@@ -184,6 +187,8 @@ jobs:
       # A row naming the released engine pin ships what that engine release
       # renders; the engine itself shipped with the same difference.
       - name: Every declared drift window is closed or belongs to the released engine
+        # ci.yml lets a pull request carry a declared window; only a release must not.
+        if: github.event_name != 'pull_request'
         run: |
           python3 scripts/check-spec-drift.py \
             --require-empty-ledger --allow-released-engine-rows \
@@ -305,7 +310,11 @@ jobs:
       # was when it was the ONLY detector: the drift ledger above already
       # refuses a known-diverging tag whatever the pin's age, and this catches
       # the case where the pin is simply old and nothing has diverged yet.
+      #
+      # A pull request runs the corpus gate below but not this step: the age
+      # limit is a release-time consequence, as in ci.yml.
       - name: The pinned engine is real and not stale
+        if: github.event_name != 'pull_request'
         run: |
           python3 carve-rs/tools/check-engine-pin.py \
             --engine carve-rs --github --max-age-days 14 \
@@ -317,10 +326,9 @@ jobs:
           spec="$(python3 scripts/pinned-spec-commit.py \
             --engine carve-rs \
             --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock)"
-          # The corpus is unchanged since the engine gitlink; this pins the spec release notes.
-          spec="$(cat spec-corpus-revision.txt)"
           echo "spec=$spec" >> "$GITHUB_OUTPUT"
 
+      # A 0.2 engine declares no corpus lag, so this holds engine-behind.txt empty.
       - name: The engine-declared corpus pairs match the pinned carve-rs
         run: python3 scripts/check-engine-behind.py --engine carve-rs --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock
 
@@ -334,9 +342,10 @@ jobs:
       # THE gate. It installs the .gem built above the way an embedder would,
       # asserts the `carve` it loaded resolved into that install and not into
       # this checkout, checks the package's files against the install byte for
-      # byte, and renders the whole spec corpus through it -- population and
-      # content both, the population derived by test/corpus_population.rb from
-      # the spec's own example pages rather than written down here.
+      # byte, and runs the Carve 0.2 conformance corpus through it: every
+      # verified render example (HTML and tree) and every source-only lint
+      # clause case. The population is held to the copy the pinned carve-rs
+      # vendors in spec-conformance/, not written down here.
       #
       # It fails the job. It does not warn: laravel-carve, symfony-carve and
       # shopware-carve each carry a correct corpus comparison that runs on a
@@ -347,7 +356,8 @@ jobs:
       # to find out is before the push, with a non-zero exit.
       - name: Run the spec corpus through the built gem
         env:
-          CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
+          CARVE_SPEC_CONFORMANCE: ${{ github.workspace }}/spec/spec/0.2/conformance
+          CARVE_ENGINE_CHECKOUT: ${{ github.workspace }}/carve-rs
         run: bash scripts/verify-release-artifact.sh "$(ls carve-lang-*.gem)"
 
       - name: Download the platform gems
@@ -379,7 +389,8 @@ jobs:
       # installs instead of the source gem.
       - name: Run the spec corpus through the x86_64-linux gem
         env:
-          CARVE_SPEC_CORPUS: ${{ github.workspace }}/spec/tests/corpus
+          CARVE_SPEC_CONFORMANCE: ${{ github.workspace }}/spec/spec/0.2/conformance
+          CARVE_ENGINE_CHECKOUT: ${{ github.workspace }}/carve-rs
         run: bash scripts/verify-release-artifact.sh "$(ls native/carve-lang-*-x86_64-linux.gem)"
 
       # The verified bytes, handed to the publish job. Uploading the artifact

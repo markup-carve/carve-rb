@@ -2,7 +2,7 @@
 name = "carve-rb"
 version = "0.1.14"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.88"
 publish = false
 license = "MIT"
 description = "Native Ruby binding (magnus + rb-sys) for the Carve markup language, over the carve-rs engine."
@@ -17,9 +17,8 @@ crate-type = ["cdylib"]
 # interop handles so this builds cleanly under rb_sys/mkmf for Ruby 3.2.
 magnus = { version = "0.8", features = ["rb-sys"] }
 rb-sys = "0.9"
-serde_json = "1"
+# The unreleased Carve 0.2 engine (carve-lang, library `carve`) is pinned to
+# one Git commit; src/lib.rs names it `::carve` because this crate is also `carve`.
+carve = { git = "https://github.com/markup-carve/carve-rs", rev = "284c05f30da3a00a0e7a1fd42fea9f5ce430d6dd", package = "carve-lang" }
 
-# The Carve engine. Imported under the Rust crate alias `carve_rs` so the
-# binding's own crate name (`carve-rb`) does not collide with the engine's
-# package name (`carve`) in the Cargo lockfile.
-carve_rs = { package = "carve-lang", version = "=0.1.14" }
+serde_json = "1"

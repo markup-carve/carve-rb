@@ -34,7 +34,33 @@ Rake::ExtensionTask.new("carve", GEMSPEC) do |ext|
   end
 end
 
+# The 0.2 engine has a new contract. The inherited 0.1 tests stay for
+# `test_legacy`; these files exercise the 0.2 boundary and the
+# version-independent safety and CI checks.
+TEST_FILES = FileList[
+  "test/v2_test.rb",
+  "test/native_host_test.rb",
+  "test/panic_unwind_test.rb",
+  "test/ci_verdict_test.rb",
+  "test/release_gate_wiring_test.rb",
+  "test/release_version_test.rb",
+]
+
 Rake::TestTask.new(:test) do |t|
+  t.libs << "test" << "lib"
+  t.test_files = TEST_FILES
+  t.warning = false
+end
+
+# The same files against an extension that is already in lib/carve/ (CI copies
+# in the one the release gate's `gem install` compiled), so no second compile.
+Rake::TestTask.new(:test_installed) do |t|
+  t.libs << "test" << "lib"
+  t.test_files = TEST_FILES
+  t.warning = false
+end
+
+Rake::TestTask.new(:test_legacy) do |t|
   t.libs << "test" << "lib"
   t.test_files = FileList["test/**/*_test.rb"]
   t.warning = false
@@ -42,5 +68,14 @@ end
 
 # Always (re)build the native extension before running the tests.
 task test: :compile
+task test_legacy: :compile
+
+# The remaining 0.1 fixtures are still outside the 0.2 suite, but the 30
+# assertions migrated to the 0.2 API run on every next2 CI build.
+task :test_ported do
+  sh "ruby -Ilib -Itest scripts/check_ported_legacy.rb"
+end
+task test: :test_ported
+task test_installed: :test_ported
 
 task default: %i[compile test]

@@ -25,6 +25,14 @@ def pinned_revision(engine, manifest, lock):
     return module.resolve_pin(pathlib.Path(engine), pin)
 
 
+def is_conformance_engine(engine, revision):
+    """True for a 0.2 carve-rs, which vendors the 0.2 conformance corpus."""
+    return subprocess.run(
+        ["git", "-C", engine, "cat-file", "-e", f"{revision}:spec-conformance/examples.json"],
+        capture_output=True, check=False,
+    ).returncode == 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--engine", required=True, help="a full carve-rs checkout")
@@ -34,11 +42,15 @@ def main():
     arguments = parser.parse_args()
 
     revision = pinned_revision(arguments.engine, arguments.manifest, arguments.lock)
-    source = subprocess.run(
-        ["git", "-C", arguments.engine, "show", f"{revision}:tests/corpus.rs"],
-        capture_output=True, text=True, check=True,
-    ).stdout
-    engine = engine_behind.from_engine_source(source)
+    if is_conformance_engine(arguments.engine, revision):
+        # A 0.2 engine has no 0.1 corpus tables; its conformance corpus allows no lag.
+        engine = {}
+    else:
+        source = subprocess.run(
+            ["git", "-C", arguments.engine, "show", f"{revision}:tests/corpus.rs"],
+            capture_output=True, text=True, check=True,
+        ).stdout
+        engine = engine_behind.from_engine_source(source)
     if arguments.write:
         engine_behind.write(engine)
         print(f"check-engine-behind: wrote {len(engine)} pair(s) from carve-rs {revision[:12]}")

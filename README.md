@@ -1,26 +1,30 @@
-# carve (Ruby)
+# Carve for Ruby
 
-Ruby bindings for the Carve Rust engine. The gem processes Carve 0.1 documents through `carve-lang`. See the [Carve documentation](https://markup-carve.github.io/carve/).
+The `next2` branch binds Ruby to the unreleased Carve 0.2 Rust engine. It pins a specific commit of the `carve-lang` crate from the `next2` branch of `markup-carve/carve-rs`; it does not use a registry engine release.
 
-## Install
-
-```sh
-gem install carve-lang
-```
-
-## Usage
+Building this branch requires Rust 1.88 or newer.
 
 ```ruby
 require "carve"
-puts Carve.to_html("# Hello *world*")
+
+Carve.to_html("Hello *world*.")
+Carve.parse("= Title")
+Carve.lint("Text")
 ```
 
-## Documentation
+`Carve.to_html(source, heading_shift: 1)` renders every heading one level deeper (0 to 5, C2-H-208).
 
-- [Carve documentation](https://markup-carve.github.io/carve/)
-- [Guide](docs/guide.md)
-- [Documentation index](docs/README.md)
+Raw HTML is escaped by default. To enable it for trusted source, pass `raw_html: true`; `safe: true` keeps it escaped. URL policy stays with the engine.
 
-## License
+The source writer, HTML importer, Markdown, plain-text, and ANSI writers, and native extension host are available on this branch. See [the API reference](docs/reference.md) and [migration guide](docs/guide.md).
 
-[MIT](LICENSE).
+This branch is for integration testing. No 0.2 gem has been released.
+
+Ruby callables can render declared extension nodes and transform resolved documents:
+
+```ruby
+Carve.to_html("# Guide", transforms: [->(tree) { tree }])
+Carve.render_with_host("", tree: tree, renderers: { "ex.note" => ->(node) { "<aside>Note</aside>" } })
+```
+
+Use `{ interactive: callable, static: callable }` to choose renderers by channel. Callback errors become engine diagnostics and retain the fallback or previous view.
