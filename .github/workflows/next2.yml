@@ -2,9 +2,9 @@ name: Carve 0.2 Ruby binding
 
 on:
   push:
-    branches: [next2]
+    branches: [main]
   pull_request:
-    branches: [next2]
+    branches: [main]
 
 jobs:
   msrv:
