@@ -84,7 +84,7 @@ jobs:
   # where NOTHING blocked and 50 documents rendered wrongly through a green PR.
   binding-parity:
     name: The gem's tree is carve-rs's tree
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     outputs:
       drift: ${{ steps.parity.outputs.drift }}
