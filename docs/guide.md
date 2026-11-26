@@ -1,6 +1,6 @@
 # Moving a Ruby host to Carve 0.2
 
-Install this repository's `next2` branch, then compile its native extension. This branch pins an exact Git commit of the unreleased Rust `carve-lang` crate (carve-rs `next2`).
+Install this repository's `main` branch, then compile its native extension. This branch pins an exact Git commit of the unreleased Rust `carve-lang` crate.
 
 Use `Carve.to_html` for HTML and `Carve.parse` for a 0.2 tree. The tree schema and diagnostic fields changed; consumers should use the fields in the 0.2 tooling specification, not 0.1 node names. `Carve.call` exposes `parse`, `parseWithDiagnostics`, `render`, `renderWithDiagnostics`, `lint`, `encodeTree`, `decodeTree`, and `includeDependencies` directly.
 

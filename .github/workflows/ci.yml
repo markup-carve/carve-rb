@@ -70,14 +70,14 @@ jobs:
         with:
           repository: markup-carve/carve-rs
           path: carve-rs
-          ref: ${{ (github.head_ref == 'next2' || github.base_ref == 'next2' || github.ref_name == 'next2') && 'next2' || 'main' }}
+          ref: main
           fetch-depth: 0
 
       - name: Report the pin's age and distance, and gate on it being real
         run: |
           # --max-age-days omitted: 0 is the script's report-only default.
           python3 scripts/check-branch-engine-pin.py \
-            --engine carve-rs --branch ${{ (github.head_ref == 'next2' || github.base_ref == 'next2' || github.ref_name == 'next2') && 'next2' || 'main' }} \
+            --engine carve-rs --branch main \
             --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock
 
   build:
@@ -280,15 +280,6 @@ jobs:
         with:
           repository: markup-carve/carve
           path: spec-main
-
-      # Until the spec's next2 branch merges, main carries only the 0.1 spec;
-      # the 0.2 conformance corpus is then measured from next2.
-      - name: Fall back to the spec's next2 while main has no 0.2 corpus
-        run: |
-          if [ ! -f spec-main/spec/0.2/conformance/examples.json ]; then
-            git -C spec-main fetch --depth 1 origin next2
-            git -C spec-main checkout --quiet FETCH_HEAD
-          fi
 
       # The exit status is discarded HERE and only here: divergence is what is
       # being measured, so a non-zero exit is the expected shape of a
