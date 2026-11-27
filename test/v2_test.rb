@@ -114,7 +114,33 @@ class CarveV2Test < Minitest::Test
     assert_raises(ArgumentError) { Carve.read_stamp("Text") }
     assert_raises(ArgumentError) { Carve.needs_review?("Text") }
     assert_raises(ArgumentError) { Carve.decision_trace("Text") }
-    assert_raises(Carve::IncludeRegionError) { Carve.select_include_region("Text", "x", mode: :carve) }
+  end
+
+  REGION_DOC = "intro\n%% #region setup\none\ntwo\n%% #endregion\n// #region code\nx\n// #endregion\n"
+
+  def test_select_include_region_returns_the_content_lines
+    assert_equal 3..4, Carve.select_include_region(REGION_DOC, "setup", mode: :carve)
+    assert_equal 3..4, Carve.select_include_region(REGION_DOC, "setup")
+    assert_equal 3..4, Carve.select_include_region(REGION_DOC, :setup, mode: "code")
+    assert_equal 7..7, Carve.select_include_region(REGION_DOC, "code", mode: :code)
+    assert_equal 2..1, Carve.select_include_region("%% #region e\n%% #endregion\n", "e", mode: :carve)
+    assert_equal 3..4, Carve.select_include_region("\xFF\n#{REGION_DOC.lines.drop(1).join}".b, "setup")
+  end
+
+  def test_select_include_region_raises_with_the_rule_id
+    [
+      [REGION_DOC, "code", :carve],
+      [REGION_DOC, "missing", :code],
+      ["%% #region a\nx\n", "a", :carve],
+      ["%% #region a\n%% #endregion\n%% #region a\n%% #endregion\n", "a", :code],
+    ].each do |source, name, mode|
+      error = assert_raises(Carve::IncludeRegionError) { Carve.select_include_region(source, name, mode: mode) }
+      assert_equal "include-region-invalid", error.rule
+      assert_kind_of ArgumentError, error
+      assert_includes error.message, name.inspect
+    end
+    error = assert_raises(ArgumentError) { Carve.select_include_region(REGION_DOC, "setup", mode: :markdown) }
+    assert_match(/mode must be/, error.message)
   end
 
   def test_html_import_mode_is_removed_c2_m_008

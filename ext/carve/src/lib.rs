@@ -5,7 +5,7 @@
 mod host;
 mod host_options;
 
-use magnus::{function, prelude::*, Error, RArray, Ruby};
+use magnus::{function, prelude::*, Error, RArray, Ruby, Value};
 use std::any::Any;
 use std::cell::RefCell;
 use std::panic::{self, AssertUnwindSafe};
@@ -63,6 +63,20 @@ fn g_parse_json(source: String) -> Result<String, Error> {
     guard(|| ::carve::tree_json(&source, &::carve::Options::default()))
 }
 
+// `[start, end]` content lines, or the engine's reason when the region is invalid.
+fn g_select_include_region(
+    ruby: &Ruby,
+    source: String,
+    name: String,
+    code: bool,
+) -> Result<Value, Error> {
+    let region = guard(|| ::carve::include::region_lines(&source, &name, code))?;
+    Ok(match region {
+        Ok((start, end)) => ruby.ary_from_vec(vec![start, end]).as_value(),
+        Err(reason) => ruby.str_new(reason).as_value(),
+    })
+}
+
 fn g_panic_probe() -> Result<String, Error> {
     guard(|| panic!("deliberate panic from the Carve extension panic probe"))
 }
@@ -95,6 +109,10 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     module.define_singleton_method("_call_json", function!(g_call_json, 1))?;
     module.define_singleton_method("_parse_json", function!(g_parse_json, 1))?;
     module.define_singleton_method("_render_host", function!(g_render_host, 6))?;
+    module.define_singleton_method(
+        "_select_include_region",
+        function!(g_select_include_region, 3),
+    )?;
     module.define_singleton_method("_panic_probe", function!(g_panic_probe, 0))?;
     Ok(())
 }
