@@ -7,13 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Building the 0.2 binding now requires Rust 1.88 or newer, matching its pinned engine (markup-carve/carve-rs#4444).
-- Port the Ruby binding on `next2` to the unreleased Carve 0.2 Rust JSON API, with a Git SHA pin.
-- Escape raw HTML by default and expose the 0.2 option, diagnostic, tree, and include shapes.
-- Keep the Markdown, plain-text and ANSI writer entry points visible with explicit availability errors until the engine ports them.
-- Pin the renamed engine: the `carve-lang` crate on carve-rs `next2` at `7fb7c249`, where `carve2` used to be.
-- `Carve.to_carve` and `Carve.from_html` work against the engine's canonical writer and HTML importer.
-- `extensions:` and `renderers:` select the engine's standard extensions (`carve.tabs`, `carve.wiki`, `carve.cite`, `carve.imgFence.img`, `carve.imgFence.image`); `Carve::EXTENSIONS` lists them.
+## [0.2.0] - 2026-11-27
+
+The Ruby binding moves to the Carve 0.2 engine: the `carve-lang` crate from carve-rs, bound through its 0.2 JSON API. Trees, diagnostics, options and includes take the 0.2 shapes; [the migration guide](docs/guide.md) maps the 0.1 calls.
+
+### Breaking
+
+- The binding calls the Carve 0.2 Rust engine through its JSON API. The tree, diagnostic, option and include shapes are the 0.2 ones (#261, #264).
+- Raw HTML is escaped by default; pass `raw_html: true` for trusted source. `safe: false` no longer enables it (#261).
+- Ruby 3.2 or newer is required (#295). Building the binding requires Rust 1.88 or newer, matching its engine (#270, markup-carve/carve-rs#4444).
+- `Carve.read_stamp`, `needs_review?` and `decision_trace` have no 0.2 counterpart.
+
+### Improvements
+
+- `Carve.to_carve` and `Carve.from_html` use the engine's canonical writer and HTML importer, and the Markdown, plain-text and ANSI writers are bound (#264, #266).
+- `Carve.from_markdown` imports GitHub Flavored Markdown again; `Carve.import_document(source, from:)` reads `html`, `gfm`, `markdown` or `djot` (#286).
+- `extensions:` and `renderers:` select the engine's standard extensions (`carve.tabs`, `carve.wiki`, `carve.cite`, `carve.imgFence.img`, `carve.imgFence.image` and the navigation extensions); `Carve::EXTENSIONS` lists them (#264, #276, #277).
+- Ruby callables render extension nodes and transform resolved documents through `Carve.render_with_host` and `to_html(renderers:, transforms:)` (#266).
+- `to_html(heading_shift:)` shifts every heading level by 0 to 5 (#282).
+- `Carve.select_include_region` returns the line range of a named include region and raises `Carve::IncludeRegionError` for a missing or malformed marker (#296).
+- `Carve.parse` converts the engine tree to Ruby once instead of repeatedly (#262).
+
+**Full Changelog**: https://github.com/markup-carve/carve-rb/compare/v0.1.14...v0.2.0
 
 ## [0.1.14] - 2026-11-12
 
