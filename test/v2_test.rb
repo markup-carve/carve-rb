@@ -246,6 +246,32 @@ class CarveV2Test < Minitest::Test
     assert_raises(Carve::EngineError) { Carve.to_html("= Chapter\n", heading_shift: 6) }
   end
 
+  def test_include_render_takes_the_core_render_options
+    Dir.mktmpdir("carve-rb-v2-") do |root|
+      page = File.join(root, "page.crv")
+      File.write(page, "= Chapter\n")
+      File.write(File.join(root, "child.crv"), "= Child\n")
+      plain = Carve.to_html("= Chapter\n", heading_shift: 1)
+      assert_equal plain, Carve.to_html_with_includes("= Chapter\n", root: root, source_path: page,
+                                                                   heading_shift: 1).fetch(:value)
+      assert_equal plain, Carve.render_with_includes("= Chapter\n", root: root, source_path: page,
+                                                                  headingShift: 1).fetch(:value)
+      included = Carve.to_html_with_includes("{{ child.crv }}", root: root, source_path: page,
+                                             heading_shift: 2).fetch(:value)
+      assert_includes included, "<h3>Child</h3>"
+      markdown = Carve.render_with_includes("{{ child.crv }}", root: root, source_path: page,
+                                            target: "markdown", heading_shift: 1).fetch(:value)
+      assert_equal Carve.write("= Child\n", target: "markdown", heading_shift: 1), markdown
+      assert_raises(Carve::EngineError) do
+        Carve.to_html_with_includes("= Chapter\n", root: root, source_path: page, heading_shift: 6)
+      end
+      # headingShift is a render option, so the parse stage refuses it as Carve.parse does.
+      assert_raises(Carve::EngineError) do
+        Carve.parse_with_includes("= Chapter\n", root: root, source_path: page, heading_shift: 1)
+      end
+    end
+  end
+
   def test_every_listed_standard_extension_enables
     Carve::EXTENSIONS.each { |name| Carve.to_html("Hi", extensions: [name]) }
     html = Carve.to_html("::: details\nBody\n:::\n", extensions: ["carve.details"],

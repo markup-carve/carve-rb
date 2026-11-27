@@ -13,6 +13,13 @@ class NativeHostTest < Minitest::Test
                          { "type" => "text", "value" => "fallback" }] }] }] }
   end
 
+  def test_native_host_takes_heading_shift
+    keep = ->(tree) { tree }
+    assert_equal Carve.to_html("= Guide\n", heading_shift: 1),
+                 Carve.to_html("= Guide\n", heading_shift: 1, transforms: [keep])
+    assert_raises(ArgumentError) { Carve.to_html("= Guide\n", heading_shift: 6, transforms: [keep]) }
+  end
+
   def test_heading_permalink_transform
     permalink = lambda do |tree|
       tree.fetch("children").each do |node|

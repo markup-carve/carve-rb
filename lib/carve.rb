@@ -220,10 +220,10 @@ module Carve
                              symbols: nil, safe: nil, raw_html: false,
                              url_policy: nil, profile: nil, sections: true,
                              max_depth: nil, max_bytes: nil,
-                             max_resolver_calls: nil, max_warnings: nil)
+                             max_resolver_calls: nil, max_warnings: nil, **options)
       raise ArgumentError, "0.2 includes does not accept max_resolver_calls or max_warnings" if max_resolver_calls || max_warnings
-      config = { includes: include_options(root, source_path, max_depth, max_bytes),
-                 rawHtml: raw_html && safe != true, sections: sections }
+      config = options.merge(includes: include_options(root, source_path, max_depth, max_bytes),
+                             rawHtml: raw_html && safe != true, sections: sections)
       config.merge!(extension_options(extensions, renderers))
       config[:mode] = mode.to_s if mode
       config[:symbols] = stringify(symbols) if symbols
@@ -231,6 +231,9 @@ module Carve
       config[:urlPolicy] = stringify(url_policy) if url_policy
       parse_config = { includes: config.fetch(:includes) }
       parse_config[:extensions] = config[:extensions] if config[:extensions]
+      # Any other core option goes to the stage that makes the value, so the
+      # engine accepts or refuses it as it does on the plain entry points.
+      parse_config.merge!(options) if target.to_s == "ast"
       parsed = call("parseWithDiagnostics", source: source, options: parse_config)
       tree = parsed.fetch("tree")
       if target.to_s == "html"
@@ -243,7 +246,7 @@ module Carve
         diagnostics = parsed.fetch("diagnostics")
         suppressed = parsed.fetch("suppressedDiagnostics")
       else
-        written = call("write", tree: tree, target: target.to_s)
+        written = call("write", options: options, tree: tree, target: target.to_s)
         value = written.fetch("output")
         diagnostics = written.fetch("diagnostics")
         suppressed = 0
