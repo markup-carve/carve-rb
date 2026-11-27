@@ -288,7 +288,7 @@ module Carve
       raise ArgumentError, "mode must be :carve or :code, got #{mode.inspect}" unless %w[carve code].include?(mode)
 
       name = name.to_s
-      result = _select_include_region(source.to_s, name, mode == "code")
+      result = _select_include_region(source_text(source), name, mode == "code")
       if result.is_a?(String)
         raise IncludeRegionError, "#{IncludeRegionError::RULE}: region #{name.inspect} #{result}"
       end

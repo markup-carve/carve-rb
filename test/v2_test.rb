@@ -124,6 +124,7 @@ class CarveV2Test < Minitest::Test
     assert_equal 3..4, Carve.select_include_region(REGION_DOC, :setup, mode: "code")
     assert_equal 7..7, Carve.select_include_region(REGION_DOC, "code", mode: :code)
     assert_equal 2..1, Carve.select_include_region("%% #region e\n%% #endregion\n", "e", mode: :carve)
+    assert_equal 3..4, Carve.select_include_region("\xFF\n#{REGION_DOC.lines.drop(1).join}".b, "setup")
   end
 
   def test_select_include_region_raises_with_the_rule_id
