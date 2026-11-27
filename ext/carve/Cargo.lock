@@ -44,7 +44,7 @@ checksum = "87a0cf66fd1eb2fb7b822cb78370d82303750809bc6ba855f3f58e517d3238db"
 [[package]]
 name = "carve-lang"
 version = "0.1.14"
-source = "git+https://github.com/markup-carve/carve-rs?rev=41596a52cce66502956765bc7805d87de8756f78#41596a52cce66502956765bc7805d87de8756f78"
+source = "git+https://github.com/markup-carve/carve-rs?rev=f2c716211cd273273514d1deffdf3059260325fd#f2c716211cd273273514d1deffdf3059260325fd"
 dependencies = [
  "aho-corasick",
  "bumpalo",
