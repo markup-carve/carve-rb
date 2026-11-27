@@ -272,6 +272,14 @@ class CarveV2Test < Minitest::Test
     end
   end
 
+  def test_lint_upgrade_turns_on_the_migration_notices_c2_w_156
+    source = "a\n\n---\n"
+    codes = ->(**options) { Carve.lint(source, **options).map { |row| row.fetch(:code) } }
+    refute_includes codes.call, "thematic-break-spelling"
+    refute_includes codes.call(upgrade: false), "thematic-break-spelling"
+    assert_includes codes.call(upgrade: true), "thematic-break-spelling"
+  end
+
   def test_every_listed_standard_extension_enables
     Carve::EXTENSIONS.each { |name| Carve.to_html("Hi", extensions: [name]) }
     html = Carve.to_html("::: details\nBody\n:::\n", extensions: ["carve.details"],

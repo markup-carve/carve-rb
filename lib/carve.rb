@@ -201,7 +201,8 @@ module Carve
 
     def lint(source, extensions: nil, root: nil, source_path: nil, rules: nil,
              platforms: nil, max_depth: nil, max_bytes: nil,
-             max_resolver_calls: nil, max_warnings: nil, caption_hints: false)
+             max_resolver_calls: nil, max_warnings: nil, caption_hints: false,
+             upgrade: false)
       unless Array(extensions).empty?
         raise ExtensionUnavailable, "0.2 lint takes no extensions; its options are rules, platforms and includes (C2-W-109)"
       end
@@ -212,6 +213,8 @@ module Carve
       opts[:rules] = stringify(rules) if rules
       opts[:platforms] = platforms if platforms
       opts[:includes] = include_options(root, source_path, max_depth, max_bytes) if root
+      # The 0.1 migration notices of C2-W-156 report only with upgrade: true.
+      opts[:upgrade] = true if upgrade
       symbolize(call("lint", source: source, options: opts).fetch("diagnostics"))
     end
 
