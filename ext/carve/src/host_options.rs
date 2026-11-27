@@ -68,6 +68,13 @@ pub(crate) fn read(value: &Value) -> Result<api::Options, String> {
                     .and_then(|n| usize::try_from(n).ok())
                     .ok_or("maxLosses must be a count")?
             }
+            "headingShift" => {
+                out.heading_shift = item
+                    .as_u64()
+                    .filter(|n| *n <= 5)
+                    .and_then(|n| u8::try_from(n).ok())
+                    .ok_or("headingShift must be a count from 0 to 5")?
+            }
             "urlPolicy" => {
                 let policy = item.as_object().ok_or("urlPolicy must be an object")?;
                 out.url_policy = if policy.len() == 1 {
