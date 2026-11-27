@@ -86,17 +86,21 @@
 # nothing about whether the lag matters. This fails only when the lag CHANGES A
 # TREE, which is the half of the question a commit count cannot answer - a pin
 # fifty commits behind an engine that only refactored passes here.
+#
+# CARVE 0.2 HAS NO tests/corpus. The documents are every Carve input the 0.2
+# conformance corpus states (spec/0.2/conformance: examples.json and
+# clause-cases.json), and each is compared twice: the tree (`carve ast`
+# against Carve.parse's entry point) and the HTML (`carve render` against the
+# gem's render call), both with default options.
 
 require "minitest/autorun"
 require "json"
 require "open3"
 require "tmpdir"
+require "fileutils"
 require "carve"
-require "corpus_population"
 
 class BindingParityTest < Minitest::Test
-  include CorpusPopulation
-
   # A `carve` binary built from carve-rs at MAIN. Not the pinned revision: see
   # the measurement above, where that comparison is green on both pins.
   ENGINE = ENV.fetch("CARVE_ENGINE_BIN", nil)
@@ -116,18 +120,62 @@ class BindingParityTest < Minitest::Test
   # was not asked, and the verdict is then the strict one.
   PUBLISHED = ENV.fetch("CARVE_PUBLISHED_ENGINE", "").strip
 
-  # A corpus directory, deliberately NOT CARVE_SPEC_CORPUS. That one is the
-  # corpus the pinned engine's spec gitlink names, and reading it here would
-  # rebuild the self-consistency this file exists to break.
+  # The spec's spec/0.2/conformance directory at spec MAIN, deliberately not the
+  # copy the pinned engine vendors: reading that here would rebuild the
+  # self-consistency this file exists to break.
   CORPUS = ENV.fetch("CARVE_PARITY_CORPUS", nil)
+
+  # The corpus files that state Carve inputs, and the list each keeps them in.
+  SOURCES = { "examples.json" => "examples", "clause-cases.json" => "cases" }.freeze
 
   # Set by the scheduled job. A stale pin against a newer release is upstream
   # drift, so the verdict is written here for the filer and the test passes;
   # unset (local, any other caller) it fails as before.
   DRIFT_VERDICT_FILE = ENV.fetch("CARVE_DRIFT_VERDICT_FILE", nil)
 
-  def corpus_files
-    Dir.glob(File.join(CORPUS, "*.crv")).sort
+  # Every row of a corpus file that states its input as text, as [id, source].
+  def self.stated_inputs(path, list)
+    rows = JSON.parse(File.read(path, encoding: "UTF-8"), max_nesting: false).fetch(list)
+    rows.filter_map { |row| [row.fetch("id"), row["input"]] if row["input"].is_a?(String) }
+  end
+
+  # One document per distinct input, written under its first id to a directory
+  # of its own, so the engine reads the same bytes the gem is given.
+  def documents
+    @documents ||= begin
+      dir = Dir.mktmpdir("carve-parity")
+      Minitest.after_run { FileUtils.remove_entry(dir) }
+      seen = {}
+      SOURCES.each do |file, list|
+        self.class.stated_inputs(File.join(CORPUS, file), list).each do |id, source|
+          next if seen.key?(source)
+
+          seen[source] = true
+          path = File.join(dir, "#{id}.crv")
+          File.binwrite(path, source)
+        end
+      end
+      Dir.glob(File.join(dir, "*.crv")).sort
+    end
+  end
+
+  # Without this a mistyped CARVE_PARITY_CORPUS or a corpus file that lost its
+  # list compares nothing and reads as clean (markup-carve/carve#755). The
+  # expectation is counted from the corpus files themselves, apart from the
+  # directory the comparison reads.
+  def assert_whole_population(files, what)
+    assert File.directory?(CORPUS), "CARVE_PARITY_CORPUS=#{CORPUS} is not a directory"
+    per_file = SOURCES.to_h do |file, list|
+      path = File.join(CORPUS, file)
+      assert File.exist?(path), "#{path} is missing; CARVE_PARITY_CORPUS must name the spec's spec/0.2/conformance"
+      [file, self.class.stated_inputs(path, list)]
+    end
+    per_file.each do |file, rows|
+      refute_empty rows, "#{File.join(CORPUS, file)} states no Carve input; this is a wiring problem"
+    end
+    declared = per_file.values.flatten(1).map(&:last).uniq.length
+    assert_equal declared, files.length,
+                 "#{what}: #{files.length}, but the conformance corpus states #{declared} distinct inputs."
   end
 
   # The pin, read through the one script that resolves it, so that a failure can
@@ -196,9 +244,10 @@ class BindingParityTest < Minitest::Test
   end
 
   # The engine's own answer for one document, from whichever `carve` binary
-  # the caller is holding the gem to.
+  # the caller is holding the gem to. `--no-includes`: the CLI resolves includes
+  # from the file's directory by default, and the gem's calls carry no resolver.
   def engine_tree(binary, path)
-    stdout, stderr, status = Open3.capture3(binary, "--json", path)
+    stdout, stderr, status = Open3.capture3(binary, "ast", "--no-includes", path)
     # A refusal is an answer, and it has to be comparable to the gem's. Reported
     # rather than swallowed: an engine that refuses every document would
     # otherwise make this run vacuous.
@@ -207,11 +256,29 @@ class BindingParityTest < Minitest::Test
     [:tree, JSON.parse(stdout, max_nesting: false)]
   end
 
+  def engine_html(binary, path)
+    stdout, stderr, status = Open3.capture3(binary, "render", "--no-includes", path, binmode: true)
+    return [:refused, stderr.strip] unless status.success?
+
+    # `carve render` prints the HTML followed by one line feed of its own.
+    html = stdout.force_encoding(Encoding::UTF_8)
+    return [:refused, "render output does not end in the line feed the CLI appends"] unless html.end_with?("\n")
+
+    [:html, html.delete_suffix("\n")]
+  end
+
   # This gem's answer, through the entry point Carve.parse uses. Compared as
   # parsed JSON rather than as bytes: key order and whitespace are not part of
   # the contract, the tree is.
   def gem_tree(source)
-    [:tree, JSON.parse(Carve._to_ast_json(source), max_nesting: false)]
+    [:tree, JSON.parse(Carve._parse_json(source), max_nesting: false)]
+  rescue StandardError => e
+    [:refused, e.message]
+  end
+
+  # HTML is compared byte for byte, as the conformance corpus compares it.
+  def gem_html(source)
+    [:html, Carve.call("render", source: source).fetch("html")]
   rescue StandardError => e
     [:refused, e.message]
   end
@@ -253,19 +320,38 @@ class BindingParityTest < Minitest::Test
 
   def divergences(binary, files)
     files.filter_map do |path|
-      mine = gem_tree(File.read(path))
-      theirs = engine_tree(binary, path)
-      next if mine == theirs
-
-      detail =
-        if mine.first == :tree && theirs.first == :tree
-          first_difference(mine.last, theirs.last)
-        else
-          "the gem #{mine.first == :refused ? "refused (#{mine.last})" : "parsed"}, " \
-            "the engine #{theirs.first == :refused ? "refused (#{theirs.last})" : "parsed"}"
-        end
-      "  #{File.basename(path, ".crv")}: #{detail}"
+      source = File.read(path, encoding: "UTF-8")
+      details = [
+        tree_detail(gem_tree(source), engine_tree(binary, path)),
+        html_detail(gem_html(source), engine_html(binary, path)),
+      ].compact
+      "  #{File.basename(path, ".crv")}: #{details.join('; ')}" unless details.empty?
     end
+  end
+
+  def tree_detail(mine, theirs)
+    return if mine == theirs
+    return "tree #{first_difference(mine.last, theirs.last)}" if mine.first == :tree && theirs.first == :tree
+
+    "tree: #{refusal_detail(mine, theirs, 'parsed')}"
+  end
+
+  def html_detail(mine, theirs)
+    return if mine == theirs
+    return "html differs at byte #{first_byte_difference(mine.last, theirs.last)}" if mine.first == :html && theirs.first == :html
+
+    "html: #{refusal_detail(mine, theirs, 'rendered')}"
+  end
+
+  def refusal_detail(mine, theirs, done)
+    "the gem #{mine.first == :refused ? "refused (#{mine.last})" : done}, " \
+      "the engine #{theirs.first == :refused ? "refused (#{theirs.last})" : done}"
+  end
+
+  def first_byte_difference(mine, theirs)
+    a = mine.b
+    b = theirs.b
+    (0...[a.length, b.length].min).find { |i| a.getbyte(i) != b.getbyte(i) } || [a.length, b.length].min
   end
 
   # The skip below is a convenience for a plain checkout with no carve-rs build
@@ -313,13 +399,13 @@ class BindingParityTest < Minitest::Test
     assert File.executable?(PINNED_ENGINE),
            "CARVE_PINNED_ENGINE_BIN=#{PINNED_ENGINE} is not an executable."
 
-    files = corpus_files
-    assert_whole_corpus(CORPUS, files.length, "corpus documents compared against the pinned engine")
+    files = documents
+    assert_whole_population(files, "corpus documents compared against the pinned engine")
 
     assert_empty divergences(PINNED_ENGINE, files),
-                 "this gem and the carve-rs revision it embeds disagree on the tree. Both sides " \
+                 "this gem and the carve-rs revision it embeds disagree on the tree or the HTML. Both sides " \
                  "are the same engine, so this is the binding: ext/carve/src/lib.rs builds its " \
-                 "own Options for `_to_ast_json` and `carve --json` builds its own, and those " \
+                 "own Options for `_parse_json` and `_call_json`, and `carve ast` / `carve render` build their own, and those " \
                  "two have to ask for the same thing. No pin bump and no engine release closes " \
                  "this one."
   end
@@ -368,21 +454,16 @@ class BindingParityTest < Minitest::Test
            "CARVE_ENGINE_BIN=#{ENGINE} is not an executable. Build it from a carve-rs checkout " \
            "at main: `cargo build --release --bin carve`."
 
-    files = corpus_files
-
-    # Without this, a mistyped or truncated corpus produces an empty file list,
-    # the comparison runs over nothing, and the run reads as clean - the
-    # variant-2 defect catalogued in markup-carve/carve#755, which this gem has
-    # already shipped three spellings of.
-    assert_whole_corpus(CORPUS, files.length, "corpus documents compared against carve-rs")
+    files = documents
+    assert_whole_population(files, "corpus documents compared against carve-rs")
 
     diverging = divergences(ENGINE, files)
     version = pinned_version
     window = diverging.any? && self.class.publication_window?(version, PUBLISHED)
     report_publication_window(diverging, files.length, version) if window
 
-    message = "#{diverging.length} of #{files.length} corpus documents parse to a different " \
-              "tree in this gem than in carve-rs#{ENGINE_REV ? " #{ENGINE_REV}" : ""}:\n" \
+    message = "#{diverging.length} of #{files.length} corpus documents parse or render " \
+              "differently in this gem than in carve-rs#{ENGINE_REV ? " #{ENGINE_REV}" : ""}:\n" \
               "#{diverging.join("\n")}\n" \
               "A binding has no vote of its own: carve-rs is right by definition here, so " \
               "every one of these is this gem's.\n" \
