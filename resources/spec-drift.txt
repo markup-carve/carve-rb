@@ -57,3 +57,4 @@
 # EMPTY IS THE GOAL STATE. An empty file means this gem renders every document
 # in spec main exactly as the spec does, and it is the only state that may be
 # tagged.
+CC-2485 # undeclared at spec main a032a6f on 2026-11-27; the pinned engine rev 41596a52cce66502956765bc7805d87de8756f78 predates it
