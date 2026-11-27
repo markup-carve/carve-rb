@@ -26,7 +26,13 @@ module Carve
 
   class WriterUnavailable < EngineError; end
   class ExtensionUnavailable < ArgumentError; end
-  class IncludeRegionError < ArgumentError; end
+  # Raised by .select_include_region when the region is missing or a marker is
+  # malformed or unmatched. +rule+ is the engine's warning rule id.
+  class IncludeRegionError < ArgumentError
+    RULE = "include-region-invalid"
+
+    def rule = RULE
+  end
 
   # The standard extensions the engine enables by name over JSON (C2-X-039).
   EXTENSIONS = %w[
@@ -273,8 +279,21 @@ module Carve
       call("importDocument", source: source, options: options, from: from.to_s)
     end
 
-    def select_include_region(_source, _name, mode:)
-      raise IncludeRegionError, "standalone region selection is not part of Carve 0.2; use an include directive (#{mode})"
+    # The 1-based, inclusive Range of content lines of <tt>@region:name</tt>,
+    # resolved with the engine's marker rules (C2-N-037 to C2-N-043). An empty
+    # region is an empty Range such as +2..1+. +mode: :code+ also reads the
+    # source-comment markers.
+    def select_include_region(source, name, mode: :carve)
+      mode = mode.to_s
+      raise ArgumentError, "mode must be :carve or :code, got #{mode.inspect}" unless %w[carve code].include?(mode)
+
+      name = name.to_s
+      result = _select_include_region(source.to_s, name, mode == "code")
+      if result.is_a?(String)
+        raise IncludeRegionError, "#{IncludeRegionError::RULE}: region #{name.inspect} #{result}"
+      end
+
+      result[0]..result[1]
     end
 
     def decision_trace(_source)
