@@ -316,9 +316,9 @@ jobs:
       - name: The pinned engine is real and not stale
         if: github.event_name != 'pull_request'
         run: |
-          python3 carve-rs/tools/check-engine-pin.py \
-            --engine carve-rs --github --max-age-days 14 \
-            --form cargo --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock
+          python3 scripts/check-branch-engine-pin.py \
+            --engine carve-rs --branch main --max-age-days 14 \
+            --manifest ext/carve/Cargo.toml --lock ext/carve/Cargo.lock
 
       - name: Resolve the spec commit the pinned engine pins
         id: pin
