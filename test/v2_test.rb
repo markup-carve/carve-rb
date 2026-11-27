@@ -269,6 +269,9 @@ class CarveV2Test < Minitest::Test
       assert_raises(Carve::EngineError) do
         Carve.parse_with_includes("= Chapter\n", root: root, source_path: page, heading_shift: 1)
       end
+      assert_raises(ArgumentError) do
+        Carve.parse_with_includes("= Chapter\n", root: root, source_path: page, includes: { root: "/" })
+      end
     end
   end
 

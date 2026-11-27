@@ -225,6 +225,7 @@ module Carve
                              max_depth: nil, max_bytes: nil,
                              max_resolver_calls: nil, max_warnings: nil, **options)
       raise ArgumentError, "0.2 includes does not accept max_resolver_calls or max_warnings" if max_resolver_calls || max_warnings
+      raise ArgumentError, "the include options come from root:, source_path:, max_depth: and max_bytes:" if options.key?(:includes) || options.key?("includes")
       config = options.merge(includes: include_options(root, source_path, max_depth, max_bytes),
                              rawHtml: raw_html && safe != true, sections: sections)
       config.merge!(extension_options(extensions, renderers))
@@ -236,7 +237,7 @@ module Carve
       parse_config[:extensions] = config[:extensions] if config[:extensions]
       # Any other core option goes to the stage that makes the value, so the
       # engine accepts or refuses it as it does on the plain entry points.
-      parse_config.merge!(options) if target.to_s == "ast"
+      parse_config = options.merge(parse_config) if target.to_s == "ast"
       parsed = call("parseWithDiagnostics", source: source, options: parse_config)
       tree = parsed.fetch("tree")
       if target.to_s == "html"
