@@ -16,6 +16,9 @@ jobs:
     name: build (Ruby ${{ matrix.ruby }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # Ruby 3.2's prebuilt headers reach `bool` without stdbool.h under bindgen.
+      BINDGEN_EXTRA_CLANG_ARGS: -include stdbool.h
     strategy:
       fail-fast: false
       matrix:

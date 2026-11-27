@@ -16,7 +16,6 @@ on:
       - "scripts/pinned-spec-commit.py"
       - "scripts/newest-published-engine.py"
       - "test/binding_parity_test.rb"
-      - "test/corpus_population.rb"
       - "Gemfile"
       - "Rakefile"
       - "carve.gemspec"
@@ -112,8 +111,8 @@ jobs:
           # here already spell it this way.
           fetch-depth: 0
 
-      # main, deliberately: a document the spec gained after the pinned engine's
-      # `tests/spec` gitlink is precisely the one the gated corpus cannot hold,
+      # main, deliberately: a document the spec gained after the copy the pinned
+      # engine vendors in `spec-conformance/` is precisely the one the gated corpus cannot hold,
       # and one of the three documents the 2026-08-22 drift showed up on was
       # exactly that.
       - name: Check out the spec corpus at main
@@ -215,7 +214,7 @@ jobs:
           CARVE_ENGINE_BIN: ${{ runner.temp }}/engines/carve-main
           CARVE_ENGINE_REV: ${{ steps.engine.outputs.rev }}
           CARVE_PINNED_ENGINE_BIN: ${{ runner.temp }}/engines/carve-pinned
-          CARVE_PARITY_CORPUS: ${{ github.workspace }}/spec/tests/corpus
+          CARVE_PARITY_CORPUS: ${{ github.workspace }}/spec/spec/0.2/conformance
           CARVE_PUBLISHED_ENGINE: ${{ steps.published.outputs.version }}
           CARVE_REQUIRE_PARITY: "1"
           CARVE_DRIFT_VERDICT_FILE: ${{ runner.temp }}/binding-drift.txt
